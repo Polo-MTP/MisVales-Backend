@@ -53,10 +53,8 @@ final class SolicitudProveedorController extends ApiController
         $user = $request->user();
 
         // Validación de permisos por sucursal en consulta individual
-        if ($user->role?->name !== 'Gerente General' && $user->role?->name !== 'Administrador') {
-            if ($user->sucursal_id !== $solicitud->sucursal_id) {
-                return $this->forbidden('Acceso Denegado. No tienes permisos para consultar solicitudes pertenecientes a otra sucursal.');
-            }
+        if ($user->role?->name !== 'Gerente General' && $user->role?->name !== 'Administrador' && $user->sucursal_id !== $solicitud->sucursal_id) {
+            return $this->forbidden('Acceso Denegado. No tienes permisos para consultar solicitudes pertenecientes a otra sucursal.');
         }
 
         $solicitud->load(['datosPersonales.direccion', 'sucursal', 'coordinador', 'verificador', 'gerente', 'evidencias', 'logs.usuario']);

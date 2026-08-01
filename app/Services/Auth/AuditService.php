@@ -15,8 +15,7 @@ final class AuditService
     public function getHistoricalLoginData(int $perPage = 10): LengthAwarePaginator
     {
         return LoginAttempt::query()
-            ->with('user:id,name,email')
-            ->orderBy('created_at', 'desc')
+            ->with('user:id,name,email')->latest()
             ->paginate($perPage);
     }
 }

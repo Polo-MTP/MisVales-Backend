@@ -14,7 +14,7 @@ final class EmailOtpService
     /**
      * Verifica la validez del código OTP de correo electrónico ingresado por el usuario.
      *
-     * @param array{user_id: int, code: string} $data
+     * @param  array{user_id: int, code: string}  $data
      * @return array<string, mixed>
      */
     public function verify(array $data): array
@@ -38,7 +38,7 @@ final class EmailOtpService
             ];
         }
 
-        $cachedCode = Cache::get('email_otp_' . $userId);
+        $cachedCode = Cache::get('email_otp_'.$userId);
 
         if (! $cachedCode) {
             Log::debug('EmailOtpService: El código OTP ha expirado o no se encuentra en caché', [
@@ -74,7 +74,7 @@ final class EmailOtpService
             ];
         }
 
-        Cache::forget('email_otp_' . $userId);
+        Cache::forget('email_otp_'.$userId);
 
         /** @var User $user */
         $user = User::query()->with('role')->findOrFail($userId);

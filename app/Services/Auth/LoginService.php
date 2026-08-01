@@ -8,17 +8,16 @@ use App\Models\LoginAttempt;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\URL;
 
 final class LoginService
 {
     /**
      * Realiza el proceso de inicio de sesión validando credenciales y evaluando requerimientos de MFA.
      *
-     * @param array{email: string, password: string} $data
+     * @param  array{email: string, password: string}  $data
      * @return array<string, mixed>
      */
-    public function login(array $data, string $ipAddress, ?string $userAgent): array
+    public function login(array $data, string $ipAddress): array
     {
         Log::debug('LoginService: Iniciando autenticación de usuario', [
             'email' => $data['email'],
@@ -33,7 +32,7 @@ final class LoginService
                 'email' => $data['email'],
             ]);
 
-            $this->guardarEnHistorial(null, $data['email'], $ipAddress, $userAgent, 'failed_user_not_found');
+            $this->guardarEnHistorial(null, $data['email'], 'failed_user_not_found');
 
             return [
                 'success' => false,
@@ -43,7 +42,7 @@ final class LoginService
         }
 
         if (! $user->is_active) {
-            $this->guardarEnHistorial($user->id, $user->email, $ipAddress, $userAgent, 'account_inactive');
+            $this->guardarEnHistorial($user->id, $user->email, 'account_inactive');
 
             return [
                 'success' => false,
@@ -58,13 +57,13 @@ final class LoginService
                 'locked_until' => $user->locked_until,
             ]);
 
-            $this->guardarEnHistorial($user->id, $user->email, $ipAddress, $userAgent, 'account_locked');
+            $this->guardarEnHistorial($user->id, $user->email, 'account_locked');
 
             return $this->generarMensajeDeBloqueo($user);
         }
 
         if (! Hash::check($data['password'], $user->password)) {
-            $this->procesarContrasenaIncorrecta($user, $ipAddress, $userAgent);
+            $this->procesarContrasenaIncorrecta($user);
 
             Log::debug('LoginService: Contraseña incorrecta ingresada', [
                 'email' => $user->email,
@@ -78,7 +77,32 @@ final class LoginService
             ];
         }
 
-        return $this->procesarLoginExitoso($user, $ipAddress, $userAgent);
+        return $this->procesarLoginExitoso($user);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function logout(?User $user): array
+    {
+        Log::debug('LoginService: Iniciando proceso de cierre de sesión', [
+            'user_id' => $user?->id,
+            'email' => $user?->email,
+        ]);
+
+        if ($user && method_exists($user, 'currentAccessToken') && $user->currentAccessToken()) {
+            $user->currentAccessToken()->delete();
+        }
+
+        Log::debug('LoginService: Sesión cerrada exitosamente', [
+            'user_id' => $user?->id,
+        ]);
+
+        return [
+            'success' => true,
+            'message' => 'Sesión cerrada exitosamente.',
+            'code' => 200,
+        ];
     }
 
     private function laCuentaEstaBloqueada(User $user): bool
@@ -95,12 +119,12 @@ final class LoginService
 
         return [
             'success' => false,
-            'message' => "Tu cuenta está bloqueada. Intenta de nuevo en {$minutosRestantes} minutos.",
+            'message' => sprintf('Tu cuenta está bloqueada. Intenta de nuevo en %d minutos.', $minutosRestantes),
             'code' => 403,
         ];
     }
 
-    private function procesarContrasenaIncorrecta(User $user, string $ipAddress, ?string $userAgent): void
+    private function procesarContrasenaIncorrecta(User $user): void
     {
         $user->failed_attempts += 1;
 
@@ -114,13 +138,13 @@ final class LoginService
         }
 
         $user->save();
-        $this->guardarEnHistorial($user->id, $user->email, $ipAddress, $userAgent, 'failed_password');
+        $this->guardarEnHistorial($user->id, $user->email, 'failed_password');
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function procesarLoginExitoso(User $user, string $ipAddress, ?string $userAgent): array
+    private function procesarLoginExitoso(User $user): array
     {
         Log::debug('LoginService: Procesando login exitoso del primer factor', [
             'email' => $user->email,
@@ -131,7 +155,7 @@ final class LoginService
         $user->locked_until = null;
         $user->save();
 
-        $this->guardarEnHistorial($user->id, $user->email, $ipAddress, $userAgent, 'success_factor_1');
+        $this->guardarEnHistorial($user->id, $user->email, 'success_factor_1');
 
         // MFA desactivado temporalmente para pruebas directas en Postman / desarrollo
         /*
@@ -162,86 +186,8 @@ final class LoginService
         ];
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function generarRetoMfa(User $user): array
-    {
-        Log::debug('LoginService: Generando reto MFA para el usuario', [
-            'email' => $user->email,
-        ]);
-
-        $mfaMethod = $user->mfaMethods()
-            ->whereHas('type', function ($q): void {
-                $q->where('type', 'totp');
-            })
-            ->where('factor_step', 2)
-            ->where('is_verified', true)
-            ->where('is_active', true)
-            ->first();
-
-        if (! $mfaMethod) {
-            Log::debug('LoginService: MFA no configurado para el usuario. Generando URL de configuración firmada', [
-                'email' => $user->email,
-            ]);
-
-            $signedUrl = URL::temporarySignedRoute(
-                'api.v1.mfa.setup',
-                now()->addMinutes(10),
-                ['email' => $user->email]
-            );
-
-            return [
-                'success' => true,
-                'requires_setup' => true,
-                'setup_url' => $signedUrl,
-                'message' => 'MFA no configurado. Requiere vincular la app de autenticación.',
-                'code' => 200,
-            ];
-        }
-
-        Log::debug('LoginService: Reto MFA TOTP generado', [
-            'email' => $user->email,
-            'mfa_method_id' => $mfaMethod->id,
-        ]);
-
-        return [
-            'success' => true,
-            'requires_mfa' => true,
-            'step' => 2,
-            'mfa_method_id' => $mfaMethod->id,
-            'message' => 'Contraseña correcta. Ingresa el código de tu app de autenticación.',
-            'code' => 200,
-        ];
-    }
-
-    private function guardarEnHistorial(?int $userId, string $email, string $ipAddress, ?string $userAgent, string $status): void
+    private function guardarEnHistorial(?int $userId, string $email, string $status): void
     {
         LoginAttempt::record($userId, $email, $status, 1);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function logout(?User $user): array
-    {
-        Log::debug('LoginService: Iniciando proceso de cierre de sesión', [
-            'user_id' => $user?->id,
-            'email' => $user?->email,
-        ]);
-
-        if ($user && method_exists($user, 'currentAccessToken') && $user->currentAccessToken()) {
-            $user->currentAccessToken()->delete();
-        }
-
-        Log::debug('LoginService: Sesión cerrada exitosamente', [
-            'user_id' => $user?->id,
-        ]);
-
-        return [
-            'success' => true,
-            'message' => 'Sesión cerrada exitosamente.',
-            'code' => 200,
-        ];
     }
 }

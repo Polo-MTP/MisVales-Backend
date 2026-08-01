@@ -17,13 +17,14 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use PragmaRX\Google2FA\Google2FA;
+use Throwable;
 
 final class MfaService
 {
     /**
      * Verifica la validez de un código MFA y procesa el paso siguiente (3FA o login final).
      *
-     * @param array{mfa_method_id: string, code: string} $data
+     * @param  array{mfa_method_id: string, code: string}  $data
      * @return array<string, mixed>
      */
     public function verify(array $data): array
@@ -88,18 +89,18 @@ final class MfaService
                 'email' => $user->email,
             ]);
 
-            $otpCode = str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
-            Cache::put('email_otp_' . $user->id, $otpCode, 300);
+            $otpCode = mb_str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
+            Cache::put('email_otp_'.$user->id, $otpCode, 300);
 
             try {
                 Mail::to($user->email)->send(new ThirdFactorMail($otpCode));
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 Log::error('MfaService: Error al enviar email de 3er factor', [
                     'user_id' => $user->id,
                     'error' => $e->getMessage(),
                 ]);
 
-                LoginAttempt::record($user->id, $user->email, 'failed_mfa_mail_error', 2, 'Error enviando correo de tercer factor: ' . $e->getMessage());
+                LoginAttempt::record($user->id, $user->email, 'failed_mfa_mail_error', 2, 'Error enviando correo de tercer factor: '.$e->getMessage());
 
                 return [
                     'success' => false,

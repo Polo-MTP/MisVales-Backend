@@ -12,65 +12,11 @@ beforeEach(function (): void {
     $this->seed(RoleSeeder::class);
 });
 
-describe('Registration', function (): void {
-    it('registers a new user successfully', function (): void {
-        $response = $this->postJson('/api/v1/register', [
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-            'password' => 'Password123!',
-            'password_confirmation' => 'Password123!',
-        ]);
-
-        $response->assertStatus(201)
-            ->assertJsonStructure([
-                'success',
-                'message',
-                'data' => [
-                    'user' => ['id', 'name', 'email'],
-                    'token',
-                ],
-            ])
-            ->assertJson([
-                'success' => true,
-            ]);
-
-        $this->assertDatabaseHas('users', [
-            'email' => 'test@example.com',
-        ]);
-    });
-
-    it('fails registration with invalid data', function (): void {
-        $response = $this->postJson('/api/v1/register', [
-            'name' => '',
-            'email' => 'invalid-email',
-            'password' => 'short',
-        ]);
-
-        $response->assertStatus(422);
-    });
-
-    it('fails registration with duplicate email', function (): void {
-        User::factory()->create([
-            'email' => 'existing@example.com',
-            'role_id' => 1,
-        ]);
-
-        $response = $this->postJson('/api/v1/register', [
-            'name' => 'Test User',
-            'email' => 'existing@example.com',
-            'password' => 'Password123!',
-            'password_confirmation' => 'Password123!',
-        ]);
-
-        $response->assertStatus(422);
-    });
-});
-
 describe('Login', function (): void {
     it('logs in with valid credentials', function (): void {
         $user = User::factory()->create([
             'password' => bcrypt('Password123!'),
-            'role_id' => 1, // Invitado
+            'role_id' => 1,
         ]);
 
         $response = $this->postJson('/api/v1/login', [

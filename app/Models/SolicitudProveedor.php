@@ -4,32 +4,32 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+#[Fillable([
+    'datos_id',
+    'sucursal_id',
+    'estado',
+    'cumple',
+    'comentario_verificador',
+    'fecha_verificacion',
+    'coordinador_id',
+    'verificador_id',
+    'gerente_id',
+    'comentario_gerente',
+    'decision_gerente',
+    'limite_credito_asignado',
+    'fecha_decision',
+])]
+#[Table(table: 'solicitudes_proveedor')]
 final class SolicitudProveedor extends Model
 {
     use HasFactory;
-
-    protected $table = 'solicitudes_proveedor';
-
-    protected $fillable = [
-        'datos_id',
-        'sucursal_id',
-        'estado',
-        'cumple',
-        'comentario_verificador',
-        'fecha_verificacion',
-        'coordinador_id',
-        'verificador_id',
-        'gerente_id',
-        'comentario_gerente',
-        'decision_gerente',
-        'limite_credito_asignado',
-        'fecha_decision',
-    ];
 
     protected $casts = [
         'cumple' => 'boolean',

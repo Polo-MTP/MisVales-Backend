@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\CheckRole;
 use App\Http\Middleware\EnsureEmailVerified;
+use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\LogApiRequests;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -21,9 +24,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'force.json' => ForceJsonResponse::class,
             'log.api' => LogApiRequests::class,
             'verified' => EnsureEmailVerified::class,
-            'active' => \App\Http\Middleware\EnsureUserIsActive::class,
-            'role' => \App\Http\Middleware\CheckRole::class,
-            'security.headers' => \App\Http\Middleware\SecurityHeaders::class,
+            'active' => EnsureUserIsActive::class,
+            'role' => CheckRole::class,
+            'security.headers' => SecurityHeaders::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

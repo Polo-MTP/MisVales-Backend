@@ -57,23 +57,6 @@ final class User extends Authenticatable implements MustVerifyEmail
 
     use Notifiable;
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
-    protected function casts(): array
-    {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            'is_active' => 'boolean',
-            'is_locked' => 'boolean',
-            'failed_attempts' => 'integer',
-            'locked_until' => 'datetime',
-        ];
-    }
-
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
@@ -107,5 +90,22 @@ final class User extends Authenticatable implements MustVerifyEmail
     public function loginAttempts(): HasMany
     {
         return $this->hasMany(LoginAttempt::class);
+    }
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+            'is_active' => 'boolean',
+            'is_locked' => 'boolean',
+            'failed_attempts' => 'integer',
+            'locked_until' => 'datetime',
+        ];
     }
 }

@@ -4,23 +4,24 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+#[Fillable([
+    'user_id',
+    'session_id',
+    'action',
+    'resource',
+])]
+#[Table(table: 'audit_log')]
 final class AuditLog extends Model
 {
-    use HasFactory, HasUuids;
-
-    protected $table = 'audit_log';
-
-    protected $fillable = [
-        'user_id',
-        'session_id',
-        'action',
-        'resource',
-    ];
+    use HasFactory;
+    use HasUuids;
 
     public function user(): BelongsTo
     {

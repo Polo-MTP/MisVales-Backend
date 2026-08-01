@@ -18,7 +18,7 @@ return new class extends Migration
             $table->boolean('cumple')->nullable();
             $table->text('comentario_verificador')->nullable();
             $table->timestamp('fecha_verificacion')->nullable();
-            
+
             $table->foreignId('coordinador_id')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('verificador_id')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('gerente_id')->nullable()->constrained('users')->nullOnDelete();
@@ -27,7 +27,7 @@ return new class extends Migration
             $table->enum('decision_gerente', ['pendiente', 'aprobado', 'rechazado'])->default('pendiente');
             $table->decimal('limite_credito_asignado', 12, 2)->nullable();
             $table->timestamp('fecha_decision')->nullable();
-            
+
             $table->timestamps();
         });
     }

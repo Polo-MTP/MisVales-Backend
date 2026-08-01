@@ -24,7 +24,7 @@ final class CheckRole
         if (! in_array($user->role->name, $roles, true)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Acceso Denegado. Tu rol (' . $user->role->name . ') no tiene privilegios para esta acción.',
+                'message' => 'Acceso Denegado. Tu rol ('.$user->role->name.') no tiene privilegios para esta acción.',
             ], Response::HTTP_FORBIDDEN);
         }
 

@@ -28,6 +28,7 @@ final class Recaptcha implements ValidationRule
                 ]);
         } catch (Throwable) {
             $fail('No se pudo verificar el reCAPTCHA debido a problemas de conexión con el servicio de verificación.');
+
             return;
         }
 
@@ -36,6 +37,7 @@ final class Recaptcha implements ValidationRule
 
         if (! isset($body['success']) || ! $body['success']) {
             $fail('La verificación anti-robots (reCAPTCHA) ha fallado. Intenta de nuevo.');
+
             return;
         }
 

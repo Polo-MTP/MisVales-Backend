@@ -22,7 +22,7 @@ final class SolicitudProveedorService
      * Captura la solicitud inicial de un nuevo proveedor realizada por un Coordinador.
      * Asigna automáticamente la sucursal del coordinador a la solicitud.
      *
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     public function crearSolicitud(array $data, User $coordinador): SolicitudProveedor
     {
@@ -107,20 +107,18 @@ final class SolicitudProveedorService
      * Verificación física en campo realizada por un Verificador.
      * Si los datos fueron modificados respecto a lo capturado por el Coordinador, registra el audit log del antes y después.
      *
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     public function verificarSolicitud(SolicitudProveedor $solicitud, array $data, User $verificador): SolicitudProveedor
     {
         // Validación de permisos por sucursal: Solo Gerente General o Administrador pueden verificar de otras sucursales.
-        if ($verificador->role?->name !== 'Gerente General' && $verificador->role?->name !== 'Administrador') {
-            if ($verificador->sucursal_id !== $solicitud->sucursal_id) {
-                Log::warning('SolicitudProveedorService: Intento de verificación en otra sucursal denegado', [
-                    'verificador_id' => $verificador->id,
-                    'verificador_sucursal' => $verificador->sucursal_id,
-                    'solicitud_sucursal' => $solicitud->sucursal_id,
-                ]);
-                abort(403, 'Acceso Denegado. No tienes permisos para gestionar solicitudes pertenecientes a otra sucursal.');
-            }
+        if ($verificador->role?->name !== 'Gerente General' && $verificador->role?->name !== 'Administrador' && $verificador->sucursal_id !== $solicitud->sucursal_id) {
+            Log::warning('SolicitudProveedorService: Intento de verificación en otra sucursal denegado', [
+                'verificador_id' => $verificador->id,
+                'verificador_sucursal' => $verificador->sucursal_id,
+                'solicitud_sucursal' => $solicitud->sucursal_id,
+            ]);
+            abort(403, 'Acceso Denegado. No tienes permisos para gestionar solicitudes pertenecientes a otra sucursal.');
         }
 
         Log::debug('SolicitudProveedorService: Iniciando proceso de verificación', [
@@ -156,6 +154,7 @@ final class SolicitudProveedorService
                         $datosPersonales->{$campo} = $nuevoValor;
                     }
                 }
+
                 $datosPersonales->save();
             }
 
@@ -179,6 +178,7 @@ final class SolicitudProveedorService
                         $direccion->{$campo} = $nuevoValor;
                     }
                 }
+
                 $direccion->save();
             }
 
@@ -220,20 +220,18 @@ final class SolicitudProveedorService
      * Gerente de Sucursal solo puede aprobar solicitudes pertenecientes a su sucursal.
      * Si es aprobado, crea la cuenta de usuario Distribuidora asignada a esa sucursal.
      *
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     public function aprobarORechazar(SolicitudProveedor $solicitud, array $data, User $gerente): SolicitudProveedor
     {
         // Validación de permisos por sucursal: Gerente de Sucursal solo gestiona su sucursal.
-        if ($gerente->role?->name !== 'Gerente General') {
-            if ($gerente->sucursal_id !== $solicitud->sucursal_id) {
-                Log::warning('SolicitudProveedorService: Intento de aprobación en otra sucursal denegado', [
-                    'gerente_id' => $gerente->id,
-                    'gerente_sucursal' => $gerente->sucursal_id,
-                    'solicitud_sucursal' => $solicitud->sucursal_id,
-                ]);
-                abort(403, 'Acceso Denegado. Como Gerente de Sucursal solo puedes aprobar o rechazar solicitudes de tu propia sucursal.');
-            }
+        if ($gerente->role?->name !== 'Gerente General' && $gerente->sucursal_id !== $solicitud->sucursal_id) {
+            Log::warning('SolicitudProveedorService: Intento de aprobación en otra sucursal denegado', [
+                'gerente_id' => $gerente->id,
+                'gerente_sucursal' => $gerente->sucursal_id,
+                'solicitud_sucursal' => $solicitud->sucursal_id,
+            ]);
+            abort(403, 'Acceso Denegado. Como Gerente de Sucursal solo puedes aprobar o rechazar solicitudes de tu propia sucursal.');
         }
 
         Log::debug('SolicitudProveedorService: Procesando decisión de Gerencia', [
@@ -253,7 +251,7 @@ final class SolicitudProveedorService
                 // Crear la cuenta de usuario para la distribuidora asignada a la sucursal de la solicitud
                 /** @var User $distribuidoraUser */
                 $distribuidoraUser = User::query()->create([
-                    'name' => $solicitud->datosPersonales->nombre . ' ' . $solicitud->datosPersonales->apellido_paterno,
+                    'name' => $solicitud->datosPersonales->nombre.' '.$solicitud->datosPersonales->apellido_paterno,
                     'email' => $data['email'],
                     'password' => Hash::make($data['password']),
                     'role_id' => $distribuidoraRole?->id,

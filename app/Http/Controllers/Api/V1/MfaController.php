@@ -94,7 +94,7 @@ final class MfaController extends ApiController
     {
         $email = $request->query('email');
 
-        if (! is_string($email) || empty($email)) {
+        if (! is_string($email) || ($email === '' || $email === '0')) {
             return $this->error('El parámetro email es obligatorio.', 400);
         }
 
