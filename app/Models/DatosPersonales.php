@@ -21,10 +21,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'fecha_nacimiento',
     'lugar_nacimiento',
 ])]
-#[Table(table: 'datos_personales')]
 final class DatosPersonales extends Model
 {
     use HasFactory;
+
+    protected $table = 'datos_personales';
 
     protected $casts = [
         'fecha_nacimiento' => 'date',

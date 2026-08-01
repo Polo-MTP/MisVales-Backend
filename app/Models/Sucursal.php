@@ -16,10 +16,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'es_matriz',
     'is_active',
 ])]
-#[Table(table: 'sucursales')]
 final class Sucursal extends Model
 {
     use HasFactory;
+
+    protected $table = 'sucursales';
 
     protected $casts = [
         'es_matriz' => 'boolean',

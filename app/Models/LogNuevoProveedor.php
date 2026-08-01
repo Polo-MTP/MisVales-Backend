@@ -23,10 +23,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'accion',
     'motivo',
 ])]
-#[Table(table: 'log_nuevo_proveedor')]
 final class LogNuevoProveedor extends Model
 {
     use HasFactory;
+
+    protected $table = 'log_nuevo_proveedor';
 
     protected $casts = [
         'fecha_hora' => 'datetime',

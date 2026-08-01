@@ -17,11 +17,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'action',
     'resource',
 ])]
-#[Table(table: 'audit_log')]
 final class AuditLog extends Model
 {
     use HasFactory;
     use HasUuids;
+
+    protected $table = 'audit_log';
 
     public function user(): BelongsTo
     {

@@ -18,10 +18,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'asignado_por',
     'motivo',
 ])]
-#[Table(table: 'historial_coordinador')]
 final class HistorialCoordinador extends Model
 {
     use HasFactory;
+
+    protected $table = 'historial_coordinador';
 
     protected $casts = [
         'fecha_inicio' => 'datetime',

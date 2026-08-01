@@ -19,10 +19,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'estado',
     'ciudad',
 ])]
-#[Table(table: 'direcciones')]
 final class Direccion extends Model
 {
     use HasFactory;
+
+    protected $table = 'direcciones';
 
     public function datosPersonales(): HasOne
     {

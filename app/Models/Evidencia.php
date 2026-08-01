@@ -19,10 +19,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'subido_por',
     'fecha_subida',
 ])]
-#[Table(table: 'evidencias')]
 final class Evidencia extends Model
 {
     use HasFactory;
+
+    protected $table = 'evidencias';
 
     protected $casts = [
         'fecha_subida' => 'datetime',

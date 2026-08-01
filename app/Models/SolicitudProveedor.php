@@ -26,10 +26,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'limite_credito_asignado',
     'fecha_decision',
 ])]
-#[Table(table: 'solicitudes_proveedor')]
 final class SolicitudProveedor extends Model
 {
     use HasFactory;
+
+    protected $table = 'solicitudes_proveedor';
 
     protected $casts = [
         'cumple' => 'boolean',

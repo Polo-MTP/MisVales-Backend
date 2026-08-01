@@ -241,7 +241,7 @@ final class SolicitudProveedorService
         ]);
 
         return DB::transaction(function () use ($solicitud, $data, $gerente): SolicitudProveedor {
-            $solicitud->load('datosPersonales');
+            $solicitud->load('datosPersonales.direccion');
             $dispositivo = $data['dispositivo'] ?? request()->header('User-Agent');
 
             if ($data['decision'] === 'aprobado') {
