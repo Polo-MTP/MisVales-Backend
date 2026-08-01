@@ -11,8 +11,11 @@ final class RoleSeeder extends Seeder
 {
     public function run(): void
     {
-        Role::query()->firstOrCreate(['name' => 'Invitado'], ['factor_count' => 1]);
-        Role::query()->firstOrCreate(['name' => 'Usuario'], ['factor_count' => 2]);
+        Role::query()->firstOrCreate(['name' => 'Distribuidora'], ['factor_count' => 2]);
+        Role::query()->firstOrCreate(['name' => 'Coordinador'], ['factor_count' => 2]);
+        Role::query()->firstOrCreate(['name' => 'Verificador'], ['factor_count' => 2]);
+        Role::query()->firstOrCreate(['name' => 'Gerente de Sucursal'], ['factor_count' => 3]);
+        Role::query()->firstOrCreate(['name' => 'Gerente General'], ['factor_count' => 3]);
         Role::query()->firstOrCreate(['name' => 'Administrador'], ['factor_count' => 3]);
     }
 }

@@ -14,10 +14,13 @@ final class UserSeeder extends Seeder
     public function run(): void
     {
         $adminRole = Role::query()->where('name', 'Administrador')->first();
-        $userRole = Role::query()->where('name', 'Usuario')->first();
-        $invitadoRole = Role::query()->where('name', 'Invitado')->first();
+        $gerenteGeneralRole = Role::query()->where('name', 'Gerente General')->first();
+        $gerenteSucursalRole = Role::query()->where('name', 'Gerente de Sucursal')->first();
+        $coordinadorRole = Role::query()->where('name', 'Coordinador')->first();
+        $verificadorRole = Role::query()->where('name', 'Verificador')->first();
+        $distribuidoraRole = Role::query()->where('name', 'Distribuidora')->first();
 
-        // 1. Administrador (3FA con contraseña original de proyecto Laravel)
+        // 1. Administrador (3FA: Contraseña + TOTP + Correo OTP)
         User::query()->updateOrCreate(
             ['email' => 'trejomisaelperez2304@gmail.com'],
             [
@@ -29,7 +32,6 @@ final class UserSeeder extends Seeder
             ]
         );
 
-        // 2. Administrador Alterno (3FA con contraseña simple Password123!)
         User::query()->updateOrCreate(
             ['email' => 'admin@correo.com'],
             [
@@ -41,37 +43,61 @@ final class UserSeeder extends Seeder
             ]
         );
 
-        // 3. Usuario Normal (2FA con contraseña original)
+        // 2. Gerente General (3FA)
         User::query()->updateOrCreate(
-            ['email' => 'usuario@correo.com'],
+            ['email' => 'gerente.general@correo.com'],
             [
-                'name' => 'Usuario Normal (2FA)',
-                'password' => Hash::make('501d[qP*r#e2T[bU'),
-                'role_id' => $userRole?->id,
+                'name' => 'Gerente General (3FA)',
+                'password' => Hash::make('Password123!'),
+                'role_id' => $gerenteGeneralRole?->id,
                 'is_active' => true,
                 'email_verified_at' => now(),
             ]
         );
 
-        // 4. Usuario Normal Alterno (2FA con contraseña simple Password123!)
+        // 3. Gerente de Sucursal (3FA)
         User::query()->updateOrCreate(
-            ['email' => 'user@correo.com'],
+            ['email' => 'gerente.sucursal@correo.com'],
             [
-                'name' => 'Usuario Test (2FA)',
+                'name' => 'Gerente de Sucursal (3FA)',
                 'password' => Hash::make('Password123!'),
-                'role_id' => $userRole?->id,
+                'role_id' => $gerenteSucursalRole?->id,
                 'is_active' => true,
                 'email_verified_at' => now(),
             ]
         );
 
-        // 5. Usuario Invitado (1FA: Contraseña simple)
+        // 4. Coordinador (2FA)
         User::query()->updateOrCreate(
-            ['email' => 'invitado@correo.com'],
+            ['email' => 'coordinador@correo.com'],
             [
-                'name' => 'Usuario Invitado (1FA)',
+                'name' => 'Coordinador Test (2FA)',
                 'password' => Hash::make('Password123!'),
-                'role_id' => $invitadoRole?->id,
+                'role_id' => $coordinadorRole?->id,
+                'is_active' => true,
+                'email_verified_at' => now(),
+            ]
+        );
+
+        // 5. Verificador (2FA)
+        User::query()->updateOrCreate(
+            ['email' => 'verificador@correo.com'],
+            [
+                'name' => 'Verificador Test (2FA)',
+                'password' => Hash::make('Password123!'),
+                'role_id' => $verificadorRole?->id,
+                'is_active' => true,
+                'email_verified_at' => now(),
+            ]
+        );
+
+        // 6. Distribuidora (2FA)
+        User::query()->updateOrCreate(
+            ['email' => 'distribuidora@correo.com'],
+            [
+                'name' => 'Distribuidora Test (2FA)',
+                'password' => Hash::make('Password123!'),
+                'role_id' => $distribuidoraRole?->id,
                 'is_active' => true,
                 'email_verified_at' => now(),
             ]

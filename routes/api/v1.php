@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\V1\AltaProveedor\SolicitudProveedorController;
 use App\Http\Controllers\Api\V1\AuditController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\MfaController;
@@ -18,7 +19,6 @@ use Illuminate\Support\Facades\Route;
 
 // Public routes with auth rate limiter (5/min - brute force protection)
 Route::middleware('throttle:auth')->group(function (): void {
-    Route::post('register', [AuthController::class, 'register'])->name('api.v1.register');
     Route::post('login', [AuthController::class, 'login'])->name('api.v1.login');
 
     // MFA & 3FA verification & setup
@@ -40,6 +40,29 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
     Route::post('email/resend', [AuthController::class, 'resendVerificationEmail'])
         ->middleware('throttle:6,1')
         ->name('verification.send');
+
+    // MÓDULO 1: ALTA DE PROVEEDORES (NUEVO DISTRIBUIDOR)
+    Route::prefix('alta-proveedor')->group(function (): void {
+        Route::get('solicitudes', [SolicitudProveedorController::class, 'index'])
+            ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General,Administrador')
+            ->name('api.v1.alta_proveedor.index');
+
+        Route::get('solicitudes/{solicitud}', [SolicitudProveedorController::class, 'show'])
+            ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General,Administrador')
+            ->name('api.v1.alta_proveedor.show');
+
+        Route::post('solicitudes', [SolicitudProveedorController::class, 'store'])
+            ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General')
+            ->name('api.v1.alta_proveedor.store');
+
+        Route::post('solicitudes/{solicitud}/verificar', [SolicitudProveedorController::class, 'verificar'])
+            ->middleware('role:Verificador,Gerente de Sucursal,Gerente General')
+            ->name('api.v1.alta_proveedor.verificar');
+
+        Route::post('solicitudes/{solicitud}/aprobar', [SolicitudProveedorController::class, 'aprobarORechazar'])
+            ->middleware('role:Gerente de Sucursal,Gerente General')
+            ->name('api.v1.alta_proveedor.aprobar');
+    });
 });
 
 // Admin-only protected routes

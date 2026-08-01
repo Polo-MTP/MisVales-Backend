@@ -133,6 +133,8 @@ final class LoginService
 
         $this->guardarEnHistorial($user->id, $user->email, $ipAddress, $userAgent, 'success_factor_1');
 
+        // MFA desactivado temporalmente para pruebas directas en Postman / desarrollo
+        /*
         $factorCount = $user->role?->factor_count ?? 1;
 
         if ($factorCount > 1) {
@@ -143,6 +145,7 @@ final class LoginService
 
             return $this->generarRetoMfa($user);
         }
+        */
 
         Log::debug('LoginService: Login de factor único exitoso y completado', [
             'email' => $user->email,
