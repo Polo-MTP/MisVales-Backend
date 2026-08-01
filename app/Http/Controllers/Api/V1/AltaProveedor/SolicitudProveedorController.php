@@ -19,16 +19,27 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 final class SolicitudProveedorController extends ApiController
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $solicitudes = QueryBuilder::for(SolicitudProveedor::class)
+        /** @var User $user */
+        $user = $request->user();
+
+        $baseQuery = SolicitudProveedor::query();
+
+        // Filtrado por sucursal: Gerente General y Administrador ven todo; los demás roles solo ven su sucursal.
+        if ($user->role?->name !== 'Gerente General' && $user->role?->name !== 'Administrador') {
+            $baseQuery->where('sucursal_id', $user->sucursal_id);
+        }
+
+        $solicitudes = QueryBuilder::for($baseQuery)
             ->allowedFilters([
                 'estado',
                 'decision_gerente',
+                AllowedFilter::exact('sucursal_id'),
                 AllowedFilter::exact('coordinador_id'),
                 AllowedFilter::exact('verificador_id'),
             ])
-            ->allowedIncludes(['datosPersonales.direccion', 'coordinador', 'verificador', 'gerente', 'evidencias', 'logs'])
+            ->allowedIncludes(['datosPersonales.direccion', 'sucursal', 'coordinador', 'verificador', 'gerente', 'evidencias', 'logs'])
             ->allowedSorts(['created_at', 'id'])
             ->defaultSort('-created_at')
             ->paginate();
@@ -36,9 +47,19 @@ final class SolicitudProveedorController extends ApiController
         return $this->success(SolicitudProveedorResource::collection($solicitudes));
     }
 
-    public function show(SolicitudProveedor $solicitud): JsonResponse
+    public function show(SolicitudProveedor $solicitud, Request $request): JsonResponse
     {
-        $solicitud->load(['datosPersonales.direccion', 'coordinador', 'verificador', 'gerente', 'evidencias', 'logs.usuario']);
+        /** @var User $user */
+        $user = $request->user();
+
+        // Validación de permisos por sucursal en consulta individual
+        if ($user->role?->name !== 'Gerente General' && $user->role?->name !== 'Administrador') {
+            if ($user->sucursal_id !== $solicitud->sucursal_id) {
+                return $this->forbidden('Acceso Denegado. No tienes permisos para consultar solicitudes pertenecientes a otra sucursal.');
+            }
+        }
+
+        $solicitud->load(['datosPersonales.direccion', 'sucursal', 'coordinador', 'verificador', 'gerente', 'evidencias', 'logs.usuario']);
 
         return $this->success(new SolicitudProveedorResource($solicitud));
     }

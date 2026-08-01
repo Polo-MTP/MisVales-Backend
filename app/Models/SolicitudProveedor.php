@@ -17,6 +17,7 @@ final class SolicitudProveedor extends Model
 
     protected $fillable = [
         'datos_id',
+        'sucursal_id',
         'estado',
         'cumple',
         'comentario_verificador',
@@ -36,6 +37,11 @@ final class SolicitudProveedor extends Model
         'fecha_decision' => 'datetime',
         'limite_credito_asignado' => 'decimal:2',
     ];
+
+    public function sucursal(): BelongsTo
+    {
+        return $this->belongsTo(Sucursal::class, 'sucursal_id');
+    }
 
     public function datosPersonales(): BelongsTo
     {

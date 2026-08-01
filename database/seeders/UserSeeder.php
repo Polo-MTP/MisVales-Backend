@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Models\Role;
+use App\Models\Sucursal;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -20,13 +21,21 @@ final class UserSeeder extends Seeder
         $verificadorRole = Role::query()->where('name', 'Verificador')->first();
         $distribuidoraRole = Role::query()->where('name', 'Distribuidora')->first();
 
-        // 1. Administrador (3FA: Contraseña + TOTP + Correo OTP)
+        /** @var Sucursal|null $matriz */
+        $matriz = Sucursal::query()->where('es_matriz', true)->first();
+        /** @var Sucursal|null $sucursalGomez */
+        $sucursalGomez = Sucursal::query()->where('nombre', 'Sucursal Gómez Palacio')->first();
+        /** @var Sucursal|null $sucursalDurango */
+        $sucursalDurango = Sucursal::query()->where('nombre', 'Sucursal Durango')->first();
+
+        // 1. Administradores (Sucursal Matriz)
         User::query()->updateOrCreate(
             ['email' => 'trejomisaelperez2304@gmail.com'],
             [
-                'name' => 'Misael Trejo (Admin 3FA)',
+                'name' => 'Misael Trejo (Admin Matriz)',
                 'password' => Hash::make('8Yro|U_WZi4.39Nny'),
                 'role_id' => $adminRole?->id,
+                'sucursal_id' => $matriz?->id,
                 'is_active' => true,
                 'email_verified_at' => now(),
             ]
@@ -35,69 +44,88 @@ final class UserSeeder extends Seeder
         User::query()->updateOrCreate(
             ['email' => 'admin@correo.com'],
             [
-                'name' => 'Admin Test (3FA)',
+                'name' => 'Admin Test (Matriz)',
                 'password' => Hash::make('Password123!'),
                 'role_id' => $adminRole?->id,
+                'sucursal_id' => $matriz?->id,
                 'is_active' => true,
                 'email_verified_at' => now(),
             ]
         );
 
-        // 2. Gerente General (3FA)
+        // 2. Gerente General (Sucursal Matriz - Acceso Global a todas las sucursales)
         User::query()->updateOrCreate(
             ['email' => 'gerente.general@correo.com'],
             [
-                'name' => 'Gerente General (3FA)',
+                'name' => 'Gerente General (Matriz Global)',
                 'password' => Hash::make('Password123!'),
                 'role_id' => $gerenteGeneralRole?->id,
+                'sucursal_id' => $matriz?->id,
                 'is_active' => true,
                 'email_verified_at' => now(),
             ]
         );
 
-        // 3. Gerente de Sucursal (3FA)
+        // 3. Gerente de Sucursal Gómez Palacio
         User::query()->updateOrCreate(
             ['email' => 'gerente.sucursal@correo.com'],
             [
-                'name' => 'Gerente de Sucursal (3FA)',
+                'name' => 'Gerente Sucursal Gómez Palacio',
                 'password' => Hash::make('Password123!'),
                 'role_id' => $gerenteSucursalRole?->id,
+                'sucursal_id' => $sucursalGomez?->id,
                 'is_active' => true,
                 'email_verified_at' => now(),
             ]
         );
 
-        // 4. Coordinador (2FA)
+        // 4. Gerente de Sucursal Durango (Para probar restricción entre sucursales)
+        User::query()->updateOrCreate(
+            ['email' => 'gerente.durango@correo.com'],
+            [
+                'name' => 'Gerente Sucursal Durango',
+                'password' => Hash::make('Password123!'),
+                'role_id' => $gerenteSucursalRole?->id,
+                'sucursal_id' => $sucursalDurango?->id,
+                'is_active' => true,
+                'email_verified_at' => now(),
+            ]
+        );
+
+        // 5. Coordinador (Sucursal Gómez Palacio)
         User::query()->updateOrCreate(
             ['email' => 'coordinador@correo.com'],
             [
-                'name' => 'Coordinador Test (2FA)',
+                'name' => 'Coordinador Gómez Palacio',
                 'password' => Hash::make('Password123!'),
                 'role_id' => $coordinadorRole?->id,
+                'sucursal_id' => $sucursalGomez?->id,
                 'is_active' => true,
                 'email_verified_at' => now(),
             ]
         );
 
-        // 5. Verificador (2FA)
+        // 6. Verificador (Sucursal Gómez Palacio)
         User::query()->updateOrCreate(
             ['email' => 'verificador@correo.com'],
             [
-                'name' => 'Verificador Test (2FA)',
+                'name' => 'Verificador Gómez Palacio',
                 'password' => Hash::make('Password123!'),
                 'role_id' => $verificadorRole?->id,
+                'sucursal_id' => $sucursalGomez?->id,
                 'is_active' => true,
                 'email_verified_at' => now(),
             ]
         );
 
-        // 6. Distribuidora (2FA)
+        // 7. Distribuidora (Sucursal Gómez Palacio)
         User::query()->updateOrCreate(
             ['email' => 'distribuidora@correo.com'],
             [
-                'name' => 'Distribuidora Test (2FA)',
+                'name' => 'Distribuidora Gómez Palacio',
                 'password' => Hash::make('Password123!'),
                 'role_id' => $distribuidoraRole?->id,
+                'sucursal_id' => $sucursalGomez?->id,
                 'is_active' => true,
                 'email_verified_at' => now(),
             ]

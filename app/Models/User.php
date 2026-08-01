@@ -24,6 +24,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string $password
  * @property int|null $role_id
  * @property int|null $datos_id
+ * @property int|null $sucursal_id
  * @property bool $is_active
  * @property bool $is_locked
  * @property int $failed_attempts
@@ -37,6 +38,7 @@ use Laravel\Sanctum\HasApiTokens;
     'password',
     'role_id',
     'datos_id',
+    'sucursal_id',
     'is_active',
     'is_locked',
     'failed_attempts',
@@ -75,6 +77,11 @@ final class User extends Authenticatable implements MustVerifyEmail
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
+    }
+
+    public function sucursal(): BelongsTo
+    {
+        return $this->belongsTo(Sucursal::class, 'sucursal_id');
     }
 
     public function datosPersonales(): BelongsTo

@@ -20,6 +20,7 @@ final class SolicitudProveedorService
 {
     /**
      * Captura la solicitud inicial de un nuevo proveedor realizada por un Coordinador.
+     * Asigna automáticamente la sucursal del coordinador a la solicitud.
      *
      * @param array<string, mixed> $data
      */
@@ -27,6 +28,7 @@ final class SolicitudProveedorService
     {
         Log::debug('SolicitudProveedorService: Iniciando creación de solicitud de nuevo proveedor', [
             'coordinador_id' => $coordinador->id,
+            'sucursal_id' => $coordinador->sucursal_id,
             'curp' => $data['curp'],
         ]);
 
@@ -56,6 +58,7 @@ final class SolicitudProveedorService
             /** @var SolicitudProveedor $solicitud */
             $solicitud = SolicitudProveedor::query()->create([
                 'datos_id' => $datosPersonales->id,
+                'sucursal_id' => $coordinador->sucursal_id,
                 'coordinador_id' => $coordinador->id,
                 'verificador_id' => $data['verificador_id'] ?? null,
                 'estado' => isset($data['verificador_id']) ? 'en_verificacion' : 'pendiente_verificacion',
@@ -93,9 +96,10 @@ final class SolicitudProveedorService
 
             Log::debug('SolicitudProveedorService: Solicitud creada exitosamente', [
                 'solicitud_id' => $solicitud->id,
+                'sucursal_id' => $solicitud->sucursal_id,
             ]);
 
-            return $solicitud->load(['datosPersonales.direccion', 'coordinador', 'evidencias']);
+            return $solicitud->load(['datosPersonales.direccion', 'sucursal', 'coordinador', 'evidencias']);
         });
     }
 
@@ -107,6 +111,18 @@ final class SolicitudProveedorService
      */
     public function verificarSolicitud(SolicitudProveedor $solicitud, array $data, User $verificador): SolicitudProveedor
     {
+        // Validación de permisos por sucursal: Solo Gerente General o Administrador pueden verificar de otras sucursales.
+        if ($verificador->role?->name !== 'Gerente General' && $verificador->role?->name !== 'Administrador') {
+            if ($verificador->sucursal_id !== $solicitud->sucursal_id) {
+                Log::warning('SolicitudProveedorService: Intento de verificación en otra sucursal denegado', [
+                    'verificador_id' => $verificador->id,
+                    'verificador_sucursal' => $verificador->sucursal_id,
+                    'solicitud_sucursal' => $solicitud->sucursal_id,
+                ]);
+                abort(403, 'Acceso Denegado. No tienes permisos para gestionar solicitudes pertenecientes a otra sucursal.');
+            }
+        }
+
         Log::debug('SolicitudProveedorService: Iniciando proceso de verificación', [
             'solicitud_id' => $solicitud->id,
             'verificador_id' => $verificador->id,
@@ -194,18 +210,32 @@ final class SolicitudProveedorService
                 'estado' => $solicitud->estado,
             ]);
 
-            return $solicitud->load(['datosPersonales.direccion', 'coordinador', 'verificador', 'evidencias', 'logs']);
+            return $solicitud->load(['datosPersonales.direccion', 'sucursal', 'coordinador', 'verificador', 'evidencias', 'logs']);
         });
     }
 
     /**
      * Decision final tomada por un Gerente (Aprobar o Rechazar).
-     * Si es aprobado, crea la cuenta de usuario Distribuidora reusando el datos_id sin duplicar registros.
+     * Gerente General puede aprobar cualquier sucursal.
+     * Gerente de Sucursal solo puede aprobar solicitudes pertenecientes a su sucursal.
+     * Si es aprobado, crea la cuenta de usuario Distribuidora asignada a esa sucursal.
      *
      * @param array<string, mixed> $data
      */
     public function aprobarORechazar(SolicitudProveedor $solicitud, array $data, User $gerente): SolicitudProveedor
     {
+        // Validación de permisos por sucursal: Gerente de Sucursal solo gestiona su sucursal.
+        if ($gerente->role?->name !== 'Gerente General') {
+            if ($gerente->sucursal_id !== $solicitud->sucursal_id) {
+                Log::warning('SolicitudProveedorService: Intento de aprobación en otra sucursal denegado', [
+                    'gerente_id' => $gerente->id,
+                    'gerente_sucursal' => $gerente->sucursal_id,
+                    'solicitud_sucursal' => $solicitud->sucursal_id,
+                ]);
+                abort(403, 'Acceso Denegado. Como Gerente de Sucursal solo puedes aprobar o rechazar solicitudes de tu propia sucursal.');
+            }
+        }
+
         Log::debug('SolicitudProveedorService: Procesando decisión de Gerencia', [
             'solicitud_id' => $solicitud->id,
             'gerente_id' => $gerente->id,
@@ -220,7 +250,7 @@ final class SolicitudProveedorService
                 /** @var Role|null $distribuidoraRole */
                 $distribuidoraRole = Role::query()->where('name', 'Distribuidora')->first();
 
-                // Crear la cuenta de usuario para la distribuidora reutilizando datos_id
+                // Crear la cuenta de usuario para la distribuidora asignada a la sucursal de la solicitud
                 /** @var User $distribuidoraUser */
                 $distribuidoraUser = User::query()->create([
                     'name' => $solicitud->datosPersonales->nombre . ' ' . $solicitud->datosPersonales->apellido_paterno,
@@ -228,6 +258,7 @@ final class SolicitudProveedorService
                     'password' => Hash::make($data['password']),
                     'role_id' => $distribuidoraRole?->id,
                     'datos_id' => $solicitud->datos_id,
+                    'sucursal_id' => $solicitud->sucursal_id,
                     'is_active' => true,
                     'email_verified_at' => now(),
                 ]);
@@ -289,7 +320,7 @@ final class SolicitudProveedorService
                 'estado' => $solicitud->estado,
             ]);
 
-            return $solicitud->load(['datosPersonales.direccion', 'coordinador', 'verificador', 'gerente', 'evidencias', 'logs']);
+            return $solicitud->load(['datosPersonales.direccion', 'sucursal', 'coordinador', 'verificador', 'gerente', 'evidencias', 'logs']);
         });
     }
 }

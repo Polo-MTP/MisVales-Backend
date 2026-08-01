@@ -28,6 +28,12 @@ final class SolicitudProveedorResource extends JsonResource
             'comentario_gerente' => $this->comentario_gerente,
             'limite_credito_asignado' => $this->limite_credito_asignado,
             'fecha_decision' => $this->fecha_decision?->toIso8601String(),
+            'sucursal' => [
+                'id' => $this->sucursal?->id,
+                'nombre' => $this->sucursal?->nombre,
+                'codigo' => $this->sucursal?->codigo,
+                'es_matriz' => $this->sucursal?->es_matriz,
+            ],
             'datos_personales' => [
                 'id' => $this->datosPersonales?->id,
                 'nombre' => $this->datosPersonales?->nombre,
