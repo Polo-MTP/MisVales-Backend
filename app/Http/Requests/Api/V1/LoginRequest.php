@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Rules\Recaptcha;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * @property string $email
  * @property string $password
+ * @property string|null $recaptcha
  */
 final class LoginRequest extends FormRequest
 {
@@ -26,6 +28,19 @@ final class LoginRequest extends FormRequest
         return [
             'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
+            'recaptcha' => ['nullable', 'string', new Recaptcha()],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'email.required' => 'El correo electrónico es obligatorio.',
+            'email.email' => 'El formato del correo es inválido.',
+            'password.required' => 'La contraseña es obligatoria.',
         ];
     }
 }

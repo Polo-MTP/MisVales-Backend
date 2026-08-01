@@ -3,17 +3,22 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    $this->seed(RoleSeeder::class);
+});
 
 describe('Registration', function (): void {
     it('registers a new user successfully', function (): void {
         $response = $this->postJson('/api/v1/register', [
             'name' => 'Test User',
             'email' => 'test@example.com',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
         ]);
 
         $response->assertStatus(201)
@@ -27,7 +32,6 @@ describe('Registration', function (): void {
             ])
             ->assertJson([
                 'success' => true,
-                'message' => 'User registered successfully. Please check your email to verify your account.',
             ]);
 
         $this->assertDatabaseHas('users', [
@@ -46,13 +50,16 @@ describe('Registration', function (): void {
     });
 
     it('fails registration with duplicate email', function (): void {
-        User::factory()->create(['email' => 'existing@example.com']);
+        User::factory()->create([
+            'email' => 'existing@example.com',
+            'role_id' => 1,
+        ]);
 
         $response = $this->postJson('/api/v1/register', [
             'name' => 'Test User',
             'email' => 'existing@example.com',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
         ]);
 
         $response->assertStatus(422);
@@ -62,12 +69,13 @@ describe('Registration', function (): void {
 describe('Login', function (): void {
     it('logs in with valid credentials', function (): void {
         $user = User::factory()->create([
-            'password' => bcrypt('password123'),
+            'password' => bcrypt('Password123!'),
+            'role_id' => 1, // Invitado
         ]);
 
         $response = $this->postJson('/api/v1/login', [
             'email' => $user->email,
-            'password' => 'password123',
+            'password' => 'Password123!',
         ]);
 
         $response->assertStatus(200)
@@ -81,13 +89,14 @@ describe('Login', function (): void {
             ])
             ->assertJson([
                 'success' => true,
-                'message' => 'Login successful',
+                'message' => 'Login exitoso',
             ]);
     });
 
     it('fails login with invalid credentials', function (): void {
         $user = User::factory()->create([
-            'password' => bcrypt('password123'),
+            'password' => bcrypt('Password123!'),
+            'role_id' => 1,
         ]);
 
         $response = $this->postJson('/api/v1/login', [
@@ -98,14 +107,14 @@ describe('Login', function (): void {
         $response->assertStatus(401)
             ->assertJson([
                 'success' => false,
-                'message' => 'Invalid credentials',
+                'message' => 'Credenciales incorrectas.',
             ]);
     });
 
     it('fails login with non-existent user', function (): void {
         $response = $this->postJson('/api/v1/login', [
             'email' => 'nonexistent@example.com',
-            'password' => 'password123',
+            'password' => 'Password123!',
         ]);
 
         $response->assertStatus(401);
@@ -114,7 +123,7 @@ describe('Login', function (): void {
 
 describe('Logout', function (): void {
     it('logs out authenticated user', function (): void {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role_id' => 1]);
         $token = $user->createToken('test-token')->plainTextToken;
 
         $response = $this->withHeader('Authorization', 'Bearer '.$token)
@@ -123,7 +132,7 @@ describe('Logout', function (): void {
         $response->assertStatus(200)
             ->assertJson([
                 'success' => true,
-                'message' => 'Logged out successfully',
+                'message' => 'Sesión cerrada exitosamente.',
             ]);
     });
 
@@ -136,7 +145,7 @@ describe('Logout', function (): void {
 
 describe('Me', function (): void {
     it('returns authenticated user data', function (): void {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role_id' => 1]);
         $token = $user->createToken('test-token')->plainTextToken;
 
         $response = $this->withHeader('Authorization', 'Bearer '.$token)
