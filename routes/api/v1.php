@@ -117,6 +117,17 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware('role:Administrador,Gerente General')
             ->name('api.v1.configuraciones.fechas.historial');
     });
+
+    // MÓDULO 4: AUDITORÍA Y CAMBIO DE ESTADO DE DISTRIBUIDORAS
+    Route::prefix('distribuidoras')->group(function (): void {
+        Route::patch('{id}/estado', [\App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraEstadoController::class, 'cambiarEstado'])
+            ->middleware('role:Gerente General,Administrador,Gerente de Sucursal')
+            ->name('api.v1.distribuidoras.estado.update');
+
+        Route::get('{id}/historial-estado', [\App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraEstadoController::class, 'historial'])
+            ->middleware('role:Gerente General,Administrador,Gerente de Sucursal,Distribuidora')
+            ->name('api.v1.distribuidoras.estado.historial');
+    });
 });
 
 // Admin-only protected routes

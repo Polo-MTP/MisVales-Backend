@@ -41,4 +41,9 @@ final class Distribuidora extends Model
     {
         return $this->hasMany(HistorialClienteDistr::class, 'distribuidor_id');
     }
+
+    public function historialEstados(): HasMany
+    {
+        return $this->hasMany(HistorialEstadoDistribuidora::class, 'distribuidora_id');
+    }
 }
