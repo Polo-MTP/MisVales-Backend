@@ -90,6 +90,33 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware('role:Distribuidora,Gerente General,Administrador')
             ->name('api.v1.distribuidora.clientes.estado');
     });
+
+    // MÓDULO 3: CONFIGURACIONES (REGLAS DE NEGOCIO Y FECHAS POR VIGENCIA)
+    Route::prefix('configuraciones')->group(function (): void {
+        Route::get('', [\App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'index'])
+            ->middleware('role:Administrador,Gerente General,Gerente de Sucursal')
+            ->name('api.v1.configuraciones.index');
+
+        Route::post('', [\App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'store'])
+            ->middleware('role:Administrador,Gerente General')
+            ->name('api.v1.configuraciones.store');
+
+        Route::get('historial/{clave}', [\App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'historial'])
+            ->middleware('role:Administrador,Gerente General')
+            ->name('api.v1.configuraciones.historial');
+
+        Route::get('fechas', [\App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'fechasIndex'])
+            ->middleware('role:Administrador,Gerente General,Gerente de Sucursal')
+            ->name('api.v1.configuraciones.fechas.index');
+
+        Route::post('fechas', [\App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'fechasStore'])
+            ->middleware('role:Administrador,Gerente General')
+            ->name('api.v1.configuraciones.fechas.store');
+
+        Route::get('fechas/historial', [\App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'fechasHistorial'])
+            ->middleware('role:Administrador,Gerente General')
+            ->name('api.v1.configuraciones.fechas.historial');
+    });
 });
 
 // Admin-only protected routes

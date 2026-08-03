@@ -18,6 +18,7 @@ final class DatabaseSeeder extends Seeder
             SucursalSeeder::class,
             MfaSeeder::class,
             UserSeeder::class,
+            ConfiguracionSeeder::class,
         ]);
     }
 }
