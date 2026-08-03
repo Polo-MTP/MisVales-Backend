@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Models\Distribuidora;
 use App\Models\Role;
 use App\Models\Sucursal;
 use App\Models\User;
@@ -119,7 +120,8 @@ final class UserSeeder extends Seeder
         );
 
         // 7. Distribuidora (Sucursal Gómez Palacio)
-        User::query()->updateOrCreate(
+        /** @var User $distribuidoraUser */
+        $distribuidoraUser = User::query()->updateOrCreate(
             ['email' => 'distribuidora@correo.com'],
             [
                 'name' => 'Distribuidora Gómez Palacio',
@@ -128,6 +130,17 @@ final class UserSeeder extends Seeder
                 'sucursal_id' => $sucursalGomez?->id,
                 'is_active' => true,
                 'email_verified_at' => now(),
+            ]
+        );
+
+        Distribuidora::query()->updateOrCreate(
+            ['usuario_id' => $distribuidoraUser->id],
+            [
+                'numero_distribuidora' => 'DIST-00001',
+                'limite_credito' => 50000.00,
+                'credito_disponible' => 50000.00,
+                'puntos_acumulados' => 120,
+                'estado' => true,
             ]
         );
     }

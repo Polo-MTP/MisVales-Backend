@@ -63,6 +63,33 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware('role:Gerente de Sucursal,Gerente General')
             ->name('api.v1.alta_proveedor.aprobar');
     });
+
+    // MÓDULO 2: GESTIÓN DE CLIENTES DE DISTRIBUIDORA
+    Route::prefix('distribuidora')->group(function (): void {
+        Route::get('perfil', [\App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'miPerfil'])
+            ->middleware('role:Distribuidora,Gerente General,Administrador')
+            ->name('api.v1.distribuidora.perfil');
+
+        Route::get('clientes', [\App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'index'])
+            ->middleware('role:Distribuidora,Gerente General,Administrador,Gerente de Sucursal')
+            ->name('api.v1.distribuidora.clientes.index');
+
+        Route::post('clientes', [\App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'store'])
+            ->middleware('role:Distribuidora,Gerente General,Administrador')
+            ->name('api.v1.distribuidora.clientes.store');
+
+        Route::get('clientes/{id}', [\App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'show'])
+            ->middleware('role:Distribuidora,Gerente General,Administrador,Gerente de Sucursal')
+            ->name('api.v1.distribuidora.clientes.show');
+
+        Route::put('clientes/{id}', [\App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'update'])
+            ->middleware('role:Distribuidora,Gerente General,Administrador')
+            ->name('api.v1.distribuidora.clientes.update');
+
+        Route::patch('clientes/{id}/estado', [\App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'cambiarEstado'])
+            ->middleware('role:Distribuidora,Gerente General,Administrador')
+            ->name('api.v1.distribuidora.clientes.estado');
+    });
 });
 
 // Admin-only protected routes

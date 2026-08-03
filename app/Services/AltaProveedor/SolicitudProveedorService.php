@@ -6,6 +6,7 @@ namespace App\Services\AltaProveedor;
 
 use App\Models\DatosPersonales;
 use App\Models\Direccion;
+use App\Models\Distribuidora;
 use App\Models\Evidencia;
 use App\Models\HistorialCoordinador;
 use App\Models\LogNuevoProveedor;
@@ -259,6 +260,16 @@ final class SolicitudProveedorService
                     'sucursal_id' => $solicitud->sucursal_id,
                     'is_active' => true,
                     'email_verified_at' => now(),
+                ]);
+
+                $limiteCredito = (float) $data['limite_credito_asignado'];
+                Distribuidora::query()->create([
+                    'usuario_id' => $distribuidoraUser->id,
+                    'numero_distribuidora' => 'DIST-'.str_pad((string) $distribuidoraUser->id, 5, '0', STR_PAD_LEFT),
+                    'limite_credito' => $limiteCredito,
+                    'credito_disponible' => $limiteCredito,
+                    'puntos_acumulados' => 0,
+                    'estado' => true,
                 ]);
 
                 // Asignar en el historial la vinculación entre Coordinador y Distribuidor
