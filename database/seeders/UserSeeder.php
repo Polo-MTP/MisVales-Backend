@@ -29,6 +29,12 @@ final class UserSeeder extends Seeder
         /** @var Sucursal|null $sucursalDurango */
         $sucursalDurango = Sucursal::query()->where('nombre', 'Sucursal Durango')->first();
 
+        // Buscar un coordinador existente para asignarlo a la distribuidora
+        $coordinador = User::query()
+            ->where('role_id', $coordinadorRole?->id)
+            ->where('sucursal_id', $sucursalGomez?->id)
+            ->first();
+
         // 1. Administradores (Sucursal Matriz)
         User::query()->updateOrCreate(
             ['email' => 'trejomisaelperez2304@gmail.com'],
@@ -133,14 +139,26 @@ final class UserSeeder extends Seeder
             ]
         );
 
+        // Crear/actualizar la distribuidora con los nuevos campos
         Distribuidora::query()->updateOrCreate(
             ['usuario_id' => $distribuidoraUser->id],
             [
                 'numero_distribuidora' => 'DIST-00001',
                 'limite_credito' => 50000.00,
-                'credito_disponible' => 50000.00,
+                // ELIMINADO: 'credito_disponible' (se calcula automáticamente)
                 'puntos_acumulados' => 120,
-                'estado' => true,
+                'estado' => 'ACTIVO',  
+
+                'sucursal_id' => $sucursalGomez?->id,
+                'coordinador_id' => $coordinador?->id, // Asignar un coordinador existente
+                'razon_social' => 'Distribuidora Gómez Palacio S.A.',
+                'rfc' => 'DGP123456789',
+                'categoria_id' => 1, // Si tienes categorías, descomenta y asigna un ID válido
+                'usuario_acceso' => 'distribuidora01',
+                'password_hash' => Hash::make('Password123!'),
+                'comentarios_verificador' => 'Verificado correctamente',
+                'fecha_aprobacion' => now(),
+                'aprobado_por' => $gerenteGeneralRole?->id, // Asignar aprobador
             ]
         );
     }

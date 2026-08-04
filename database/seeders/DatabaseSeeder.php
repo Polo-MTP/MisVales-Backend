@@ -1,24 +1,23 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
-final class DatabaseSeeder extends Seeder
+class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     public function run(): void
     {
+        // Orden recomendado según dependencias
         $this->call([
-            RoleSeeder::class,
-            SucursalSeeder::class,
-            MfaSeeder::class,
-            UserSeeder::class,
-            ConfiguracionSeeder::class,
+            RoleSeeder::class,                 // Roles (Spatie)
+            UserSeeder::class,                 // Usuarios básicos
+            SucursalSeeder::class,             // Sucursales
+            CategoriaDistribuidoraSeeder::class, // Categorías (BRONCE, PLATA, ORO)
+            ProductoSeeder::class,             // Catálogo de productos
+            // DistribuidoraSeeder::class,     // Opcional: para datos de prueba
+            ConfiguracionSeeder::class,        // Configuraciones globales
+            MfaSeeder::class,                  // MFA (si aplica)
         ]);
     }
 }

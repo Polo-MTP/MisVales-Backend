@@ -4,46 +4,134 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use App\Models\Vale;
 
-#[Fillable([
-    'usuario_id',
-    'numero_distribuidora',
-    'limite_credito',
-    'credito_disponible',
-    'categoria_id',
-    'puntos_acumulados',
-    'estado',
-])]
 final class Distribuidora extends Model
 {
     use HasFactory;
 
     protected $table = 'distribuidoras';
 
-    protected $casts = [
-        'limite_credito' => 'decimal:2',
-        'credito_disponible' => 'decimal:2',
-        'puntos_acumulados' => 'integer',
-        'estado' => 'boolean',
+    protected $fillable = [
+        'usuario_id',          // ← lo conservamos porque ya lo tienes
+        'numero_distribuidora',
+        'limite_credito',
+        // 'credito_disponible' → lo calculamos, no lo guardamos
+        'categoria_id',
+        'puntos_acumulados',
+        'estado',              // ahora es string (ACTIVO, INACTIVO, etc.)
+        // Nuevos campos que agregaste en tu migración:
+        'sucursal_id',
+        'coordinador_id',
+        'verificador_id',
+        'razon_social',
+        'rfc',
+        'usuario_acceso',
+        'password_hash',
+        'comentarios_verificador',
+        'fecha_aprobacion',
+        'aprobado_por',
     ];
 
+    protected $casts = [
+        'limite_credito' => 'decimal:2',
+        'puntos_acumulados' => 'integer',
+        'estado' => 'string',
+        'fecha_aprobacion' => 'datetime',
+    ];
+
+    // ─── Relaciones ─────────────────────────────────────────────
+
+    // La relación con User (ahora es el usuario dueño de la distribuidora, 
+    // pero puede ser el coordinador o el representante)
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(User::class, 'usuario_id');
     }
 
+    public function sucursal(): BelongsTo
+    {
+        return $this->belongsTo(Sucursal::class);
+    }
+
+    public function coordinador(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'coordinador_id');
+    }
+
+    public function verificador(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'verificador_id');
+    }
+
+    public function aprobador(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'aprobado_por');
+    }
+
+    public function categoria(): BelongsTo
+    {
+        return $this->belongsTo(CategoriaDistribuidora::class, 'categoria_id');
+    }
+
+    // Datos personales extensos (tabla que creaste: distribuidor_datos_personales)
+    public function datosPersonales(): HasOne
+    {
+        return $this->hasOne(DatosPersonales::class);
+    }
+
+    // Historial de estados (tabla historial_estado_distribuidora)
+    public function historialEstados(): HasMany
+    {
+        return $this->hasMany(HistorialEstadoDistribuidora::class);
+    }
+
+    // Historial de clientes (la que ya tenías)
     public function historialClientes(): HasMany
     {
         return $this->hasMany(HistorialClienteDistr::class, 'distribuidor_id');
     }
 
-    public function historialEstados(): HasMany
+    // Vales solicitados por esta distribuidora
+    public function vales(): HasMany
     {
-        return $this->hasMany(HistorialEstadoDistribuidora::class, 'distribuidora_id');
+        return $this->hasMany(Vale::class);
+    }
+
+    // ─── Accesor (crédito disponible calculado) ──────────────
+
+    public function getCreditoDisponibleAttribute(): float
+    {
+        $totalEnUso = $this->vales()
+            ->whereIn('estado', ['activo', 'parcial'])
+            ->sum('monto') ?? 0;
+
+        return max(0, (float) $this->limite_credito - (float) $totalEnUso);
+    }
+
+    // ─── Métodos de negocio ────────────────────────────────────
+
+    public function puedeSolicitarVale(float $montoSolicitado, bool $esPrimerVale = false): bool
+    {
+        // Solo pueden solicitar si están activas o en verificación
+        if (!in_array($this->estado, ['ACTIVO', 'EN_VERIFICACION'])) {
+            return false;
+        }
+
+        if ($montoSolicitado > $this->credito_disponible) {
+            return false;
+        }
+
+        // Regla del 50% solo para el primer vale
+        if ($esPrimerVale && ($montoSolicitado > $this->limite_credito * 0.5)) {
+            return false;
+        }
+
+        return true;
     }
 }
