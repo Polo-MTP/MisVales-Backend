@@ -19,6 +19,10 @@ final class CrearSolicitudProveedorRequest extends FormRequest
     public function rules(): array
     {
         return [
+            // Datos del negocio (distribuidora)
+            'razon_social' => ['required', 'string', 'max:255'],
+            'rfc' => ['required', 'string', 'size:13', 'unique:distribuidoras,rfc', 'unique:solicitudes_proveedor,rfc'],
+
             // Datos Personales
             'nombre' => ['required', 'string', 'max:255'],
             'apellido_paterno' => ['required', 'string', 'max:255'],
@@ -35,6 +39,12 @@ final class CrearSolicitudProveedorRequest extends FormRequest
             'codigo_postal' => ['required', 'string', 'max:10'],
             'estado' => ['required', 'string', 'max:255'],
             'ciudad' => ['required', 'string', 'max:255'],
+
+            // Datos adicionales del solicitante (familiares, vehículo, vivienda, referencia laboral)
+            'datos_familiares' => ['nullable', 'array'],
+            'datos_vehiculos' => ['nullable', 'array'],
+            'datos_vivienda' => ['nullable', 'array'],
+            'referencia_laboral' => ['nullable', 'string', 'max:255'],
 
             // Asignación opcional de Verificador por el Coordinador
             'verificador_id' => ['nullable', 'integer', 'exists:users,id'],

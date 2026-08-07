@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use App\Models\Vale;
 
 final class Distribuidora extends Model
 {
@@ -47,7 +46,7 @@ final class Distribuidora extends Model
 
     // ─── Relaciones ─────────────────────────────────────────────
 
-    // La relación con User (ahora es el usuario dueño de la distribuidora, 
+    // La relación con User (ahora es el usuario dueño de la distribuidora,
     // pero puede ser el coordinador o el representante)
     public function usuario(): BelongsTo
     {
@@ -79,10 +78,10 @@ final class Distribuidora extends Model
         return $this->belongsTo(CategoriaDistribuidora::class, 'categoria_id');
     }
 
-    // Datos personales extensos (tabla que creaste: distribuidor_datos_personales)
-    public function datosPersonales(): HasOne
+    // Datos adicionales del solicitante capturados durante el alta (familiares, vehículo, vivienda, referencia laboral)
+    public function datosExtras(): HasOne
     {
-        return $this->hasOne(DatosPersonales::class);
+        return $this->hasOne(DistribuidorDatosExtras::class);
     }
 
     // Historial de estados (tabla historial_estado_distribuidora)
@@ -119,7 +118,7 @@ final class Distribuidora extends Model
     public function puedeSolicitarVale(float $montoSolicitado, bool $esPrimerVale = false): bool
     {
         // Solo pueden solicitar si están activas o en verificación
-        if (!in_array($this->estado, ['ACTIVO', 'EN_VERIFICACION'])) {
+        if (! in_array($this->estado, ['ACTIVO', 'EN_VERIFICACION'])) {
             return false;
         }
 

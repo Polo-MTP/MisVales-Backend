@@ -16,9 +16,9 @@ final class DistribuidoraEstadoService
     /**
      * Cambia el estado de una distribuidora y genera la bitácora de auditoría histórica.
      */
-    public function cambiarEstado(Distribuidora $distribuidora, bool $nuevoEstado, string $motivo, User $usuario): Distribuidora
+    public function cambiarEstado(Distribuidora $distribuidora, string $nuevoEstado, string $motivo, User $usuario): Distribuidora
     {
-        $estadoAnterior = (bool) $distribuidora->estado;
+        $estadoAnterior = (string) $distribuidora->estado;
 
         Log::debug('DistribuidoraEstadoService: Cambiando estado de distribuidora', [
             'distribuidora_id' => $distribuidora->id,
@@ -34,8 +34,9 @@ final class DistribuidoraEstadoService
             $distribuidora->save();
 
             // 2. Sincronizar estado de la cuenta de usuario si existe
+            // (puede seguir accediendo si está ACTIVO o en proceso de verificación; RECHAZADO/MOROSO/EN_CAPTURA bloquean el acceso)
             if ($distribuidora->usuario) {
-                $distribuidora->usuario->is_active = $nuevoEstado;
+                $distribuidora->usuario->is_active = in_array($nuevoEstado, ['ACTIVO', 'EN_VERIFICACION'], true);
                 $distribuidora->usuario->save();
             }
 

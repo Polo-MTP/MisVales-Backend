@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Resources\Distribuidora;
 
 use App\Models\Distribuidora;
-use App\Http\Resources\Distribuidora\CategoriaDistribuidoraResource;
-use App\Http\Resources\Distribuidora\DistribuidorDatosPersonalesResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -40,7 +38,24 @@ final class DistribuidoraResource extends JsonResource
                 'id' => $this->verificador?->id,
                 'name' => $this->verificador?->name,
             ],
-            'datos_personales' => new DistribuidorDatosPersonalesResource($this->whenLoaded('datosPersonales')),
+            'datos_personales' => [
+                'nombre' => $this->usuario?->datosPersonales?->nombre,
+                'apellido_paterno' => $this->usuario?->datosPersonales?->apellido_paterno,
+                'apellido_materno' => $this->usuario?->datosPersonales?->apellido_materno,
+                'curp' => $this->usuario?->datosPersonales?->curp,
+                'fecha_nacimiento' => $this->usuario?->datosPersonales?->fecha_nacimiento?->toDateString(),
+                'lugar_nacimiento' => $this->usuario?->datosPersonales?->lugar_nacimiento,
+                'direccion' => [
+                    'calle' => $this->usuario?->datosPersonales?->direccion?->calle,
+                    'colonia' => $this->usuario?->datosPersonales?->direccion?->colonia,
+                    'numero_ext' => $this->usuario?->datosPersonales?->direccion?->numero_ext,
+                    'numero_int' => $this->usuario?->datosPersonales?->direccion?->numero_int,
+                    'codigo_postal' => $this->usuario?->datosPersonales?->direccion?->codigo_postal,
+                    'estado' => $this->usuario?->datosPersonales?->direccion?->estado,
+                    'ciudad' => $this->usuario?->datosPersonales?->direccion?->ciudad,
+                ],
+            ],
+            'datos_extras' => new DistribuidorDatosExtrasResource($this->whenLoaded('datosExtras')),
             'comentarios_verificador' => $this->comentarios_verificador,
             'fecha_aprobacion' => $this->fecha_aprobacion?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
