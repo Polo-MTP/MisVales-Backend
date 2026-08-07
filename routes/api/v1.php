@@ -6,8 +6,8 @@ use App\Http\Controllers\Api\V1\AltaProveedor\SolicitudProveedorController;
 use App\Http\Controllers\Api\V1\AuditController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\MfaController;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\Producto\ProductoController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -67,65 +67,63 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
 
     // MÓDULO 2: GESTIÓN DE CLIENTES DE DISTRIBUIDORA
     Route::prefix('distribuidora')->group(function (): void {
-        Route::get('perfil', [\App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'miPerfil'])
+        Route::get('perfil', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'miPerfil'])
             ->middleware('role:Distribuidora,Gerente General,Administrador')
             ->name('api.v1.distribuidora.perfil');
 
-        Route::get('clientes', [\App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'index'])
+        Route::get('clientes', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'index'])
             ->middleware('role:Distribuidora,Gerente General,Administrador,Gerente de Sucursal')
             ->name('api.v1.distribuidora.clientes.index');
 
-        Route::post('clientes', [\App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'store'])
+        Route::post('clientes', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'store'])
             ->middleware('role:Distribuidora,Gerente General,Administrador')
             ->name('api.v1.distribuidora.clientes.store');
 
-        Route::get('clientes/{id}', [\App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'show'])
+        Route::get('clientes/{id}', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'show'])
             ->middleware('role:Distribuidora,Gerente General,Administrador,Gerente de Sucursal')
             ->name('api.v1.distribuidora.clientes.show');
 
-        Route::put('clientes/{id}', [\App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'update'])
+        Route::put('clientes/{id}', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'update'])
             ->middleware('role:Distribuidora,Gerente General,Administrador')
             ->name('api.v1.distribuidora.clientes.update');
 
-        Route::patch('clientes/{id}/estado', [\App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'cambiarEstado'])
+        Route::patch('clientes/{id}/estado', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'cambiarEstado'])
             ->middleware('role:Distribuidora,Gerente General,Administrador')
             ->name('api.v1.distribuidora.clientes.estado');
     });
 
     // MÓDULO 3: CONFIGURACIONES (REGLAS DE NEGOCIO Y FECHAS POR VIGENCIA)
     Route::prefix('configuraciones')->group(function (): void {
-        Route::get('', [\App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'index'])
+        Route::get('', [App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'index'])
             ->middleware('role:Administrador,Gerente General,Gerente de Sucursal')
             ->name('api.v1.configuraciones.index');
 
-        Route::post('', [\App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'store'])
+        Route::post('', [App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'store'])
             ->middleware('role:Administrador,Gerente General')
             ->name('api.v1.configuraciones.store');
 
-        Route::get('historial/{clave}', [\App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'historial'])
+        Route::get('historial/{clave}', [App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'historial'])
             ->middleware('role:Administrador,Gerente General')
             ->name('api.v1.configuraciones.historial');
 
-        Route::get('fechas', [\App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'fechasIndex'])
+        Route::get('fechas', [App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'fechasIndex'])
             ->middleware('role:Administrador,Gerente General,Gerente de Sucursal')
             ->name('api.v1.configuraciones.fechas.index');
 
-        Route::post('fechas', [\App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'fechasStore'])
+        Route::post('fechas', [App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'fechasStore'])
             ->middleware('role:Administrador,Gerente General')
             ->name('api.v1.configuraciones.fechas.store');
 
-        Route::get('fechas/historial', [\App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'fechasHistorial'])
+        Route::get('fechas/historial', [App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'fechasHistorial'])
             ->middleware('role:Administrador,Gerente General')
             ->name('api.v1.configuraciones.fechas.historial');
     });
 
-    // MÓDULO 4: AUDITORÍA Y CAMBIO DE ESTADO DE DISTRIBUIDORAS
+    // MÓDULO 4: AUDITORÍA DE CAMBIOS DE ESTADO DE DISTRIBUIDORAS
+    // El cambio de estado en sí se hace vía MÓDULO 6 (PUT distribuidoras/{id}/estado),
+    // que tiene autorización granular por estado destino.
     Route::prefix('distribuidoras')->group(function (): void {
-        Route::patch('{id}/estado', [\App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraEstadoController::class, 'cambiarEstado'])
-            ->middleware('role:Gerente General,Administrador,Gerente de Sucursal')
-            ->name('api.v1.distribuidoras.estado.update');
-
-        Route::get('{id}/historial-estado', [\App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraEstadoController::class, 'historial'])
+        Route::get('{id}/historial-estado', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraEstadoController::class, 'historial'])
             ->middleware('role:Gerente General,Administrador,Gerente de Sucursal,Distribuidora')
             ->name('api.v1.distribuidoras.estado.historial');
     });
@@ -135,16 +133,16 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
     Route::prefix('productos')
         ->middleware('role:Administrador,Gerente General')
         ->group(function () {
-            Route::get('/', [\App\Http\Controllers\Api\V1\Producto\ProductoController::class, 'index'])
+            Route::get('/', [ProductoController::class, 'index'])
                 ->withoutMiddleware('role') // o permite acceso a todos con permiso viewAny
                 ->name('api.v1.productos.index');
-            Route::post('/', [\App\Http\Controllers\Api\V1\Producto\ProductoController::class, 'store'])
+            Route::post('/', [ProductoController::class, 'store'])
                 ->name('api.v1.productos.store');
-            Route::get('{producto}', [\App\Http\Controllers\Api\V1\Producto\ProductoController::class, 'show'])
+            Route::get('{producto}', [ProductoController::class, 'show'])
                 ->name('api.v1.productos.show');
-            Route::put('{producto}', [\App\Http\Controllers\Api\V1\Producto\ProductoController::class, 'update'])
+            Route::put('{producto}', [ProductoController::class, 'update'])
                 ->name('api.v1.productos.update');
-            Route::delete('{producto}', [\App\Http\Controllers\Api\V1\Producto\ProductoController::class, 'destroy'])
+            Route::delete('{producto}', [ProductoController::class, 'destroy'])
                 ->name('api.v1.productos.destroy');
         });
 
@@ -155,33 +153,33 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
         // Las rutas que ya tienes (estado, historial) se mantienen.
         // Agregamos las nuevas rutas:
 
-        // Listar y crear distribuidoras (con filtros por rol en el servicio)
-        Route::get('/', [\App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'index'])
+        // Listar distribuidoras (con filtros por rol en el servicio).
+        // La creación de distribuidoras NO se hace aquí: el alta de un nuevo proveedor/distribuidor
+        // se hace exclusivamente vía el flujo de solicitud (MÓDULO 1: alta-proveedor/solicitudes),
+        // que exige captura -> verificación -> aprobación de gerencia antes de crear la distribuidora.
+        Route::get('/', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'index'])
             ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General,Administrador')
             ->name('api.v1.distribuidoras.index');
-        Route::post('/', [\App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'store'])
-            ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General')
-            ->name('api.v1.distribuidoras.store');
 
         // Detalle, actualización y eliminación (con autorización por política)
-        Route::get('{distribuidora}', [\App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'show'])
+        Route::get('{distribuidora}', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'show'])
             ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General,Administrador')
             ->name('api.v1.distribuidoras.show');
-        Route::put('{distribuidora}', [\App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'update'])
+        Route::put('{distribuidora}', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'update'])
             ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.distribuidoras.update');
-        Route::delete('{distribuidora}', [\App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'destroy'])
+        Route::delete('{distribuidora}', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'destroy'])
             ->middleware('role:Gerente General')
             ->name('api.v1.distribuidoras.destroy');
 
         // Acciones específicas
-        Route::put('{distribuidora}/estado', [\App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'cambiarEstado'])
+        Route::put('{distribuidora}/estado', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'cambiarEstado'])
             ->middleware('role:Verificador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.distribuidoras.estado');
-        Route::put('{distribuidora}/credito', [\App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'asignarCredito'])
+        Route::put('{distribuidora}/credito', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'asignarCredito'])
             ->middleware('role:Gerente de Sucursal,Gerente General')
             ->name('api.v1.distribuidoras.credito');
-        Route::get('{distribuidora}/saldo-disponible', [\App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'saldoDisponible'])
+        Route::get('{distribuidora}/saldo-disponible', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'saldoDisponible'])
             ->middleware('role:Cajera,Distribuidora,Gerente de Sucursal,Gerente General')
             ->name('api.v1.distribuidoras.saldo');
     });

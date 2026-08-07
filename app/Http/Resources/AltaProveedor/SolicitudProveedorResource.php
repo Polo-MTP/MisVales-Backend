@@ -21,6 +21,12 @@ final class SolicitudProveedorResource extends JsonResource
         return [
             'id' => $this->id,
             'estado' => $this->estado,
+            'razon_social' => $this->razon_social,
+            'rfc' => $this->rfc,
+            'datos_familiares' => $this->datos_familiares,
+            'datos_vehiculos' => $this->datos_vehiculos,
+            'datos_vivienda' => $this->datos_vivienda,
+            'referencia_laboral' => $this->referencia_laboral,
             'cumple' => $this->cumple,
             'comentario_verificador' => $this->comentario_verificador,
             'fecha_verificacion' => $this->fecha_verificacion?->toIso8601String(),

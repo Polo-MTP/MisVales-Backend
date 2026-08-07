@@ -7,6 +7,7 @@ namespace App\Services\AltaProveedor;
 use App\Models\DatosPersonales;
 use App\Models\Direccion;
 use App\Models\Distribuidora;
+use App\Models\DistribuidorDatosExtras;
 use App\Models\Evidencia;
 use App\Models\HistorialCoordinador;
 use App\Models\LogNuevoProveedor;
@@ -63,6 +64,12 @@ final class SolicitudProveedorService
                 'coordinador_id' => $coordinador->id,
                 'verificador_id' => $data['verificador_id'] ?? null,
                 'estado' => isset($data['verificador_id']) ? 'en_verificacion' : 'pendiente_verificacion',
+                'razon_social' => $data['razon_social'],
+                'rfc' => $data['rfc'],
+                'datos_familiares' => $data['datos_familiares'] ?? null,
+                'datos_vehiculos' => $data['datos_vehiculos'] ?? null,
+                'datos_vivienda' => $data['datos_vivienda'] ?? null,
+                'referencia_laboral' => $data['referencia_laboral'] ?? null,
             ]);
 
             // Auditoría inicial de creación
@@ -263,14 +270,32 @@ final class SolicitudProveedorService
                 ]);
 
                 $limiteCredito = (float) $data['limite_credito_asignado'];
-                Distribuidora::query()->create([
+                /** @var Distribuidora $distribuidora */
+                $distribuidora = Distribuidora::query()->create([
                     'usuario_id' => $distribuidoraUser->id,
-                    'numero_distribuidora' => 'DIST-'.str_pad((string) $distribuidoraUser->id, 5, '0', STR_PAD_LEFT),
+                    'numero_distribuidora' => 'DIST-'.mb_str_pad((string) $distribuidoraUser->id, 5, '0', STR_PAD_LEFT),
+                    'razon_social' => $solicitud->razon_social,
+                    'rfc' => $solicitud->rfc,
+                    'sucursal_id' => $solicitud->sucursal_id,
+                    'coordinador_id' => $solicitud->coordinador_id,
+                    'verificador_id' => $solicitud->verificador_id,
+                    'aprobado_por' => $gerente->id,
+                    'fecha_aprobacion' => now(),
+                    'comentarios_verificador' => $solicitud->comentario_verificador,
                     'limite_credito' => $limiteCredito,
-                    'credito_disponible' => $limiteCredito,
                     'puntos_acumulados' => 0,
-                    'estado' => true,
+                    'estado' => 'ACTIVO',
                 ]);
+
+                if ($solicitud->datos_familiares || $solicitud->datos_vehiculos || $solicitud->datos_vivienda || $solicitud->referencia_laboral) {
+                    DistribuidorDatosExtras::query()->create([
+                        'distribuidora_id' => $distribuidora->id,
+                        'datos_familiares' => $solicitud->datos_familiares,
+                        'datos_vehiculos' => $solicitud->datos_vehiculos,
+                        'datos_vivienda' => $solicitud->datos_vivienda,
+                        'referencia_laboral' => $solicitud->referencia_laboral,
+                    ]);
+                }
 
                 // Asignar en el historial la vinculación entre Coordinador y Distribuidor
                 if ($solicitud->coordinador_id) {

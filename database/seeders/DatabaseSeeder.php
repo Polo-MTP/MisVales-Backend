@@ -11,8 +11,8 @@ class DatabaseSeeder extends Seeder
         // Orden recomendado según dependencias
         $this->call([
             RoleSeeder::class,                 // Roles (Spatie)
-            UserSeeder::class,                 // Usuarios básicos
             SucursalSeeder::class,             // Sucursales
+            UserSeeder::class,                 // Usuarios básicos (depende de sucursales)
             CategoriaDistribuidoraSeeder::class, // Categorías (BRONCE, PLATA, ORO)
             ProductoSeeder::class,             // Catálogo de productos
             // DistribuidoraSeeder::class,     // Opcional: para datos de prueba

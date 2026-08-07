@@ -24,6 +24,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'decision_gerente',
     'limite_credito_asignado',
     'fecha_decision',
+    'razon_social',
+    'rfc',
+    'datos_familiares',
+    'datos_vehiculos',
+    'datos_vivienda',
+    'referencia_laboral',
 ])]
 final class SolicitudProveedor extends Model
 {
@@ -36,6 +42,9 @@ final class SolicitudProveedor extends Model
         'fecha_verificacion' => 'datetime',
         'fecha_decision' => 'datetime',
         'limite_credito_asignado' => 'decimal:2',
+        'datos_familiares' => 'array',
+        'datos_vehiculos' => 'array',
+        'datos_vivienda' => 'array',
     ];
 
     public function sucursal(): BelongsTo
