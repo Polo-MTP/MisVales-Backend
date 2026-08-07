@@ -32,15 +32,15 @@ final class SolicitudProveedorController extends ApiController
         }
 
         $solicitudes = QueryBuilder::for($baseQuery)
-            ->allowedFilters([
+            ->allowedFilters(
                 'estado',
                 'decision_gerente',
                 AllowedFilter::exact('sucursal_id'),
                 AllowedFilter::exact('coordinador_id'),
                 AllowedFilter::exact('verificador_id'),
-            ])
-            ->allowedIncludes(['datosPersonales.direccion', 'sucursal', 'coordinador', 'verificador', 'gerente', 'evidencias', 'logs'])
-            ->allowedSorts(['created_at', 'id'])
+            )
+            ->allowedIncludes('datosPersonales.direccion', 'sucursal', 'coordinador', 'verificador', 'gerente', 'evidencias', 'logs')
+            ->allowedSorts('created_at', 'id')
             ->defaultSort('-created_at')
             ->paginate();
 
