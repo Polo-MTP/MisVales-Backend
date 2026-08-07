@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\AuditController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\MfaController;
 use App\Http\Controllers\Api\V1\Producto\ProductoController;
+use App\Http\Controllers\Api\V1\UsuarioController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -41,6 +42,11 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
     Route::post('email/resend', [AuthController::class, 'resendVerificationEmail'])
         ->middleware('throttle:6,1')
         ->name('verification.send');
+
+    // Listado de usuarios (ej. verificadores disponibles para asignar en alta-proveedor)
+    Route::get('usuarios', [UsuarioController::class, 'index'])
+        ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General,Administrador')
+        ->name('api.v1.usuarios.index');
 
     // MÓDULO 1: ALTA DE PROVEEDORES (NUEVO DISTRIBUIDOR)
     Route::prefix('alta-proveedor')->group(function (): void {
