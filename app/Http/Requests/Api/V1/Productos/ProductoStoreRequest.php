@@ -9,7 +9,7 @@ class ProductoStoreRequest extends FormRequest
     public function authorize(): bool
     {
         $user = $this->user();
-        return $user && in_array($user->role->name, ['coordinador', 'gerente-sucursal', 'Gerente General']);
+        return $user && $user->role->name === 'Gerente General';
     }
     public function rules(): array
     {

@@ -35,4 +35,14 @@ final class Sucursal extends Model
     {
         return $this->hasMany(SolicitudProveedor::class, 'sucursal_id');
     }
+
+    public function relaciones(): HasMany
+    {
+        return $this->hasMany(Relacion::class);
+    }
+
+    public function conveniosBancarios(): HasMany
+    {
+        return $this->hasMany(ConvenioBancario::class);
+    }
 }

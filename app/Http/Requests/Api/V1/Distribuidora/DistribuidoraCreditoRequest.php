@@ -11,7 +11,7 @@ final class DistribuidoraCreditoRequest extends FormRequest
     public function authorize(): bool
     {
         $user = $this->user();
-        return $user && in_array($user->role->name, ['coordinador', 'gerente-sucursal', 'Gerente General']);
+        return $user && in_array($user->role->name, ['Gerente de Sucursal', 'Gerente General']);
     }
 
     public function rules(): array

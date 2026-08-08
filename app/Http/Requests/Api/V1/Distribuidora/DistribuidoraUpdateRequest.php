@@ -13,7 +13,7 @@ final class DistribuidoraUpdateRequest extends FormRequest
     {
         $user = $this->user();
 
-        return $user && in_array($user->role->name, ['coordinador', 'gerente-sucursal', 'Gerente General']);
+        return $user && in_array($user->role->name, ['Coordinador', 'Gerente de Sucursal', 'Gerente General']);
     }
 
     public function rules(): array

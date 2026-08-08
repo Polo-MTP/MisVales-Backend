@@ -51,6 +51,42 @@ final class ConfiguracionSeeder extends Seeder
                 'valor' => '50',
                 'tipo_dato' => 'decimal',
             ],
+            // Reglas del motor de cálculo de relaciones (ver "Analisis de calculo de relacion")
+            [
+                'clave' => 'comision_base_pct',
+                'valor' => '10',
+                'tipo_dato' => 'decimal',
+            ],
+            [
+                'clave' => 'interes_pct_quincena',
+                'valor' => '5',
+                'tipo_dato' => 'decimal',
+            ],
+            [
+                'clave' => 'multa_no_pago',
+                'valor' => '300',
+                'tipo_dato' => 'decimal',
+            ],
+            [
+                'clave' => 'puntos_divisor',
+                'valor' => '1200',
+                'tipo_dato' => 'decimal',
+            ],
+            [
+                'clave' => 'puntos_multiplicador',
+                'valor' => '3',
+                'tipo_dato' => 'decimal',
+            ],
+            [
+                'clave' => 'puntos_penalizacion_pct',
+                'valor' => '20',
+                'tipo_dato' => 'decimal',
+            ],
+            [
+                'clave' => 'limite_perdones_relacion',
+                'valor' => '2',
+                'tipo_dato' => 'decimal',
+            ],
         ];
 
         foreach ($configsIniciales as $cfg) {

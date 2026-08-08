@@ -1,0 +1,65 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+#[Fillable([
+    'relacion_id',
+    'vale_id',
+    'cliente_id',
+    'producto_id',
+    'cuota_numero',
+    'cuotas_totales',
+    'capital',
+    'comision',
+    'interes',
+    'seguro',
+    'recargo',
+    'pago',
+    'total',
+    'estado',
+])]
+final class RelacionDetalle extends Model
+{
+    use HasFactory;
+
+    protected $table = 'relacion_detalles';
+
+    protected $casts = [
+        'cuota_numero' => 'integer',
+        'cuotas_totales' => 'integer',
+        'capital' => 'decimal:2',
+        'comision' => 'decimal:2',
+        'interes' => 'decimal:2',
+        'seguro' => 'decimal:2',
+        'recargo' => 'decimal:2',
+        'pago' => 'decimal:2',
+        'total' => 'decimal:2',
+    ];
+
+    public function relacion(): BelongsTo
+    {
+        return $this->belongsTo(Relacion::class);
+    }
+
+    public function vale(): BelongsTo
+    {
+        return $this->belongsTo(Vale::class);
+    }
+
+    public function cliente(): BelongsTo
+    {
+        return $this->belongsTo(Cliente::class);
+    }
+
+    public function producto(): BelongsTo
+    {
+        return $this->belongsTo(Producto::class);
+    }
+}

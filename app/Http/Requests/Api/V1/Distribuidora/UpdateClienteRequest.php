@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1\Distribuidora;
 
+use App\Models\Cliente;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 final class UpdateClienteRequest extends FormRequest
 {
@@ -13,17 +15,26 @@ final class UpdateClienteRequest extends FormRequest
         return true;
     }
 
+    public function messages(): array
+    {
+        return [
+            'datos_personales.curp.unique' => 'Este CURP ya está registrado con otra distribuidora u otro cliente.',
+        ];
+    }
+
     /**
      * @return array<string, mixed>
      */
     public function rules(): array
     {
+        $datosId = Cliente::query()->find($this->route('id'))?->datos_id;
+
         return [
             'datos_personales' => ['nullable', 'array'],
             'datos_personales.nombre' => ['nullable', 'string', 'max:255'],
             'datos_personales.apellido_paterno' => ['nullable', 'string', 'max:255'],
             'datos_personales.apellido_materno' => ['nullable', 'string', 'max:255'],
-            'datos_personales.curp' => ['nullable', 'string', 'size:18'],
+            'datos_personales.curp' => ['nullable', 'string', 'size:18', Rule::unique('datos_personales', 'curp')->ignore($datosId)],
             'datos_personales.fecha_nacimiento' => ['nullable', 'date'],
             'datos_personales.lugar_nacimiento' => ['nullable', 'string', 'max:255'],
             'direccion' => ['nullable', 'array'],

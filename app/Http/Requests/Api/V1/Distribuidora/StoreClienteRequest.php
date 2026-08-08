@@ -16,13 +16,20 @@ final class StoreClienteRequest extends FormRequest
     /**
      * @return array<string, mixed>
      */
+    public function messages(): array
+    {
+        return [
+            'curp.unique' => 'Este CURP ya está registrado con otra distribuidora u otro cliente.',
+        ];
+    }
+
     public function rules(): array
     {
         return [
             'nombre' => ['required', 'string', 'max:255'],
             'apellido_paterno' => ['required', 'string', 'max:255'],
             'apellido_materno' => ['nullable', 'string', 'max:255'],
-            'curp' => ['nullable', 'string', 'size:18'],
+            'curp' => ['required', 'string', 'size:18', 'unique:datos_personales,curp'],
             'fecha_nacimiento' => ['nullable', 'date'],
             'lugar_nacimiento' => ['nullable', 'string', 'max:255'],
             'calle' => ['required', 'string', 'max:255'],

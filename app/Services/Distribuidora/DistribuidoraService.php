@@ -34,11 +34,11 @@ final class DistribuidoraService
         // Obtener el nombre del rol del usuario
         $roleName = $user->role?->name; // Asumiendo que tienes relación role()
 
-        if ($roleName === 'coordinador') {
+        if ($roleName === 'Coordinador') {
             $query->where('coordinador_id', $user->id);
-        } elseif ($roleName === 'gerente-sucursal') {
+        } elseif ($roleName === 'Gerente de Sucursal') {
             $query->whereHas('sucursal', fn ($q) => $q->where('id', $user->sucursal_id));
-        } elseif ($roleName === 'verificador') {
+        } elseif ($roleName === 'Verificador') {
             $query->where(function ($q) use ($user) {
                 $q->where('verificador_id', $user->id)
                     ->orWhere(function ($q2) use ($user) {

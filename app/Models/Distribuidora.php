@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use App\Services\Configuracion\ConfiguracionService;
 
 final class Distribuidora extends Model
 {
@@ -102,6 +103,22 @@ final class Distribuidora extends Model
         return $this->hasMany(Vale::class);
     }
 
+    // Relaciones (cortes/estados de cuenta) generadas para esta distribuidora
+    public function relaciones(): HasMany
+    {
+        return $this->hasMany(Relacion::class);
+    }
+
+    public function puntosMovimientos(): HasMany
+    {
+        return $this->hasMany(PuntoMovimiento::class);
+    }
+
+    public function relacionPerdones(): HasMany
+    {
+        return $this->hasMany(RelacionPerdon::class);
+    }
+
     // ─── Accesor (crédito disponible calculado) ──────────────
 
     public function getCreditoDisponibleAttribute(): float
@@ -126,9 +143,13 @@ final class Distribuidora extends Model
             return false;
         }
 
-        // Regla del 50% solo para el primer vale
-        if ($esPrimerVale && ($montoSolicitado > $this->limite_credito * 0.5)) {
-            return false;
+        // Regla del porcentaje máximo para el primer vale (configurable, clave 'regla_50_pct')
+        if ($esPrimerVale) {
+            $porcentaje = (float) (app(ConfiguracionService::class)->obtenerValorVigente('regla_50_pct') ?? 50);
+
+            if ($montoSolicitado > $this->limite_credito * ($porcentaje / 100)) {
+                return false;
+            }
         }
 
         return true;

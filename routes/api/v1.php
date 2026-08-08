@@ -7,6 +7,9 @@ use App\Http\Controllers\Api\V1\AuditController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\MfaController;
 use App\Http\Controllers\Api\V1\Producto\ProductoController;
+use App\Http\Controllers\Api\V1\Relacion\ConciliacionController;
+use App\Http\Controllers\Api\V1\Relacion\RelacionController;
+use App\Http\Controllers\Api\V1\Reporte\ReporteController;
 use App\Http\Controllers\Api\V1\UsuarioController;
 use Illuminate\Support\Facades\Route;
 
@@ -134,21 +137,23 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->name('api.v1.distribuidoras.estado.historial');
     });
     // ============================================================
-    // MÓDULO 5: CATÁLOGO DE PRODUCTOS (solo Gerente General)
+    // MÓDULO 5: CATÁLOGO DE PRODUCTOS (solo Gerente General escribe; Administrador solo lectura)
     // ============================================================
     Route::prefix('productos')
-        ->middleware('role:Administrador,Gerente General')
         ->group(function () {
             Route::get('/', [ProductoController::class, 'index'])
-                ->withoutMiddleware('role') // o permite acceso a todos con permiso viewAny
                 ->name('api.v1.productos.index');
-            Route::post('/', [ProductoController::class, 'store'])
-                ->name('api.v1.productos.store');
             Route::get('{producto}', [ProductoController::class, 'show'])
+                ->middleware('role:Administrador,Gerente General')
                 ->name('api.v1.productos.show');
+            Route::post('/', [ProductoController::class, 'store'])
+                ->middleware('role:Gerente General')
+                ->name('api.v1.productos.store');
             Route::put('{producto}', [ProductoController::class, 'update'])
+                ->middleware('role:Gerente General')
                 ->name('api.v1.productos.update');
             Route::delete('{producto}', [ProductoController::class, 'destroy'])
+                ->middleware('role:Gerente General')
                 ->name('api.v1.productos.destroy');
         });
 
@@ -188,6 +193,56 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
         Route::get('{distribuidora}/saldo-disponible', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'saldoDisponible'])
             ->middleware('role:Cajera,Distribuidora,Gerente de Sucursal,Gerente General')
             ->name('api.v1.distribuidoras.saldo');
+    });
+
+    // ============================================================
+    // MÓDULO 7: RELACIÓN DE CÁLCULOS (cortes / estado de cuenta por distribuidora)
+    // ============================================================
+    Route::prefix('relaciones')->group(function (): void {
+        Route::get('/', [RelacionController::class, 'index'])
+            ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General,Administrador')
+            ->name('api.v1.relaciones.index');
+
+        Route::get('{relacion}', [RelacionController::class, 'show'])
+            ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General,Administrador')
+            ->name('api.v1.relaciones.show');
+
+        // Disparo manual del corte (el disparo normal es automático vía comando programado). Administrador
+        // queda fuera a propósito: solo lee, no genera ni autoriza nada.
+        Route::post('generar', [RelacionController::class, 'generar'])
+            ->middleware('role:Gerente General')
+            ->name('api.v1.relaciones.generar');
+
+        Route::post('{relacion}/perdonar', [RelacionController::class, 'perdonar'])
+            ->middleware('role:Gerente de Sucursal,Gerente General')
+            ->name('api.v1.relaciones.perdonar');
+    });
+
+    // ============================================================
+    // MÓDULO 8: CONCILIACIÓN BANCARIA (importación del Excel del banco)
+    // ============================================================
+    Route::prefix('conciliaciones')->group(function (): void {
+        Route::get('/', [ConciliacionController::class, 'index'])
+            ->middleware('role:Cajera,Coordinador,Gerente de Sucursal,Gerente General,Administrador')
+            ->name('api.v1.conciliaciones.index');
+
+        Route::post('importar', [ConciliacionController::class, 'importar'])
+            ->middleware('role:Cajera,Gerente de Sucursal,Gerente General')
+            ->name('api.v1.conciliaciones.importar');
+
+        // Autorización de conciliación manual cuando la referencia no coincidió con ninguna relación.
+        Route::post('{abono}/conciliar-manual', [ConciliacionController::class, 'conciliarManual'])
+            ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General')
+            ->name('api.v1.conciliaciones.conciliar_manual');
+    });
+
+    // ============================================================
+    // MÓDULO 9: REPORTES
+    // ============================================================
+    Route::prefix('reportes')->group(function (): void {
+        Route::get('morosos', [ReporteController::class, 'morosos'])
+            ->middleware('role:Cajera,Coordinador,Gerente de Sucursal,Gerente General,Administrador')
+            ->name('api.v1.reportes.morosos');
     });
 
 });
