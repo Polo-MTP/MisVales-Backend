@@ -39,6 +39,7 @@ final class ValeResource extends JsonResource
             'quincenas' => $this->quincenas,
             'tipo' => $this->tipo,
             'estado' => $this->estado,
+            'activo' => $this->activo,
             'fecha_solicitud' => $this->fecha_solicitud?->toIso8601String(),
             'fecha_autorizacion' => $this->fecha_autorizacion?->toIso8601String(),
             'numero_transferencia' => $this->numero_transferencia,

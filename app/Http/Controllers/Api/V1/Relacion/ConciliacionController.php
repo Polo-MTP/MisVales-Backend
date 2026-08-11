@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Relacion;
 
 use App\Http\Controllers\Api\ApiController;
-use App\Http\Requests\Api\V1\Relacion\ConciliarManualRequest;
+use App\Http\Requests\Api\V1\Relacion\DecidirSolicitudConciliacionRequest;
+use App\Http\Requests\Api\V1\Relacion\EjecutarConciliacionManualRequest;
 use App\Http\Requests\Api\V1\Relacion\ImportarConciliacionRequest;
+use App\Http\Requests\Api\V1\Relacion\SolicitarConciliacionRequest;
 use App\Http\Resources\Relacion\AbonoConciliacionResource;
+use App\Http\Resources\Relacion\SolicitudConciliacionResource;
 use App\Models\AbonoConciliacion;
-use App\Models\Relacion;
+use App\Models\SolicitudConciliacion;
 use App\Models\User;
 use App\Services\Relacion\ConciliacionBancariaService;
+use App\Services\Relacion\SolicitudConciliacionService;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -19,6 +24,7 @@ final class ConciliacionController extends ApiController
 {
     public function __construct(
         private readonly ConciliacionBancariaService $conciliacionService,
+        private readonly SolicitudConciliacionService $solicitudConciliacionService,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -58,26 +64,67 @@ final class ConciliacionController extends ApiController
         );
     }
 
-    public function conciliarManual(ConciliarManualRequest $request, AbonoConciliacion $abono): JsonResponse
+    public function solicitarAutorizacion(SolicitarConciliacionRequest $request, AbonoConciliacion $abono): JsonResponse
     {
         /** @var User $usuario */
         $usuario = $request->user();
 
-        $relacion = Relacion::query()->findOrFail($request->integer('relacion_id'));
+        try {
+            $solicitud = $this->solicitudConciliacionService->solicitar(
+                $abono,
+                $request->integer('relacion_id'),
+                (string) $request->string('motivo'),
+                $usuario
+            );
+
+            return $this->created(
+                data: new SolicitudConciliacionResource($solicitud),
+                message: 'Solicitud de conciliación manual enviada. Queda pendiente de autorización.'
+            );
+        } catch (DomainException $e) {
+            return $this->error($e->getMessage());
+        }
+    }
+
+    public function decidirAutorizacion(DecidirSolicitudConciliacionRequest $request, SolicitudConciliacion $solicitud): JsonResponse
+    {
+        /** @var User $usuario */
+        $usuario = $request->user();
 
         try {
-            $abonoActualizado = $this->conciliacionService->conciliarManual(
-                $abono,
-                $relacion,
-                $usuario,
-                (string) $request->string('motivo')
+            $solicitud = $this->solicitudConciliacionService->decidir(
+                $solicitud,
+                (string) $request->string('decision'),
+                $request->filled('comentario') ? (string) $request->string('comentario') : null,
+                $usuario
             );
+
+            return $this->success(
+                data: new SolicitudConciliacionResource($solicitud),
+                message: 'Decisión registrada exitosamente.'
+            );
+        } catch (DomainException $e) {
+            return $this->error($e->getMessage());
+        }
+    }
+
+    public function conciliarManual(EjecutarConciliacionManualRequest $request, AbonoConciliacion $abono): JsonResponse
+    {
+        /** @var User $usuario */
+        $usuario = $request->user();
+
+        $solicitud = SolicitudConciliacion::query()
+            ->where('abono_conciliacion_id', $abono->id)
+            ->findOrFail($request->integer('solicitud_id'));
+
+        try {
+            $abonoActualizado = $this->solicitudConciliacionService->ejecutar($solicitud, $usuario);
 
             return $this->success(
                 data: new AbonoConciliacionResource($abonoActualizado),
                 message: 'Abono conciliado manualmente.'
             );
-        } catch (\DomainException $e) {
+        } catch (DomainException $e) {
             return $this->error($e->getMessage());
         }
     }

@@ -86,6 +86,28 @@ final class ValeService
     }
 
     /**
+     * La distribuidora puede desactivar/activar sus propios vales libremente, sin autorización
+     * de nadie más. Un vale inactivo no cuenta contra el crédito disponible ni entra a un corte.
+     */
+    public function desactivar(Vale $vale, User $usuario): Vale
+    {
+        $this->verificarPropiedad($vale, $usuario);
+
+        $vale->update(['activo' => false]);
+
+        return $vale->fresh(['distribuidora', 'cliente.datosPersonales', 'producto']);
+    }
+
+    public function activar(Vale $vale, User $usuario): Vale
+    {
+        $this->verificarPropiedad($vale, $usuario);
+
+        $vale->update(['activo' => true]);
+
+        return $vale->fresh(['distribuidora', 'cliente.datosPersonales', 'producto']);
+    }
+
+    /**
      * Lista vales. Para el rol Distribuidora, solo los suyos; para roles de staff,
      * todos (opcionalmente filtrados por distribuidora_id/estado).
      *
@@ -107,5 +129,12 @@ final class ValeService
         }
 
         return $query->latest('id')->paginate((int) ($filters['per_page'] ?? 15));
+    }
+
+    private function verificarPropiedad(Vale $vale, User $usuario): void
+    {
+        if ($vale->distribuidora_id !== $usuario->distribuidora?->id) {
+            abort(403, 'Este vale no pertenece a tu distribuidora.');
+        }
     }
 }

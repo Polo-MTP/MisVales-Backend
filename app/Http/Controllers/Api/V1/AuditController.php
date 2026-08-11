@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Api\ApiController;
 use App\Services\Auth\AuditService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 final class AuditController extends ApiController
 {
@@ -21,6 +22,19 @@ final class AuditController extends ApiController
         return $this->success(
             data: $logs,
             message: 'Historial de auditoría de accesos obtenido exitosamente.'
+        );
+    }
+
+    public function getAuditLog(Request $request): JsonResponse
+    {
+        $logs = $this->auditService->getAuditLog(
+            (int) $request->input('per_page', 20),
+            $request->only(['user_id', 'action'])
+        );
+
+        return $this->success(
+            data: $logs,
+            message: 'Log de auditoría obtenido exitosamente.'
         );
     }
 }

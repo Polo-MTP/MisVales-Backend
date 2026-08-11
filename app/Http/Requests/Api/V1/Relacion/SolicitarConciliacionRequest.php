@@ -6,13 +6,16 @@ namespace App\Http\Requests\Api\V1\Relacion;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-final class ConciliarManualRequest extends FormRequest
+final class SolicitarConciliacionRequest extends FormRequest
 {
     public function authorize(): bool
     {
         return true;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function rules(): array
     {
         return [

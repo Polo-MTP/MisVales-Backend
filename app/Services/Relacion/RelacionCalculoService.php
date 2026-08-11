@@ -12,6 +12,7 @@ use App\Models\Vale;
 use App\Services\Configuracion\ConfiguracionService;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use DomainException;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -78,11 +79,12 @@ final class RelacionCalculoService
             ->whereDate('fecha_corte', $fechaCorte->toDateString())
             ->exists()
         ) {
-            throw new \DomainException('Ya existe una relación generada para esta distribuidora en la fecha de corte indicada.');
+            throw new DomainException('Ya existe una relación generada para esta distribuidora en la fecha de corte indicada.');
         }
 
         $valesPendientes = Vale::query()
             ->where('distribuidora_id', $distribuidora->id)
+            ->where('activo', true)
             ->whereIn('estado', ['autorizado', 'parcial', 'vencido'])
             ->get();
 

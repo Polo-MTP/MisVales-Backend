@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\Configuracion\ConfiguracionService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use App\Services\Configuracion\ConfiguracionService;
 
 final class Distribuidora extends Model
 {
@@ -126,6 +126,7 @@ final class Distribuidora extends Model
         // Mismo conjunto de estados que RelacionCalculoService considera "vales pendientes"
         // ('activo' no es un valor válido del enum vales.estado, nunca hacía match).
         $totalEnUso = $this->vales()
+            ->where('activo', true)
             ->whereIn('estado', ['autorizado', 'parcial', 'vencido'])
             ->sum('monto') ?? 0;
 

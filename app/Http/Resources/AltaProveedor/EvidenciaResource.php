@@ -20,6 +20,7 @@ final class EvidenciaResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'solicitud_id' => $this->solicitud_id,
             'tipo_documento' => $this->tipo_documento,
             'url_archivo' => $this->url_archivo,
             'subido_por' => $this->usuario?->name,

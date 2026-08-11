@@ -57,4 +57,30 @@ final class ValeController extends ApiController
             message: 'Vale autorizado exitosamente.'
         );
     }
+
+    public function desactivar(Vale $vale, Request $request): JsonResponse
+    {
+        /** @var User $usuario */
+        $usuario = $request->user();
+
+        $vale = $this->valeService->desactivar($vale, $usuario);
+
+        return $this->success(
+            data: new ValeResource($vale),
+            message: 'Vale desactivado exitosamente.'
+        );
+    }
+
+    public function activar(Vale $vale, Request $request): JsonResponse
+    {
+        /** @var User $usuario */
+        $usuario = $request->user();
+
+        $vale = $this->valeService->activar($vale, $usuario);
+
+        return $this->success(
+            data: new ValeResource($vale),
+            message: 'Vale activado exitosamente.'
+        );
+    }
 }

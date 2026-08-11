@@ -50,17 +50,17 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
 
     // Listado de usuarios (ej. verificadores disponibles para asignar en alta-proveedor)
     Route::get('usuarios', [UsuarioController::class, 'index'])
-        ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General,Administrador')
+        ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General')
         ->name('api.v1.usuarios.index');
 
     // MÓDULO 1: ALTA DE PROVEEDORES (NUEVO DISTRIBUIDOR)
     Route::prefix('alta-proveedor')->group(function (): void {
         Route::get('solicitudes', [SolicitudProveedorController::class, 'index'])
-            ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General,Administrador')
+            ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.alta_proveedor.index');
 
         Route::get('solicitudes/{solicitud}', [SolicitudProveedorController::class, 'show'])
-            ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General,Administrador')
+            ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.alta_proveedor.show');
 
         Route::post('solicitudes', [SolicitudProveedorController::class, 'store'])
@@ -74,59 +74,78 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
         Route::post('solicitudes/{solicitud}/aprobar', [SolicitudProveedorController::class, 'aprobarORechazar'])
             ->middleware('role:Gerente de Sucursal,Gerente General')
             ->name('api.v1.alta_proveedor.aprobar');
+
+        // Subida real del archivo de una evidencia (logo, fachada, identificación, etc.).
+        Route::post('solicitudes/{solicitud}/evidencias', [App\Http\Controllers\Api\V1\AltaProveedor\EvidenciaController::class, 'store'])
+            ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General')
+            ->name('api.v1.alta_proveedor.evidencias.store');
     });
 
     // MÓDULO 2: GESTIÓN DE CLIENTES DE DISTRIBUIDORA
     Route::prefix('distribuidora')->group(function (): void {
         Route::get('perfil', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'miPerfil'])
-            ->middleware('role:Distribuidora,Gerente General,Administrador')
+            ->middleware('role:Distribuidora,Gerente General')
             ->name('api.v1.distribuidora.perfil');
 
         Route::get('clientes', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'index'])
-            ->middleware('role:Distribuidora,Gerente General,Administrador,Gerente de Sucursal')
+            ->middleware('role:Distribuidora,Gerente General,Gerente de Sucursal')
             ->name('api.v1.distribuidora.clientes.index');
 
         Route::post('clientes', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'store'])
-            ->middleware('role:Distribuidora,Gerente General,Administrador')
+            ->middleware('role:Distribuidora,Gerente General')
             ->name('api.v1.distribuidora.clientes.store');
 
         Route::get('clientes/{id}', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'show'])
-            ->middleware('role:Distribuidora,Gerente General,Administrador,Gerente de Sucursal')
+            ->middleware('role:Distribuidora,Gerente General,Gerente de Sucursal')
             ->name('api.v1.distribuidora.clientes.show');
 
         Route::put('clientes/{id}', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'update'])
-            ->middleware('role:Distribuidora,Gerente General,Administrador')
+            ->middleware('role:Distribuidora,Gerente General')
             ->name('api.v1.distribuidora.clientes.update');
 
         Route::patch('clientes/{id}/estado', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'cambiarEstado'])
-            ->middleware('role:Distribuidora,Gerente General,Administrador')
+            ->middleware('role:Distribuidora,Gerente General')
             ->name('api.v1.distribuidora.clientes.estado');
+
+        // La cajera comprueba los datos del pre-vale/vale del cliente; si algo necesita corrección,
+        // pide autorización a Coordinador/Gerente de Sucursal/Gerente General antes de poder editar.
+        Route::post('clientes/{id}/solicitar-edicion', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudEdicionClienteController::class, 'store'])
+            ->middleware('role:Cajera')
+            ->name('api.v1.distribuidora.clientes.solicitar_edicion');
+
+        Route::put('clientes/ediciones/{solicitud}/decidir', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudEdicionClienteController::class, 'decidir'])
+            ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General')
+            ->name('api.v1.distribuidora.clientes.decidir_edicion');
+
+        Route::put('clientes/{id}/editar-datos', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudEdicionClienteController::class, 'aplicar'])
+            ->middleware('role:Cajera')
+            ->name('api.v1.distribuidora.clientes.editar_datos');
     });
 
     // MÓDULO 3: CONFIGURACIONES (REGLAS DE NEGOCIO Y FECHAS POR VIGENCIA)
     Route::prefix('configuraciones')->group(function (): void {
         Route::get('', [App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'index'])
-            ->middleware('role:Administrador,Gerente General,Gerente de Sucursal')
+            ->middleware('role:Gerente General,Gerente de Sucursal')
             ->name('api.v1.configuraciones.index');
 
         Route::post('', [App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'store'])
-            ->middleware('role:Administrador,Gerente General')
+            ->middleware('role:Gerente General')
             ->name('api.v1.configuraciones.store');
 
         Route::get('historial/{clave}', [App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'historial'])
-            ->middleware('role:Administrador,Gerente General')
+            ->middleware('role:Gerente General')
             ->name('api.v1.configuraciones.historial');
 
         Route::get('fechas', [App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'fechasIndex'])
-            ->middleware('role:Administrador,Gerente General,Gerente de Sucursal')
+            ->middleware('role:Gerente General,Gerente de Sucursal')
             ->name('api.v1.configuraciones.fechas.index');
 
         Route::post('fechas', [App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'fechasStore'])
-            ->middleware('role:Administrador,Gerente General')
+            ->middleware('role:Gerente General')
             ->name('api.v1.configuraciones.fechas.store');
 
         Route::get('fechas/historial', [App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'fechasHistorial'])
-            ->middleware('role:Administrador,Gerente General')
+            ->middleware('role:Gerente General')
             ->name('api.v1.configuraciones.fechas.historial');
     });
 
@@ -135,18 +154,18 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
     // que tiene autorización granular por estado destino.
     Route::prefix('distribuidoras')->group(function (): void {
         Route::get('{id}/historial-estado', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraEstadoController::class, 'historial'])
-            ->middleware('role:Gerente General,Administrador,Gerente de Sucursal,Distribuidora')
+            ->middleware('role:Gerente General,Gerente de Sucursal,Distribuidora')
             ->name('api.v1.distribuidoras.estado.historial');
     });
     // ============================================================
-    // MÓDULO 5: CATÁLOGO DE PRODUCTOS (solo Gerente General escribe; Administrador solo lectura)
+    // MÓDULO 5: CATÁLOGO DE PRODUCTOS (solo Gerente General escribe; Administrador queda fuera, solo ve logs)
     // ============================================================
     Route::prefix('productos')
         ->group(function () {
             Route::get('/', [ProductoController::class, 'index'])
                 ->name('api.v1.productos.index');
             Route::get('{producto}', [ProductoController::class, 'show'])
-                ->middleware('role:Administrador,Gerente General')
+                ->middleware('role:Gerente General')
                 ->name('api.v1.productos.show');
             Route::post('/', [ProductoController::class, 'store'])
                 ->middleware('role:Gerente General')
@@ -161,7 +180,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
 
     // Catálogo de categorías de distribuidora (usado por el selector de PUT distribuidoras/{id}/credito)
     Route::get('categorias-distribuidoras', [CategoriaDistribuidoraController::class, 'index'])
-        ->middleware('role:Gerente de Sucursal,Gerente General,Administrador')
+        ->middleware('role:Gerente de Sucursal,Gerente General')
         ->name('api.v1.categorias_distribuidoras.index');
 
     // ============================================================
@@ -176,12 +195,12 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
         // se hace exclusivamente vía el flujo de solicitud (MÓDULO 1: alta-proveedor/solicitudes),
         // que exige captura -> verificación -> aprobación de gerencia antes de crear la distribuidora.
         Route::get('/', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'index'])
-            ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General,Administrador')
+            ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.distribuidoras.index');
 
         // Detalle, actualización y eliminación (con autorización por política)
         Route::get('{distribuidora}', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'show'])
-            ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General,Administrador')
+            ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.distribuidoras.show');
         Route::put('{distribuidora}', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'update'])
             ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General')
@@ -200,6 +219,11 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
         Route::get('{distribuidora}/saldo-disponible', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'saldoDisponible'])
             ->middleware('role:Cajera,Distribuidora,Gerente de Sucursal,Gerente General')
             ->name('api.v1.distribuidoras.saldo');
+
+        // Canje de puntos: la cajera lo captura en caja.
+        Route::post('{distribuidora}/puntos/canjear', [App\Http\Controllers\Api\V1\Distribuidora\PuntoCanjeController::class, 'canjear'])
+            ->middleware('role:Cajera')
+            ->name('api.v1.distribuidoras.puntos.canjear');
     });
 
     // ============================================================
@@ -208,7 +232,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
     // ============================================================
     Route::prefix('vales')->group(function (): void {
         Route::get('/', [ValeController::class, 'index'])
-            ->middleware('role:Distribuidora,Coordinador,Gerente de Sucursal,Gerente General,Administrador')
+            ->middleware('role:Distribuidora,Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.vales.index');
 
         Route::post('/', [ValeController::class, 'store'])
@@ -218,6 +242,15 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
         Route::put('{vale}/autorizar', [ValeController::class, 'autorizar'])
             ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.vales.autorizar');
+
+        // La distribuidora activa/desactiva sus propios vales sin autorización de nadie más.
+        Route::put('{vale}/desactivar', [ValeController::class, 'desactivar'])
+            ->middleware('role:Distribuidora')
+            ->name('api.v1.vales.desactivar');
+
+        Route::put('{vale}/activar', [ValeController::class, 'activar'])
+            ->middleware('role:Distribuidora')
+            ->name('api.v1.vales.activar');
     });
 
     // ============================================================
@@ -225,11 +258,11 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
     // ============================================================
     Route::prefix('relaciones')->group(function (): void {
         Route::get('/', [RelacionController::class, 'index'])
-            ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General,Administrador')
+            ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.relaciones.index');
 
         Route::get('{relacion}', [RelacionController::class, 'show'])
-            ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General,Administrador')
+            ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.relaciones.show');
 
         // Disparo manual del corte (el disparo normal es automático vía comando programado). Administrador
@@ -248,16 +281,25 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
     // ============================================================
     Route::prefix('conciliaciones')->group(function (): void {
         Route::get('/', [ConciliacionController::class, 'index'])
-            ->middleware('role:Cajera,Coordinador,Gerente de Sucursal,Gerente General,Administrador')
+            ->middleware('role:Cajera,Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.conciliaciones.index');
 
         Route::post('importar', [ConciliacionController::class, 'importar'])
             ->middleware('role:Cajera,Gerente de Sucursal,Gerente General')
             ->name('api.v1.conciliaciones.importar');
 
-        // Autorización de conciliación manual cuando la referencia no coincidió con ninguna relación.
-        Route::post('{abono}/conciliar-manual', [ConciliacionController::class, 'conciliarManual'])
+        // Solo la cajera puede hacer conciliaciones manuales; para ello primero necesita que un
+        // Coordinador/Gerente autorice la solicitud puntual sobre ese abono.
+        Route::post('{abono}/solicitar-autorizacion', [ConciliacionController::class, 'solicitarAutorizacion'])
+            ->middleware('role:Cajera')
+            ->name('api.v1.conciliaciones.solicitar_autorizacion');
+
+        Route::put('autorizaciones/{solicitud}/decidir', [ConciliacionController::class, 'decidirAutorizacion'])
             ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General')
+            ->name('api.v1.conciliaciones.decidir_autorizacion');
+
+        Route::post('{abono}/conciliar-manual', [ConciliacionController::class, 'conciliarManual'])
+            ->middleware('role:Cajera')
             ->name('api.v1.conciliaciones.conciliar_manual');
     });
 
@@ -266,16 +308,19 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
     // ============================================================
     Route::prefix('reportes')->group(function (): void {
         Route::get('morosos', [ReporteController::class, 'morosos'])
-            ->middleware('role:Cajera,Coordinador,Gerente de Sucursal,Gerente General,Administrador')
+            ->middleware('role:Cajera,Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.reportes.morosos');
     });
 
 });
 
-// Admin-only protected routes
+// Admin-only protected routes — el Administrador solo ve logs de todo lo que se hace en el aplicativo.
 Route::middleware(['auth:sanctum', 'active', 'role:Administrador', 'throttle:authenticated'])->group(function (): void {
     Route::get('admin/historical-data', [AuditController::class, 'getHistoricalData'])
         ->name('api.v1.admin.historical_data');
+
+    Route::get('admin/logs', [AuditController::class, 'getAuditLog'])
+        ->name('api.v1.admin.logs');
 });
 
 // Password reset routes (public with rate limiting)

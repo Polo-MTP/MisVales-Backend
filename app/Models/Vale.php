@@ -23,14 +23,16 @@ final class Vale extends Model
         'quincenas',     // snapshot del producto al momento del alta
         'tipo',          // 'pre-vale' o 'vale-digital'
         'estado',        // 'solicitado', 'autorizado', 'pagado', 'vencido', 'incidencia'
+        'activo',        // la distribuidora la activa/desactiva sin autorización
         'fecha_solicitud',
         'fecha_autorizacion',
-        'numero_transferencia'
+        'numero_transferencia',
     ];
 
     protected $casts = [
         'monto' => 'decimal:2',
         'quincenas' => 'integer',
+        'activo' => 'boolean',
         'fecha_solicitud' => 'datetime',
         'fecha_autorizacion' => 'datetime',
     ];

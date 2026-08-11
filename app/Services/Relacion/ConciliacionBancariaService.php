@@ -11,12 +11,15 @@ use App\Models\User;
 use App\Models\Vale;
 use App\Services\Configuracion\ConfiguracionService;
 use Carbon\Carbon;
+use DomainException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
+use Throwable;
 
 /**
  * Importa el Excel que la cajera descarga del banco, concilia cada movimiento contra la
@@ -61,7 +64,7 @@ final class ConciliacionBancariaService
 
                 $resumen['procesadas']++;
                 $resumen[$abono->estado === 'conciliado' ? 'conciliadas' : 'sin_coincidencia']++;
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 $resumen['errores'][] = 'Fila '.($numeroFila + 2).': '.$e->getMessage();
             }
         }
@@ -71,19 +74,21 @@ final class ConciliacionBancariaService
 
     /**
      * Concilia manualmente un abono que no coincidió con ninguna referencia (ej. la distribuidora
-     * escribió mal el número de relación). Requiere autorización de gerente/coordinador.
+     * escribió mal el número de relación). Solo la cajera ejecuta ($ejecutor); requiere que un
+     * gerente/coordinador haya autorizado previamente la solicitud puntual (ver SolicitudConciliacionService).
      */
-    public function conciliarManual(AbonoConciliacion $abono, Relacion $relacion, User $autorizador, string $motivo): AbonoConciliacion
+    public function conciliarManual(AbonoConciliacion $abono, Relacion $relacion, User $ejecutor, string $motivo, ?int $autorizadoPorId = null): AbonoConciliacion
     {
         if ($abono->estado !== 'sin_coincidencia') {
-            throw new \DomainException('Este abono ya fue conciliado previamente.');
+            throw new DomainException('Este abono ya fue conciliado previamente.');
         }
 
-        return DB::transaction(function () use ($abono, $relacion, $autorizador, $motivo): AbonoConciliacion {
+        return DB::transaction(function () use ($abono, $relacion, $ejecutor, $motivo, $autorizadoPorId): AbonoConciliacion {
             $abono->update([
                 'relacion_id' => $relacion->id,
                 'estado' => 'conciliado_manual',
-                'autorizado_por' => $autorizador->id,
+                'conciliado_por' => $ejecutor->id,
+                'autorizado_por' => $autorizadoPorId ?? $ejecutor->id,
                 'motivo_manual' => $motivo,
             ]);
 
@@ -113,7 +118,7 @@ final class ConciliacionBancariaService
     private function procesarFila(array $datos, ?int $convenioBancarioId, User $usuario, string $lote): AbonoConciliacion
     {
         if ($datos['referencia'] === '' || $datos['monto'] <= 0) {
-            throw new \InvalidArgumentException('Referencia o monto inválido.');
+            throw new InvalidArgumentException('Referencia o monto inválido.');
         }
 
         $relacion = Relacion::query()->where('referencia_pago', $datos['referencia'])->first();
@@ -158,8 +163,36 @@ final class ConciliacionBancariaService
 
             if ($relacion->estado === 'liquidada') {
                 $this->procesarPuntos($relacion, $fechaAbono);
+                $this->marcarValesPagados($relacion);
             }
         });
+    }
+
+    /**
+     * Un vale queda 'pagado' hasta que se liquida su última cuota (cuota_numero === cuotas_totales);
+     * si nació como 'pre-vale' (primer vale de un cliente nuevo), se convierte en 'vale-digital'
+     * en ese mismo momento.
+     */
+    private function marcarValesPagados(Relacion $relacion): void
+    {
+        $relacion->loadMissing('detalles.vale');
+
+        foreach ($relacion->detalles as $detalle) {
+            if ($detalle->cuota_numero !== $detalle->cuotas_totales) {
+                continue;
+            }
+
+            $vale = $detalle->vale;
+            if (! $vale || $vale->estado === 'pagado') {
+                continue;
+            }
+
+            $vale->estado = 'pagado';
+            if ($vale->tipo === 'pre-vale') {
+                $vale->tipo = 'vale-digital';
+            }
+            $vale->save();
+        }
     }
 
     /**
@@ -272,7 +305,7 @@ final class ConciliacionBancariaService
         foreach (['d/m/Y', 'd-m-Y', 'Y-m-d'] as $formato) {
             try {
                 return Carbon::createFromFormat($formato, trim((string) $valor))->format('Y-m-d');
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 continue;
             }
         }
@@ -292,7 +325,7 @@ final class ConciliacionBancariaService
 
         try {
             return Carbon::parse((string) $valor)->format('H:i:s');
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
     }
