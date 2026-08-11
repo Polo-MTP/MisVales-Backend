@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\Relacion\ConciliacionController;
 use App\Http\Controllers\Api\V1\Relacion\RelacionController;
 use App\Http\Controllers\Api\V1\Reporte\ReporteController;
 use App\Http\Controllers\Api\V1\UsuarioController;
+use App\Http\Controllers\Api\V1\Vale\ValeController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -199,6 +200,24 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
         Route::get('{distribuidora}/saldo-disponible', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'saldoDisponible'])
             ->middleware('role:Cajera,Distribuidora,Gerente de Sucursal,Gerente General')
             ->name('api.v1.distribuidoras.saldo');
+    });
+
+    // ============================================================
+    // MÓDULO 10: VALES (EMISIÓN) — prerequisito de Relaciones/Conciliación:
+    // sin esto, RelacionCalculoService nunca tiene vales que cortar.
+    // ============================================================
+    Route::prefix('vales')->group(function (): void {
+        Route::get('/', [ValeController::class, 'index'])
+            ->middleware('role:Distribuidora,Coordinador,Gerente de Sucursal,Gerente General,Administrador')
+            ->name('api.v1.vales.index');
+
+        Route::post('/', [ValeController::class, 'store'])
+            ->middleware('role:Distribuidora')
+            ->name('api.v1.vales.store');
+
+        Route::put('{vale}/autorizar', [ValeController::class, 'autorizar'])
+            ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General')
+            ->name('api.v1.vales.autorizar');
     });
 
     // ============================================================

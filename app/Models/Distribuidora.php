@@ -123,8 +123,10 @@ final class Distribuidora extends Model
 
     public function getCreditoDisponibleAttribute(): float
     {
+        // Mismo conjunto de estados que RelacionCalculoService considera "vales pendientes"
+        // ('activo' no es un valor válido del enum vales.estado, nunca hacía match).
         $totalEnUso = $this->vales()
-            ->whereIn('estado', ['activo', 'parcial'])
+            ->whereIn('estado', ['autorizado', 'parcial', 'vencido'])
             ->sum('monto') ?? 0;
 
         return max(0, (float) $this->limite_credito - (float) $totalEnUso);
