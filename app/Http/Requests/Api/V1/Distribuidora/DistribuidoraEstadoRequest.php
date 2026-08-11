@@ -12,12 +12,13 @@ final class DistribuidoraEstadoRequest extends FormRequest
     public function authorize(): bool
     {
         $user = $this->user();
+        $role = $user?->role?->name;
         $estado = $this->input('estado');
         $permisos = [
-            'EN_VERIFICACION' => $user->hasRole('verificador'),
-            'RECHAZADO'       => $user->hasAnyRole(['verificador', 'gerente-sucursal']),
-            'ACTIVO'          => $user->hasAnyRole(['gerente-sucursal', 'Gerente General']),
-            'MOROSO'          => $user->hasAnyRole(['gerente-sucursal', 'Gerente General']),
+            'EN_VERIFICACION' => $role === 'Verificador',
+            'RECHAZADO'       => in_array($role, ['Verificador', 'Gerente de Sucursal'], true),
+            'ACTIVO'          => in_array($role, ['Gerente de Sucursal', 'Gerente General'], true),
+            'MOROSO'          => in_array($role, ['Gerente de Sucursal', 'Gerente General'], true),
         ];
         return $permisos[$estado] ?? false;
     }

@@ -11,21 +11,23 @@ final class DistribuidoraPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->hasAnyRole(['coordinador', 'gerente-sucursal', 'gerente-general', 'verificador', 'administrador']);
+        return in_array($user->role?->name, ['Coordinador', 'Gerente de Sucursal', 'Gerente General', 'Verificador', 'Administrador'], true);
     }
 
     public function view(User $user, Distribuidora $distribuidora): bool
     {
-        if ($user->hasRole('gerente-general') || $user->hasRole('administrador')) {
+        $role = $user->role?->name;
+
+        if ($role === 'Gerente General' || $role === 'Administrador') {
             return true;
         }
-        if ($user->hasRole('gerente-sucursal')) {
+        if ($role === 'Gerente de Sucursal') {
             return $distribuidora->sucursal_id === $user->sucursal_id;
         }
-        if ($user->hasRole('coordinador')) {
+        if ($role === 'Coordinador') {
             return $distribuidora->coordinador_id === $user->id;
         }
-        if ($user->hasRole('verificador')) {
+        if ($role === 'Verificador') {
             return $distribuidora->verificador_id === $user->id || $distribuidora->estado === 'EN_VERIFICACION';
         }
         return false;
@@ -33,37 +35,41 @@ final class DistribuidoraPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasAnyRole(['coordinador', 'gerente-sucursal', 'gerente-general']);
+        return in_array($user->role?->name, ['Coordinador', 'Gerente de Sucursal', 'Gerente General'], true);
     }
 
     public function update(User $user, Distribuidora $distribuidora): bool
     {
-        if ($user->hasRole('gerente-general')) {
+        $role = $user->role?->name;
+
+        if ($role === 'Gerente General') {
             return true;
         }
-        if ($user->hasRole('gerente-sucursal')) {
+        if ($role === 'Gerente de Sucursal') {
             return $distribuidora->sucursal_id === $user->sucursal_id;
         }
-        if ($user->hasRole('coordinador')) {
-            return $distribuidora->coordinador_id === $user->id && in_array($distribuidora->estado, ['EN_CAPTURA', 'EN_VERIFICACION']);
+        if ($role === 'Coordinador') {
+            return $distribuidora->coordinador_id === $user->id && in_array($distribuidora->estado, ['EN_CAPTURA', 'EN_VERIFICACION'], true);
         }
         return false;
     }
 
     public function delete(User $user, Distribuidora $distribuidora): bool
     {
-        return $user->hasRole('gerente-general');
+        return $user->role?->name === 'Gerente General';
     }
 
     public function cambiarEstado(User $user, Distribuidora $distribuidora): bool
     {
-        if ($user->hasRole('gerente-general')) {
+        $role = $user->role?->name;
+
+        if ($role === 'Gerente General') {
             return true;
         }
-        if ($user->hasRole('gerente-sucursal')) {
+        if ($role === 'Gerente de Sucursal') {
             return $distribuidora->sucursal_id === $user->sucursal_id;
         }
-        if ($user->hasRole('verificador')) {
+        if ($role === 'Verificador') {
             return $distribuidora->estado === 'EN_CAPTURA' && $distribuidora->sucursal_id === $user->sucursal_id;
         }
         return false;
@@ -71,7 +77,9 @@ final class DistribuidoraPolicy
 
     public function asignarCredito(User $user, Distribuidora $distribuidora): bool
     {
-        return $user->hasAnyRole(['gerente-sucursal', 'gerente-general'])
-            && ($user->hasRole('gerente-general') || $distribuidora->sucursal_id === $user->sucursal_id);
+        $role = $user->role?->name;
+
+        return in_array($role, ['Gerente de Sucursal', 'Gerente General'], true)
+            && ($role === 'Gerente General' || $distribuidora->sucursal_id === $user->sucursal_id);
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\V1\AltaProveedor\SolicitudProveedorController;
 use App\Http\Controllers\Api\V1\AuditController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\Distribuidora\CategoriaDistribuidoraController;
 use App\Http\Controllers\Api\V1\MfaController;
 use App\Http\Controllers\Api\V1\Producto\ProductoController;
 use App\Http\Controllers\Api\V1\Relacion\ConciliacionController;
@@ -156,6 +157,11 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
                 ->middleware('role:Gerente General')
                 ->name('api.v1.productos.destroy');
         });
+
+    // Catálogo de categorías de distribuidora (usado por el selector de PUT distribuidoras/{id}/credito)
+    Route::get('categorias-distribuidoras', [CategoriaDistribuidoraController::class, 'index'])
+        ->middleware('role:Gerente de Sucursal,Gerente General,Administrador')
+        ->name('api.v1.categorias_distribuidoras.index');
 
     // ============================================================
     // MÓDULO 6: GESTIÓN AVANZADA DE DISTRIBUIDORAS
