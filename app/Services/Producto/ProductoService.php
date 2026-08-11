@@ -19,7 +19,7 @@ class ProductoService
     public function crear(array $data): Producto
     {
         $data['created_by'] = Auth::id();
-        return Producto::create($data);
+        return Producto::create($data)->fresh();
     }
 
     public function actualizar(Producto $producto, array $data): Producto

@@ -21,8 +21,13 @@ class ProductoUpdateRequest extends FormRequest
                 'numeric',
                 'min:100',
                 'multiple_of:100',
-                Rule::unique('productos', 'monto')->ignore($id),
+                Rule::unique('productos', 'monto')->ignore($id)->where(function ($query): void {
+                    $this->filled('quincenas') ? $query->where('quincenas', $this->input('quincenas')) : $query->whereNull('quincenas');
+                    $this->filled('variante') ? $query->where('variante', $this->input('variante')) : $query->whereNull('variante');
+                }),
             ],
+            'quincenas' => 'nullable|integer|min:1',
+            'variante' => 'nullable|string|max:50',
             'descripcion' => 'nullable|string|max:255',
             'activo' => 'sometimes|boolean',
         ];

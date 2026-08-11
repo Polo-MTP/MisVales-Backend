@@ -21,16 +21,16 @@ final class ProductoPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasRole('gerente-general');
+        return $user->role?->name === 'Gerente General';
     }
 
     public function update(User $user, Producto $producto): bool
     {
-        return $user->hasRole('gerente-general');
+        return $user->role?->name === 'Gerente General';
     }
 
     public function delete(User $user, Producto $producto): bool
     {
-        return $user->hasRole('gerente-general');
+        return $user->role?->name === 'Gerente General';
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api\V1\Productos;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class ProductoStoreRequest extends FormRequest
 {
@@ -14,7 +15,18 @@ class ProductoStoreRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'monto' => 'required|numeric|min:100|multiple_of:100|unique:productos,monto',
+            'monto' => [
+                'required',
+                'numeric',
+                'min:100',
+                'multiple_of:100',
+                Rule::unique('productos', 'monto')->where(function ($query): void {
+                    $this->filled('quincenas') ? $query->where('quincenas', $this->input('quincenas')) : $query->whereNull('quincenas');
+                    $this->filled('variante') ? $query->where('variante', $this->input('variante')) : $query->whereNull('variante');
+                }),
+            ],
+            'quincenas' => 'nullable|integer|min:1',
+            'variante' => 'nullable|string|max:50',
             'descripcion' => 'nullable|string|max:255',
         ];
     }
@@ -23,7 +35,7 @@ class ProductoStoreRequest extends FormRequest
     {
         return [
             'monto.multiple_of' => 'El monto debe ser múltiplo de 100.',
-            'monto.unique' => 'Este monto ya está registrado.',
+            'monto.unique' => 'Ya existe un producto con este monto, número de quincenas y variante.',
         ];
     }
 }

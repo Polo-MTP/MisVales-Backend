@@ -11,6 +11,7 @@ use App\Models\Producto;
 use App\Services\Producto\ProductoService;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class ProductoController extends Controller
@@ -19,9 +20,14 @@ class ProductoController extends Controller
     {
     }
 
-    public function index(): JsonResponse
+    /**
+     * ?activos=false permite ver también los productos desactivados (para poder reactivarlos).
+     * Por defecto solo regresa los activos.
+     */
+    public function index(Request $request): JsonResponse
     {
-        $productos = $this->productoService->listar(true);
+        $soloActivos = $request->boolean('activos', true);
+        $productos = $this->productoService->listar($soloActivos);
         return response()->json(ProductoResource::collection($productos));
     }
 
