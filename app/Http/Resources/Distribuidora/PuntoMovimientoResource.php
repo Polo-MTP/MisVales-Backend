@@ -21,10 +21,13 @@ final class PuntoMovimientoResource extends JsonResource
         return [
             'id' => $this->id,
             'distribuidora_id' => $this->distribuidora_id,
+            'relacion_id' => $this->relacion_id,
             'tipo' => $this->tipo,
             'cantidad' => $this->cantidad,
+            'valor_punto_snapshot' => $this->valor_punto_snapshot,
             'motivo' => $this->motivo,
             'registrado_por' => $this->registrado_por,
+            'registrado_por_nombre' => $this->whenLoaded('registradoPor', fn () => $this->registradoPor?->name),
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }

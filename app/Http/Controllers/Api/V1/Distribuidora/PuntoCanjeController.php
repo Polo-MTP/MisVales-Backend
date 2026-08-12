@@ -12,12 +12,26 @@ use App\Models\User;
 use App\Services\Distribuidora\PuntoCanjeService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 final class PuntoCanjeController extends ApiController
 {
     public function __construct(
         private readonly PuntoCanjeService $puntoCanjeService,
     ) {}
+
+    public function index(Request $request, Distribuidora $distribuidora): JsonResponse
+    {
+        /** @var User $usuario */
+        $usuario = $request->user();
+
+        $movimientos = $this->puntoCanjeService->listar($distribuidora, $usuario, $request->all());
+
+        return $this->success(
+            data: PuntoMovimientoResource::collection($movimientos)->response()->getData(true),
+            message: 'Historial de movimientos de puntos obtenido exitosamente.'
+        );
+    }
 
     public function canjear(CanjearPuntosRequest $request, Distribuidora $distribuidora): JsonResponse
     {

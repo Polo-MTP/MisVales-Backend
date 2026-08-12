@@ -227,6 +227,12 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware('role:Cajera,Distribuidora,Gerente de Sucursal,Gerente General')
             ->name('api.v1.distribuidoras.saldo');
 
+        // Historial de movimientos de puntos (generados, penalizados, canjeados, ajustes): sin
+        // esto no había forma de ver cómo se llegó al saldo actual, solo el número final.
+        Route::get('{distribuidora}/puntos', [App\Http\Controllers\Api\V1\Distribuidora\PuntoCanjeController::class, 'index'])
+            ->middleware('role:Cajera,Distribuidora,Gerente de Sucursal,Gerente General')
+            ->name('api.v1.distribuidoras.puntos.index');
+
         // Canje de puntos: la cajera lo captura en caja.
         Route::post('{distribuidora}/puntos/canjear', [App\Http\Controllers\Api\V1\Distribuidora\PuntoCanjeController::class, 'canjear'])
             ->middleware('role:Cajera')
