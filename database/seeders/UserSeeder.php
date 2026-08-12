@@ -20,6 +20,7 @@ final class UserSeeder extends Seeder
         $gerenteSucursalRole = Role::query()->where('name', 'Gerente de Sucursal')->first();
         $coordinadorRole = Role::query()->where('name', 'Coordinador')->first();
         $verificadorRole = Role::query()->where('name', 'Verificador')->first();
+        $cajeraRole = Role::query()->where('name', 'Cajera')->first();
         $distribuidoraRole = Role::query()->where('name', 'Distribuidora')->first();
 
         /** @var Sucursal|null $matriz */
@@ -119,6 +120,19 @@ final class UserSeeder extends Seeder
                 'name' => 'Verificador Gómez Palacio',
                 'password' => Hash::make('Password123!'),
                 'role_id' => $verificadorRole?->id,
+                'sucursal_id' => $sucursalGomez?->id,
+                'is_active' => true,
+                'email_verified_at' => now(),
+            ]
+        );
+
+        // 6b. Cajera (Sucursal Gómez Palacio)
+        User::query()->updateOrCreate(
+            ['email' => 'cajera@correo.com'],
+            [
+                'name' => 'Cajera Gómez Palacio',
+                'password' => Hash::make('Password123!'),
+                'role_id' => $cajeraRole?->id,
                 'sucursal_id' => $sucursalGomez?->id,
                 'is_active' => true,
                 'email_verified_at' => now(),

@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             // DistribuidoraSeeder::class,     // Opcional: para datos de prueba
             ConfiguracionSeeder::class,        // Configuraciones globales
             MfaSeeder::class,                  // MFA (si aplica)
+            MorosidadDemoSeeder::class,        // Distribuidoras/vales/relaciones vencidas para probar reportes/morosos
         ]);
     }
 }
