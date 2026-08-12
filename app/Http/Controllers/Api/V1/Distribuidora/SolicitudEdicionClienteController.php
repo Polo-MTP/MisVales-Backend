@@ -23,6 +23,19 @@ final class SolicitudEdicionClienteController extends ApiController
         private readonly SolicitudEdicionClienteService $solicitudEdicionClienteService,
     ) {}
 
+    public function index(Request $request): JsonResponse
+    {
+        /** @var User $usuario */
+        $usuario = $request->user();
+
+        $solicitudes = $this->solicitudEdicionClienteService->listar($usuario, $request->all());
+
+        return $this->success(
+            data: SolicitudEdicionClienteResource::collection($solicitudes)->response()->getData(true),
+            message: 'Lista de solicitudes de edición de cliente obtenida exitosamente.'
+        );
+    }
+
     public function store(SolicitarEdicionClienteRequest $request, int $id): JsonResponse
     {
         /** @var User $usuario */

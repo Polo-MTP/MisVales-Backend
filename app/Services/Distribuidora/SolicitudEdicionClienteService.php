@@ -8,6 +8,7 @@ use App\Models\Cliente;
 use App\Models\SolicitudEdicionCliente;
 use App\Models\User;
 use DomainException;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -96,5 +97,30 @@ final class SolicitudEdicionClienteService
 
             return $cliente->fresh(['datosPersonales.direccion']);
         });
+    }
+
+    /**
+     * Lista solicitudes de edición de cliente. Cajera ve solo las suyas; Coordinador/Gerente
+     * de Sucursal ven las de su sucursal; Gerente General ve todas.
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    public function listar(User $usuario, array $filters = []): LengthAwarePaginator
+    {
+        $query = SolicitudEdicionCliente::query()->with(['cliente.datosPersonales', 'solicitante', 'autorizador']);
+
+        $role = $usuario->role?->name;
+
+        if ($role === 'Cajera') {
+            $query->where('solicitado_por', $usuario->id);
+        } elseif ($role !== 'Gerente General') {
+            $query->where('sucursal_id', $usuario->sucursal_id);
+        }
+
+        if (! empty($filters['estado'])) {
+            $query->where('estado', $filters['estado']);
+        }
+
+        return $query->latest('id')->paginate((int) ($filters['per_page'] ?? 15));
     }
 }

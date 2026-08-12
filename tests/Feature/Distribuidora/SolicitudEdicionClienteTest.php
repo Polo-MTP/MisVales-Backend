@@ -10,6 +10,7 @@ use App\Models\Sucursal;
 use App\Models\User;
 use App\Services\Distribuidora\SolicitudEdicionClienteService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
 
@@ -80,3 +81,33 @@ it('una solicitud rechazada no puede aplicarse', function (): void {
 
     app(SolicitudEdicionClienteService::class)->aplicar($solicitud, $cajera);
 })->throws(DomainException::class);
+
+it('el gerente de sucursal puede listar por HTTP las solicitudes de edición pendientes, y la ruta no la tapa clientes/{id}', function (): void {
+    ['cajera' => $cajera, 'gerenteSucursal' => $gerenteSucursal] = crearUsuariosSucursalEdicion();
+    $cliente = crearClienteParaEdicion();
+
+    app(SolicitudEdicionClienteService::class)->solicitar($cliente, ['nombre' => 'Juan Corregido'], [], 'CURP con typo', $cajera);
+
+    Sanctum::actingAs($gerenteSucursal->fresh());
+
+    $response = $this->getJson('/api/v1/distribuidora/clientes/ediciones');
+
+    $response->assertStatus(200)
+        ->assertJsonCount(1, 'data.data')
+        ->assertJsonPath('data.data.0.estado', 'pendiente')
+        ->assertJsonPath('data.data.0.cliente_id', $cliente->id);
+});
+
+it('la cajera solo ve por HTTP sus propias solicitudes de edición', function (): void {
+    ['cajera' => $cajera] = crearUsuariosSucursalEdicion();
+    $otraCajera = User::factory()->create(['role_id' => $cajera->role_id, 'sucursal_id' => $cajera->sucursal_id, 'is_active' => true]);
+    $cliente = crearClienteParaEdicion();
+
+    app(SolicitudEdicionClienteService::class)->solicitar($cliente, ['nombre' => 'Juan Corregido'], [], 'motivo', $cajera);
+
+    Sanctum::actingAs($otraCajera);
+
+    $this->getJson('/api/v1/distribuidora/clientes/ediciones')
+        ->assertStatus(200)
+        ->assertJsonCount(0, 'data.data');
+});

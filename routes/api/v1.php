@@ -95,6 +95,13 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware('role:Distribuidora,Gerente General')
             ->name('api.v1.distribuidora.clientes.store');
 
+        // Debe ir ANTES de clientes/{id}: si no, el wildcard {id} capturaría "ediciones" como si
+        // fuera un id y esta ruta nunca se alcanzaría. Listado de solicitudes de edición: sin esto
+        // Coordinador/Gerente no tienen forma de ver qué hay pendiente de aprobar.
+        Route::get('clientes/ediciones', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudEdicionClienteController::class, 'index'])
+            ->middleware('role:Cajera,Coordinador,Gerente de Sucursal,Gerente General')
+            ->name('api.v1.distribuidora.clientes.ediciones.index');
+
         Route::get('clientes/{id}', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'show'])
             ->middleware('role:Distribuidora,Gerente General,Gerente de Sucursal')
             ->name('api.v1.distribuidora.clientes.show');
@@ -287,6 +294,12 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
         Route::post('importar', [ConciliacionController::class, 'importar'])
             ->middleware('role:Cajera,Gerente de Sucursal,Gerente General')
             ->name('api.v1.conciliaciones.importar');
+
+        // Listado de solicitudes de conciliación manual: sin esto Coordinador/Gerente no tienen
+        // forma de ver qué hay pendiente de aprobar.
+        Route::get('autorizaciones', [ConciliacionController::class, 'listarAutorizaciones'])
+            ->middleware('role:Cajera,Coordinador,Gerente de Sucursal,Gerente General')
+            ->name('api.v1.conciliaciones.autorizaciones.index');
 
         // Solo la cajera puede hacer conciliaciones manuales; para ello primero necesita que un
         // Coordinador/Gerente autorice la solicitud puntual sobre ese abono.

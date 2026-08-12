@@ -64,6 +64,19 @@ final class ConciliacionController extends ApiController
         );
     }
 
+    public function listarAutorizaciones(Request $request): JsonResponse
+    {
+        /** @var User $usuario */
+        $usuario = $request->user();
+
+        $solicitudes = $this->solicitudConciliacionService->listar($usuario, $request->all());
+
+        return $this->success(
+            data: SolicitudConciliacionResource::collection($solicitudes)->response()->getData(true),
+            message: 'Lista de solicitudes de conciliación manual obtenida exitosamente.'
+        );
+    }
+
     public function solicitarAutorizacion(SolicitarConciliacionRequest $request, AbonoConciliacion $abono): JsonResponse
     {
         /** @var User $usuario */

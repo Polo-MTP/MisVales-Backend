@@ -17,6 +17,7 @@ use App\Models\Vale;
 use App\Services\Relacion\RelacionCalculoService;
 use App\Services\Relacion\SolicitudConciliacionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
 
@@ -144,3 +145,24 @@ it('otra cajera distinta a la solicitante no puede ejecutar la conciliación ya 
 
     app(SolicitudConciliacionService::class)->ejecutar($solicitud, $otraCajera);
 })->throws(Symfony\Component\HttpKernel\Exception\HttpException::class);
+
+it('el coordinador puede listar por HTTP las solicitudes de conciliación pendientes de su sucursal', function (): void {
+    ['sucursal' => $sucursal, 'cajera' => $cajera, 'coordinador' => $coordinador, 'coordinadorOtraSucursal' => $coordinadorOtraSucursal] = crearSucursalConUsuarios();
+    ['relacion' => $relacion, 'abono' => $abono] = crearDistribuidoraYAbonoSinCoincidencia($sucursal);
+
+    app(SolicitudConciliacionService::class)->solicitar($abono, $relacion->id, 'Referencia mal escrita', $cajera);
+
+    Sanctum::actingAs($coordinador->fresh());
+
+    $response = $this->getJson('/api/v1/conciliaciones/autorizaciones');
+
+    $response->assertStatus(200)
+        ->assertJsonCount(1, 'data.data')
+        ->assertJsonPath('data.data.0.estado', 'pendiente');
+
+    Sanctum::actingAs($coordinadorOtraSucursal->fresh());
+
+    $this->getJson('/api/v1/conciliaciones/autorizaciones')
+        ->assertStatus(200)
+        ->assertJsonCount(0, 'data.data');
+});
