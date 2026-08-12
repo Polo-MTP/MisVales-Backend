@@ -16,7 +16,8 @@ final class ThirdFactorMail extends Mailable
     use SerializesModels;
 
     public function __construct(
-        public string $code
+        public string $code,
+        public string $rol = 'tu cuenta',
     ) {}
 
     public function envelope(): Envelope
@@ -30,6 +31,7 @@ final class ThirdFactorMail extends Mailable
     {
         return new Content(
             view: 'emails.third-factor',
+            with: ['rol' => $this->rol],
         );
     }
 

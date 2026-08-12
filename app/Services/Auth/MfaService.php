@@ -93,7 +93,7 @@ final class MfaService
             Cache::put('email_otp_'.$user->id, $otpCode, 300);
 
             try {
-                Mail::to($user->email)->send(new ThirdFactorMail($otpCode));
+                Mail::to($user->email)->send(new ThirdFactorMail($otpCode, $user->role?->name ?? 'tu cuenta'));
             } catch (Throwable $e) {
                 Log::error('MfaService: Error al enviar email de 3er factor', [
                     'user_id' => $user->id,

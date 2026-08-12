@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Auth;
 
 use App\Models\LoginAttempt;
+use App\Models\MfaMethod;
+use App\Models\MfaType;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -157,8 +159,6 @@ final class LoginService
 
         $this->guardarEnHistorial($user->id, $user->email, 'success_factor_1');
 
-        // MFA desactivado temporalmente para pruebas directas en Postman / desarrollo
-        /*
         $factorCount = $user->role?->factor_count ?? 1;
 
         if ($factorCount > 1) {
@@ -169,7 +169,6 @@ final class LoginService
 
             return $this->generarRetoMfa($user);
         }
-        */
 
         Log::debug('LoginService: Login de factor único exitoso y completado', [
             'email' => $user->email,
@@ -189,5 +188,52 @@ final class LoginService
     private function guardarEnHistorial(?int $userId, string $email, string $status): void
     {
         LoginAttempt::record($userId, $email, $status, 1);
+    }
+
+    /**
+     * Determina si el usuario ya tiene su segundo factor (TOTP) configurado y verificado.
+     * Si no, pide setup (QR); si ya lo tiene, pide el código para continuar el login.
+     *
+     * @return array<string, mixed>
+     */
+    private function generarRetoMfa(User $user): array
+    {
+        /** @var MfaType|null $totpType */
+        $totpType = MfaType::query()->where('type', 'totp')->first();
+
+        $metodo = $totpType
+            ? MfaMethod::query()->where('user_id', $user->id)->where('mfa_type_id', $totpType->id)->first()
+            : null;
+
+        if (! $metodo || ! $metodo->is_verified) {
+            Log::debug('LoginService: Usuario sin segundo factor configurado, requiere setup', [
+                'email' => $user->email,
+            ]);
+
+            $this->guardarEnHistorial($user->id, $user->email, 'requires_mfa_setup');
+
+            return [
+                'success' => true,
+                'requires_setup' => true,
+                'email' => $user->email,
+                'message' => 'Necesitas configurar tu autenticación de dos pasos. Escanea el código QR desde /mfa/setup.',
+                'code' => 200,
+            ];
+        }
+
+        Log::debug('LoginService: Usuario con segundo factor configurado, requiere código', [
+            'email' => $user->email,
+            'mfa_method_id' => $metodo->id,
+        ]);
+
+        $this->guardarEnHistorial($user->id, $user->email, 'requires_mfa_code');
+
+        return [
+            'success' => true,
+            'requires_mfa' => true,
+            'mfa_method_id' => (string) $metodo->id,
+            'message' => 'Ingresa el código de tu aplicación de autenticación.',
+            'code' => 200,
+        ];
     }
 }

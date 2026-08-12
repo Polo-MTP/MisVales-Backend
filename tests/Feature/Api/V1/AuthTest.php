@@ -13,10 +13,10 @@ beforeEach(function (): void {
 });
 
 describe('Login', function (): void {
-    it('logs in with valid credentials', function (): void {
+    it('logs in with valid credentials for a role with no MFA requirement', function (): void {
         $user = User::factory()->create([
             'password' => bcrypt('Password123!'),
-            'role_id' => 1,
+            'role_id' => null,
         ]);
 
         $response = $this->postJson('/api/v1/login', [
@@ -36,6 +36,27 @@ describe('Login', function (): void {
             ->assertJson([
                 'success' => true,
                 'message' => 'Login exitoso',
+            ]);
+    });
+
+    it('requires MFA setup on first login for a role that needs a second factor', function (): void {
+        $user = User::factory()->create([
+            'password' => bcrypt('Password123!'),
+            'role_id' => 1,
+        ]);
+
+        $response = $this->postJson('/api/v1/login', [
+            'email' => $user->email,
+            'password' => 'Password123!',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'requires_setup' => true,
+                    'email' => $user->email,
+                ],
             ]);
     });
 
