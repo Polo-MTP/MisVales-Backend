@@ -28,7 +28,7 @@ final class ClienteService
         /** @var Distribuidora $distribuidora */
         $distribuidora = Distribuidora::query()->create([
             'usuario_id' => $usuario->id,
-            'numero_distribuidora' => 'DIST-'.str_pad((string) $usuario->id, 5, '0', STR_PAD_LEFT),
+            'numero_distribuidora' => 'DIST-'.mb_str_pad((string) $usuario->id, 5, '0', STR_PAD_LEFT),
             'limite_credito' => 0.00,
             'credito_disponible' => 0.00,
             'puntos_acumulados' => 0,
@@ -99,21 +99,32 @@ final class ClienteService
     }
 
     /**
-     * Obtiene la lista paginada de clientes activos/asignados a la distribuidora del usuario.
+     * Obtiene la lista paginada de clientes. Para Distribuidora, solo los suyos. Para staff
+     * (Cajera/Gerente de Sucursal), los de su sucursal; Gerente General ve todos.
      *
      * @param  array<string, mixed>  $filters
      */
     public function listarClientes(User $usuario, array $filters = []): LengthAwarePaginator
     {
-        $distribuidora = $this->obtenerOAsegurarDistribuidora($usuario);
+        $query = Cliente::query()->with(['datosPersonales.direccion', 'historialDistribuidoras.distribuidora']);
 
-        $query = Cliente::query()
-            ->with(['datosPersonales.direccion', 'historialDistribuidoras' => function ($q) use ($distribuidora): void {
-                $q->where('distribuidor_id', $distribuidora->id)->whereNull('fecha_fin');
-            }])
-            ->whereHas('historialDistribuidoras', function ($q) use ($distribuidora): void {
+        if ($this->esStaff($usuario)) {
+            $role = $usuario->role?->name;
+
+            $query->whereHas('historialDistribuidoras', function ($q) use ($usuario, $role): void {
+                $q->whereNull('fecha_fin');
+
+                if ($role !== 'Gerente General') {
+                    $q->whereHas('distribuidora', fn ($dq) => $dq->where('sucursal_id', $usuario->sucursal_id));
+                }
+            });
+        } else {
+            $distribuidora = $this->obtenerOAsegurarDistribuidora($usuario);
+
+            $query->whereHas('historialDistribuidoras', function ($q) use ($distribuidora): void {
                 $q->where('distribuidor_id', $distribuidora->id)->whereNull('fecha_fin');
             });
+        }
 
         if (isset($filters['estado'])) {
             $estado = filter_var($filters['estado'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
@@ -145,19 +156,34 @@ final class ClienteService
             ->with(['datosPersonales.direccion', 'historialDistribuidoras.distribuidora'])
             ->findOrFail($clienteId);
 
-        $distribuidora = $this->obtenerOAsegurarDistribuidora($usuario);
+        $role = $usuario->role?->name;
 
-        $esSuperusuario = in_array($usuario->role?->name, ['Gerente General', 'Administrador', 'Gerente de Sucursal'], true);
+        if (in_array($role, ['Gerente General', 'Administrador'], true)) {
+            return $cliente;
+        }
 
-        if (! $esSuperusuario) {
-            $perteneceADistribuidora = $cliente->historialDistribuidoras()
-                ->where('distribuidor_id', $distribuidora->id)
+        if (in_array($role, ['Cajera', 'Gerente de Sucursal'], true)) {
+            $perteneceASucursal = $cliente->historialDistribuidoras()
                 ->whereNull('fecha_fin')
+                ->whereHas('distribuidora', fn ($q) => $q->where('sucursal_id', $usuario->sucursal_id))
                 ->exists();
 
-            if (! $perteneceADistribuidora) {
-                abort(403, 'Acceso Denegado. Este cliente no está asignado a tu distribuidora.');
+            if (! $perteneceASucursal) {
+                abort(403, 'Acceso Denegado. Este cliente no está asignado a tu sucursal.');
             }
+
+            return $cliente;
+        }
+
+        $distribuidora = $this->obtenerOAsegurarDistribuidora($usuario);
+
+        $perteneceADistribuidora = $cliente->historialDistribuidoras()
+            ->where('distribuidor_id', $distribuidora->id)
+            ->whereNull('fecha_fin')
+            ->exists();
+
+        if (! $perteneceADistribuidora) {
+            abort(403, 'Acceso Denegado. Este cliente no está asignado a tu distribuidora.');
         }
 
         return $cliente;
@@ -207,5 +233,14 @@ final class ClienteService
         ]);
 
         return $cliente->load(['datosPersonales.direccion']);
+    }
+
+    /**
+     * Roles de staff (no son ellos mismos una distribuidora) que necesitan ver clientes de
+     * varias distribuidoras a la vez -- ej. la cajera buscando a quién corregirle datos.
+     */
+    private function esStaff(User $usuario): bool
+    {
+        return in_array($usuario->role?->name, ['Cajera', 'Gerente de Sucursal', 'Gerente General'], true);
     }
 }

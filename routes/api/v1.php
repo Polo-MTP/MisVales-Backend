@@ -88,7 +88,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->name('api.v1.distribuidora.perfil');
 
         Route::get('clientes', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'index'])
-            ->middleware('role:Distribuidora,Gerente General,Gerente de Sucursal')
+            ->middleware('role:Distribuidora,Gerente General,Gerente de Sucursal,Cajera')
             ->name('api.v1.distribuidora.clientes.index');
 
         Route::post('clientes', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'store'])
@@ -103,7 +103,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->name('api.v1.distribuidora.clientes.ediciones.index');
 
         Route::get('clientes/{id}', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'show'])
-            ->middleware('role:Distribuidora,Gerente General,Gerente de Sucursal')
+            ->middleware('role:Distribuidora,Gerente General,Gerente de Sucursal,Cajera')
             ->name('api.v1.distribuidora.clientes.show');
 
         Route::put('clientes/{id}', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'update'])
@@ -202,7 +202,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
         // se hace exclusivamente vía el flujo de solicitud (MÓDULO 1: alta-proveedor/solicitudes),
         // que exige captura -> verificación -> aprobación de gerencia antes de crear la distribuidora.
         Route::get('/', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'index'])
-            ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General')
+            ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General,Cajera')
             ->name('api.v1.distribuidoras.index');
 
         // Detalle, actualización y eliminación (con autorización por política)
@@ -330,6 +330,14 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware('role:Cajera,Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.reportes.morosos');
     });
+
+    // ============================================================
+    // MÓDULO 11: NOTIFICACIONES — feed de movimientos del aplicativo. Gerente de Sucursal ve
+    // solo los de su sucursal; Gerente General y Administrador ven todos, sin filtrar.
+    // ============================================================
+    Route::get('notificaciones', [App\Http\Controllers\Api\V1\NotificacionController::class, 'index'])
+        ->middleware('role:Gerente de Sucursal,Gerente General,Administrador')
+        ->name('api.v1.notificaciones.index');
 
 });
 

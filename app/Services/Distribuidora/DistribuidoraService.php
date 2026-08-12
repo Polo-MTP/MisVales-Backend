@@ -36,7 +36,8 @@ final class DistribuidoraService
 
         if ($roleName === 'Coordinador') {
             $query->where('coordinador_id', $user->id);
-        } elseif ($roleName === 'Gerente de Sucursal') {
+        } elseif ($roleName === 'Gerente de Sucursal' || $roleName === 'Cajera') {
+            // La cajera necesita esto para elegir la distribuidora al capturar un canje de puntos.
             $query->whereHas('sucursal', fn ($q) => $q->where('id', $user->sucursal_id));
         } elseif ($roleName === 'Verificador') {
             $query->where(function ($q) use ($user) {
