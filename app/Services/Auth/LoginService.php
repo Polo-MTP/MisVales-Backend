@@ -10,6 +10,7 @@ use App\Models\MfaType;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 
 final class LoginService
 {
@@ -212,10 +213,20 @@ final class LoginService
 
             $this->guardarEnHistorial($user->id, $user->email, 'requires_mfa_setup');
 
+            // Firmado y de corta duración: solo quien acaba de demostrar la contraseña (este
+            // mismo request) puede obtener el link para ver/generar el secreto TOTP. Sin esto,
+            // mfa/setup?email= era alcanzable por cualquiera con solo adivinar un correo.
+            $setupUrl = URL::temporarySignedRoute(
+                'api.v1.mfa.setup',
+                now()->addMinutes(10),
+                ['email' => $user->email]
+            );
+
             return [
                 'success' => true,
                 'requires_setup' => true,
                 'email' => $user->email,
+                'setup_url' => $setupUrl,
                 'message' => 'Necesitas configurar tu autenticación de dos pasos. Escanea el código QR desde /mfa/setup.',
                 'code' => 200,
             ];

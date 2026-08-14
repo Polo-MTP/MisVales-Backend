@@ -15,6 +15,10 @@ uses(RefreshDatabase::class);
 beforeEach(function (): void {
     $this->seed(RoleSeeder::class);
     Mail::fake();
+    // El store de caché de pruebas (array) vive durante todo el proceso, no por test; sin
+    // limpiarlo, el throttle:auth (5/min) compartido entre tests de este archivo se agota
+    // antes de llegar a los últimos casos.
+    Cache::flush();
 });
 
 function crearUsuarioConRol(string $nombreRol, string $password = 'Password123!'): User
@@ -31,11 +35,20 @@ function crearUsuarioConRol(string $nombreRol, string $password = 'Password123!'
  * Recorre el setup completo del segundo factor (TOTP) para un usuario y regresa
  * [mfa_method_id, secretKey] ya confirmado y verificado.
  *
+ * mfa/setup ahora exige una URL firmada (emitida solo tras validar la contraseña en
+ * /login) en vez de aceptar cualquier ?email= sin más, así que el helper primero hace
+ * login para obtener ese setup_url y solo entonces lo sigue.
+ *
  * @return array{0: string, 1: string}
  */
-function configurarSegundoFactor(Tests\TestCase $test, User $user): array
+function configurarSegundoFactor(Tests\TestCase $test, User $user, string $password = 'Password123!'): array
 {
-    $setup = $test->getJson('/api/v1/mfa/setup?email='.urlencode($user->email))
+    $loginData = $test->postJson('/api/v1/login', ['email' => $user->email, 'password' => $password])
+        ->assertStatus(200)
+        ->assertJson(['data' => ['requires_setup' => true]])
+        ->json('data');
+
+    $setup = $test->getJson($loginData['setup_url'])
         ->assertStatus(200)
         ->json('data');
 
@@ -45,6 +58,12 @@ function configurarSegundoFactor(Tests\TestCase $test, User $user): array
         'mfa_method_id' => $setup['mfa_method_id'],
         'code' => $codigo,
     ])->assertStatus(200)->assertJson(['success' => true]);
+
+    // El setup en sí ya consumió 3 de los 5 cupos del throttle:auth (login + mfa/setup +
+    // mfa/setup/confirm), y no es lo que estos tests están verificando; se libera el cupo
+    // para que el login/verify que hace el test después de llamar a este helper no choque
+    // con el límite de 5/min.
+    Cache::flush();
 
     return [$setup['mfa_method_id'], $setup['secretKey']];
 }
@@ -107,4 +126,23 @@ it('flujo completo de 3 factores: tras el TOTP pide un código por correo antes 
         ->assertStatus(200)
         ->assertJsonStructure(['success', 'message', 'data' => ['user' => ['id', 'email'], 'token']])
         ->assertJson(['success' => true]);
+});
+
+it('rechaza pedir el setup de MFA con solo el email, sin la firma emitida por /login', function (): void {
+    $user = crearUsuarioConRol('Cajera');
+
+    $this->getJson('/api/v1/mfa/setup?email='.urlencode($user->email))
+        ->assertStatus(403);
+});
+
+it('no reexpone ni regenera el secreto TOTP de una cuenta cuyo segundo factor ya está verificado', function (): void {
+    $user = crearUsuarioConRol('Cajera');
+    configurarSegundoFactor($this, $user);
+
+    $loginData = $this->postJson('/api/v1/login', ['email' => $user->email, 'password' => 'Password123!'])
+        ->assertStatus(200)
+        ->assertJson(['data' => ['requires_mfa' => true]])
+        ->json('data');
+
+    expect($loginData)->not->toHaveKey('requires_setup');
 });

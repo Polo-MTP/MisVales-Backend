@@ -23,7 +23,7 @@ final class RelacionController extends ApiController
 
     public function index(Request $request): JsonResponse
     {
-        $query = Relacion::query()->with(['sucursal', 'categoriaSnapshot']);
+        $query = Relacion::query()->with(['distribuidora', 'sucursal', 'categoriaSnapshot']);
 
         if ($request->filled('distribuidora_id')) {
             $query->where('distribuidora_id', $request->integer('distribuidora_id'));
@@ -43,7 +43,7 @@ final class RelacionController extends ApiController
 
     public function show(Relacion $relacion): JsonResponse
     {
-        $relacion->load(['sucursal', 'categoriaSnapshot', 'detalles.vale', 'detalles.cliente.datosPersonales', 'detalles.producto']);
+        $relacion->load(['distribuidora', 'sucursal', 'categoriaSnapshot', 'detalles.vale', 'detalles.cliente.datosPersonales', 'detalles.producto']);
 
         return $this->success(
             data: new RelacionResource($relacion),
@@ -68,7 +68,7 @@ final class RelacionController extends ApiController
                 }
 
                 return $this->created(
-                    data: new RelacionResource($relacion->load(['detalles.vale', 'detalles.cliente', 'detalles.producto', 'sucursal', 'categoriaSnapshot'])),
+                    data: new RelacionResource($relacion->load(['detalles.vale', 'detalles.cliente', 'detalles.producto', 'distribuidora', 'sucursal', 'categoriaSnapshot'])),
                     message: 'Relación generada exitosamente.'
                 );
             }

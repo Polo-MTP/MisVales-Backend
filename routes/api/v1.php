@@ -31,7 +31,7 @@ Route::middleware('throttle:auth')->group(function (): void {
     // MFA & 3FA verification & setup
     Route::post('mfa/verify', [MfaController::class, 'verify'])->name('api.v1.mfa.verify');
     Route::post('mfa/email/verify', [MfaController::class, 'verifyEmailOtp'])->name('api.v1.mfa.email.verify');
-    Route::get('mfa/setup', [MfaController::class, 'showSetup'])->name('api.v1.mfa.setup');
+    Route::get('mfa/setup', [MfaController::class, 'showSetup'])->middleware('signed')->name('api.v1.mfa.setup');
     Route::post('mfa/setup/confirm', [MfaController::class, 'confirmSetup'])->name('api.v1.mfa.setup.confirm');
 });
 

@@ -18,6 +18,10 @@ final class RelacionResource extends JsonResource
         return [
             'id' => $this->id,
             'distribuidora_id' => $this->distribuidora_id,
+            'distribuidora' => [
+                'numero_distribuidora' => $this->distribuidora?->numero_distribuidora,
+                'razon_social' => $this->distribuidora?->razon_social,
+            ],
             'sucursal' => $this->sucursal?->nombre,
             'referencia_pago' => $this->referencia_pago,
             'fecha_corte' => $this->fecha_corte?->toDateString(),

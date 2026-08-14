@@ -7,6 +7,7 @@ namespace App\Services\Distribuidora;
 use App\Models\Distribuidora;
 use App\Models\PuntoMovimiento;
 use App\Models\User;
+use App\Services\Configuracion\ConfiguracionService;
 use DomainException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -17,8 +18,14 @@ use Illuminate\Support\Facades\DB;
  */
 final class PuntoCanjeService
 {
+    public function __construct(
+        private readonly ConfiguracionService $configuracionService,
+    ) {}
+
     public function canjear(Distribuidora $distribuidora, int $cantidad, string $motivo, User $cajera): PuntoMovimiento
     {
+        $this->verificarAcceso($distribuidora, $cajera);
+
         if ($cantidad <= 0) {
             throw new DomainException('La cantidad a canjear debe ser mayor a cero.');
         }
@@ -27,12 +34,15 @@ final class PuntoCanjeService
             throw new DomainException('La distribuidora no cuenta con puntos suficientes para este canje.');
         }
 
-        return DB::transaction(function () use ($distribuidora, $cantidad, $motivo, $cajera): PuntoMovimiento {
+        $valorPunto = (float) ($this->configuracionService->obtenerValorVigente('valor_punto') ?? 0);
+
+        return DB::transaction(function () use ($distribuidora, $cantidad, $motivo, $cajera, $valorPunto): PuntoMovimiento {
             /** @var PuntoMovimiento $movimiento */
             $movimiento = PuntoMovimiento::query()->create([
                 'distribuidora_id' => $distribuidora->id,
                 'tipo' => 'redimido',
                 'cantidad' => -$cantidad,
+                'valor_punto_snapshot' => $valorPunto,
                 'motivo' => $motivo,
                 'registrado_por' => $cajera->id,
             ]);
@@ -69,11 +79,11 @@ final class PuntoCanjeService
         $role = $usuario->role?->name;
 
         if ($role === 'Distribuidora' && $distribuidora->usuario_id !== $usuario->id) {
-            abort(403, 'Solo puedes ver los movimientos de puntos de tu propia distribuidora.');
+            abort(403, 'Solo puedes operar los puntos de tu propia distribuidora.');
         }
 
-        if ($role === 'Gerente de Sucursal' && $distribuidora->sucursal_id !== $usuario->sucursal_id) {
-            abort(403, 'No puedes ver movimientos de puntos de una distribuidora de otra sucursal.');
+        if (in_array($role, ['Gerente de Sucursal', 'Cajera'], true) && $distribuidora->sucursal_id !== $usuario->sucursal_id) {
+            abort(403, 'No puedes operar puntos de una distribuidora de otra sucursal.');
         }
     }
 }

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\CategoriaDistribuidora;
+use App\Models\Configuracion;
 use App\Models\Distribuidora;
 use App\Models\Role;
 use App\Models\Sucursal;
@@ -26,11 +27,11 @@ function crearDistribuidoraConPuntos(int $puntos): Distribuidora
     ]);
 }
 
-function crearCajeraActiva(): User
+function crearCajeraActiva(?int $sucursalId = null): User
 {
     $role = Role::firstOrCreate(['name' => 'Cajera']);
 
-    return User::factory()->create(['role_id' => $role->id, 'is_active' => true]);
+    return User::factory()->create(['role_id' => $role->id, 'sucursal_id' => $sucursalId, 'is_active' => true]);
 }
 
 it('la cajera canjea puntos: descuenta el saldo y registra el movimiento redimido', function (): void {
@@ -59,9 +60,32 @@ it('no permite canjear una cantidad de cero o negativa', function (): void {
     app(PuntoCanjeService::class)->canjear($distribuidora, 0, 'Canje inválido', $cajera);
 })->throws(DomainException::class);
 
+it('no permite que una cajera canjee puntos de una distribuidora de otra sucursal', function (): void {
+    $distribuidora = crearDistribuidoraConPuntos(100);
+    $otraSucursal = Sucursal::create(['nombre' => 'Otra', 'codigo' => 'SUC-'.uniqid(), 'es_matriz' => false, 'is_active' => true]);
+    $cajera = crearCajeraActiva($otraSucursal->id);
+
+    expect(fn () => app(PuntoCanjeService::class)->canjear($distribuidora, 30, 'Canje en caja', $cajera))
+        ->toThrow(Symfony\Component\HttpKernel\Exception\HttpException::class);
+
+    expect($distribuidora->fresh()->puntos_acumulados)->toBe(100);
+});
+
+it('registra el valor del punto vigente como snapshot al canjear', function (): void {
+    $admin = User::factory()->create();
+    Configuracion::create(['clave' => 'valor_punto', 'valor' => '7.5', 'tipo_dato' => 'decimal', 'vigente_desde' => '2025-01-01', 'modificado_por' => $admin->id]);
+
+    $distribuidora = crearDistribuidoraConPuntos(100);
+    $cajera = crearCajeraActiva($distribuidora->sucursal_id);
+
+    $movimiento = app(PuntoCanjeService::class)->canjear($distribuidora, 30, 'Canje en caja', $cajera);
+
+    expect((float) $movimiento->valor_punto_snapshot)->toBe(7.5);
+});
+
 it('la cajera lista por HTTP el historial de movimientos de puntos de una distribuidora', function (): void {
     $distribuidora = crearDistribuidoraConPuntos(100);
-    $cajera = crearCajeraActiva();
+    $cajera = crearCajeraActiva($distribuidora->sucursal_id);
 
     app(PuntoCanjeService::class)->canjear($distribuidora, 30, 'Canje en caja', $cajera);
 
@@ -78,7 +102,7 @@ it('la cajera lista por HTTP el historial de movimientos de puntos de una distri
 it('la distribuidora puede ver su propio historial de puntos pero no el de otra', function (): void {
     $distribuidoraA = crearDistribuidoraConPuntos(100);
     $distribuidoraB = crearDistribuidoraConPuntos(50);
-    $cajera = crearCajeraActiva();
+    $cajera = crearCajeraActiva($distribuidoraA->sucursal_id);
     app(PuntoCanjeService::class)->canjear($distribuidoraA, 10, 'Canje A', $cajera);
 
     Sanctum::actingAs($distribuidoraA->usuario->fresh());
@@ -93,7 +117,7 @@ it('la distribuidora puede ver su propio historial de puntos pero no el de otra'
 
 it('filtra el historial de puntos por tipo', function (): void {
     $distribuidora = crearDistribuidoraConPuntos(100);
-    $cajera = crearCajeraActiva();
+    $cajera = crearCajeraActiva($distribuidora->sucursal_id);
     app(PuntoCanjeService::class)->canjear($distribuidora, 10, 'Canje 1', $cajera);
     App\Models\PuntoMovimiento::query()->create([
         'distribuidora_id' => $distribuidora->id,

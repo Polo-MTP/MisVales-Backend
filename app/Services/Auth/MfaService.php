@@ -13,6 +13,7 @@ use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
+use DomainException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -163,7 +164,20 @@ final class MfaService
             ->where('mfa_type_id', $totpMfa->id)
             ->first();
 
-        // Si ya existe un método verificado, mantenemos o actualizamos la clave para permitir vinculación limpia
+        // Un método ya verificado no debe volver a exponerse ni regenerarse por esta vía: el
+        // secreto activo de una cuenta jamás debe salir de una petición autenticada por ese
+        // mismo usuario. Reiniciar el 2FA de una cuenta ya configurada requiere un flujo aparte.
+        if ($existingMethod && $existingMethod->is_verified) {
+            Log::debug('MfaService: Intento de regenerar/exponer setup de un método ya verificado', [
+                'user_id' => $user->id,
+                'mfa_method_id' => $existingMethod->id,
+            ]);
+
+            throw new DomainException('El segundo factor de esta cuenta ya está configurado y verificado. Contacta a soporte para reiniciarlo.');
+        }
+
+        // Si ya existe un método sin verificar (setup a medias), reutilizamos la misma clave para
+        // que un QR ya escaneado a medias siga funcionando en vez de invalidarse silenciosamente.
         $secretKey = ($existingMethod && $existingMethod->secret) ? $existingMethod->secret : $google2fa->generateSecretKey();
 
         /** @var MfaMethod $method */

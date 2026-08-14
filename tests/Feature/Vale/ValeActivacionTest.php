@@ -43,6 +43,18 @@ function crearValeAutorizado(Distribuidora $distribuidora, float $monto = 5000, 
     ]);
 }
 
+function crearValeSolicitado(Distribuidora $distribuidora, float $monto = 5000, int $quincenas = 4): Vale
+{
+    $direccion = Direccion::create(['calle' => 'Test', 'colonia' => 'Test', 'numero_ext' => '1', 'codigo_postal' => '00000', 'estado' => 'Coahuila', 'ciudad' => 'Torreón']);
+    $datos = DatosPersonales::create(['nombre' => 'Cliente', 'apellido_paterno' => 'Prueba', 'curp' => 'CUPD'.uniqid(), 'direccion_id' => $direccion->id]);
+    $cliente = Cliente::create(['datos_id' => $datos->id, 'estado' => true]);
+
+    return Vale::create([
+        'distribuidora_id' => $distribuidora->id, 'cliente_id' => $cliente->id, 'monto' => $monto, 'quincenas' => $quincenas,
+        'tipo' => 'vale-digital', 'estado' => 'solicitado', 'fecha_solicitud' => now(),
+    ]);
+}
+
 beforeEach(function (): void {
     $admin = User::factory()->create();
     Configuracion::create(['clave' => 'regla_50_pct', 'valor' => '50', 'tipo_dato' => 'decimal', 'vigente_desde' => '2025-01-01', 'modificado_por' => $admin->id]);
@@ -51,9 +63,9 @@ beforeEach(function (): void {
     Configuracion::create(['clave' => 'multa_no_pago', 'valor' => '300', 'tipo_dato' => 'decimal', 'vigente_desde' => '2025-01-01', 'modificado_por' => $admin->id]);
 });
 
-it('la propia distribuidora desactiva y reactiva su vale sin necesitar aprobación de nadie más', function (): void {
+it('la propia distribuidora desactiva y reactiva un vale solicitado (aún no autorizado) sin necesitar aprobación de nadie más', function (): void {
     $distribuidora = crearDistribuidoraActivacion();
-    $vale = crearValeAutorizado($distribuidora);
+    $vale = crearValeSolicitado($distribuidora);
     $usuarioDistribuidora = $distribuidora->usuario;
 
     $valeDesactivado = app(ValeService::class)->desactivar($vale, $usuarioDistribuidora);
@@ -61,6 +73,18 @@ it('la propia distribuidora desactiva y reactiva su vale sin necesitar aprobaci�
 
     $valeActivado = app(ValeService::class)->activar($vale, $usuarioDistribuidora);
     expect($valeActivado->activo)->toBeTrue();
+});
+
+it('no permite desactivar un vale ya autorizado, para no poder liberar crédito artificialmente', function (): void {
+    $distribuidora = crearDistribuidoraActivacion();
+    $vale = crearValeAutorizado($distribuidora, 5000, 4);
+    $usuarioDistribuidora = $distribuidora->usuario;
+
+    expect(fn () => app(ValeService::class)->desactivar($vale, $usuarioDistribuidora))
+        ->toThrow(Symfony\Component\HttpKernel\Exception\HttpException::class);
+
+    expect($vale->fresh()->activo)->toBeTrue();
+    expect((float) $distribuidora->fresh()->credito_disponible)->toBe(15000.0);
 });
 
 it('un vale nace activo al crearse', function (): void {
@@ -78,9 +102,9 @@ it('una distribuidora no puede desactivar el vale de otra distribuidora', functi
     app(ValeService::class)->desactivar($vale, $distribuidoraB->usuario);
 })->throws(Symfony\Component\HttpKernel\Exception\HttpException::class);
 
-it('un vale inactivo no cuenta en el crédito disponible ni entra a un nuevo corte', function (): void {
+it('un vale solicitado desactivado no cuenta en el crédito disponible ni entra a un nuevo corte', function (): void {
     $distribuidora = crearDistribuidoraActivacion();
-    $vale = crearValeAutorizado($distribuidora, 5000, 4);
+    $vale = crearValeSolicitado($distribuidora, 5000, 4);
 
     app(ValeService::class)->desactivar($vale, $distribuidora->usuario);
     $distribuidora->refresh();

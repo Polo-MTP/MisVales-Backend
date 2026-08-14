@@ -12,6 +12,7 @@ use App\Http\Resources\UserResource;
 use App\Models\MfaMethod;
 use App\Services\Auth\EmailOtpService;
 use App\Services\Auth\MfaService;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -100,7 +101,11 @@ final class MfaController extends ApiController
 
         Log::debug('MfaController: Generando datos de setup MFA', ['email' => $email]);
 
-        $setupData = $mfaService->generateSetupData($email);
+        try {
+            $setupData = $mfaService->generateSetupData($email);
+        } catch (DomainException $e) {
+            return $this->error($e->getMessage(), 409);
+        }
 
         return $this->success(
             data: $setupData,

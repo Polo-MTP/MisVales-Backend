@@ -87,11 +87,17 @@ final class ValeService
 
     /**
      * La distribuidora puede desactivar/activar sus propios vales libremente, sin autorización
-     * de nadie más. Un vale inactivo no cuenta contra el crédito disponible ni entra a un corte.
+     * de nadie más, pero solo mientras el vale sigue en 'solicitado' (aún no cuenta contra el
+     * crédito ni entra a un corte). Una vez autorizado, pagado, vencido o parcial, el vale ya
+     * está comprometido: desactivarlo no debe poder "liberar" ese crédito artificialmente.
      */
     public function desactivar(Vale $vale, User $usuario): Vale
     {
         $this->verificarPropiedad($vale, $usuario);
+
+        if ($vale->estado !== 'solicitado') {
+            abort(422, "Solo se pueden desactivar vales en estado 'solicitado' (actual: {$vale->estado}). Un vale autorizado, pagado, vencido o parcial ya cuenta contra el crédito y no puede desactivarse desde aquí.");
+        }
 
         $vale->update(['activo' => false]);
 
@@ -101,6 +107,10 @@ final class ValeService
     public function activar(Vale $vale, User $usuario): Vale
     {
         $this->verificarPropiedad($vale, $usuario);
+
+        if ($vale->estado !== 'solicitado') {
+            abort(422, "Solo se pueden reactivar vales en estado 'solicitado' (actual: {$vale->estado}).");
+        }
 
         $vale->update(['activo' => true]);
 

@@ -28,6 +28,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => CheckRole::class,
             'security.headers' => SecurityHeaders::class,
         ]);
+
+        // El alias por sí solo no aplica el middleware a ninguna ruta: hay que
+        // adjuntarlo al grupo 'api' para que corra en todas las respuestas de la API.
+        $middleware->api(append: [
+            SecurityHeaders::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
