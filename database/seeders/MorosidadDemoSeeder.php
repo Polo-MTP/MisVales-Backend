@@ -58,6 +58,10 @@ final class MorosidadDemoSeeder extends Seeder
             distribuidoraRoleId: $distribuidoraRole?->id,
             sucursalId: $sucursalGomez?->id,
             coordinadorId: $coordinador?->id,
+            titularNombre: 'Carlos',
+            titularApellidoPaterno: 'Nevárez',
+            titularApellidoMaterno: 'Ortiz',
+            titularCurp: 'NEOC800315HDGVRR05',
         );
         $clienteA = $this->crearCliente($distribuidoraA, 'Juana', 'Reyes', 'Ibarra', 'REIJ800101MDGYBN08');
 
@@ -88,6 +92,10 @@ final class MorosidadDemoSeeder extends Seeder
             distribuidoraRoleId: $distribuidoraRole?->id,
             sucursalId: $sucursalGomez?->id,
             coordinadorId: $coordinador?->id,
+            titularNombre: 'Guadalupe',
+            titularApellidoPaterno: 'Salcido',
+            titularApellidoMaterno: 'Reyes',
+            titularCurp: 'SARG820720MDGLYD02',
         );
         $clienteB = $this->crearCliente($distribuidoraB, 'Roberto', 'Aguilar', 'Nevárez', 'AUNR780512HDGGVB03');
 
@@ -145,7 +153,37 @@ final class MorosidadDemoSeeder extends Seeder
         ?int $distribuidoraRoleId,
         ?int $sucursalId,
         ?int $coordinadorId,
+        string $titularNombre,
+        string $titularApellidoPaterno,
+        string $titularApellidoMaterno,
+        string $titularCurp,
     ): Distribuidora {
+        // DistribuidoraResource lee el titular desde User.datosPersonales (users.datos_id), no
+        // desde la propia Distribuidora — sin esto la ficha muestra Nombre/CURP en blanco.
+        $datosPersonalesTitular = DatosPersonales::query()->where('curp', $titularCurp)->first();
+
+        if (! $datosPersonalesTitular) {
+            $direccionTitular = Direccion::create([
+                'calle' => 'Blvd. Miguel Alemán 500',
+                'colonia' => 'Centro',
+                'numero_ext' => '500',
+                'numero_int' => null,
+                'codigo_postal' => '35000',
+                'estado' => 'Durango',
+                'ciudad' => 'Gómez Palacio',
+            ]);
+
+            $datosPersonalesTitular = DatosPersonales::create([
+                'nombre' => $titularNombre,
+                'apellido_paterno' => $titularApellidoPaterno,
+                'apellido_materno' => $titularApellidoMaterno,
+                'curp' => $titularCurp,
+                'direccion_id' => $direccionTitular->id,
+                'fecha_nacimiento' => '1980-01-01',
+                'lugar_nacimiento' => 'Durango',
+            ]);
+        }
+
         $usuario = User::query()->updateOrCreate(
             ['email' => $email],
             [
@@ -153,6 +191,7 @@ final class MorosidadDemoSeeder extends Seeder
                 'password' => Hash::make('Password123!'),
                 'role_id' => $distribuidoraRoleId,
                 'sucursal_id' => $sucursalId,
+                'datos_id' => $datosPersonalesTitular->id,
                 'is_active' => true,
                 'email_verified_at' => now(),
             ]
