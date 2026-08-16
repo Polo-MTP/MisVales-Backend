@@ -56,8 +56,8 @@ describe('Reset Password', function (): void {
         $response = $this->postJson('/api/v1/reset-password', [
             'email' => $user->email,
             'token' => $token,
-            'password' => 'newpassword123',
-            'password_confirmation' => 'newpassword123',
+            'password' => 'Newpassword123',
+            'password_confirmation' => 'Newpassword123',
         ]);
 
         $response->assertStatus(200)
@@ -67,7 +67,7 @@ describe('Reset Password', function (): void {
             ]);
 
         // Verify password was changed
-        $this->assertTrue(Hash::check('newpassword123', $user->fresh()->password));
+        $this->assertTrue(Hash::check('Newpassword123', $user->fresh()->password));
 
         // Verify all tokens were deleted
         $this->assertDatabaseCount('personal_access_tokens', 0);
@@ -79,8 +79,8 @@ describe('Reset Password', function (): void {
         $response = $this->postJson('/api/v1/reset-password', [
             'email' => $user->email,
             'token' => 'invalid-token',
-            'password' => 'newpassword123',
-            'password_confirmation' => 'newpassword123',
+            'password' => 'Newpassword123',
+            'password_confirmation' => 'Newpassword123',
         ]);
 
         $response->assertStatus(400)
@@ -108,8 +108,8 @@ describe('Reset Password', function (): void {
         $response = $this->postJson('/api/v1/reset-password', [
             'email' => 'nonexistent@example.com',
             'token' => 'some-token',
-            'password' => 'newpassword123',
-            'password_confirmation' => 'newpassword123',
+            'password' => 'Newpassword123',
+            'password_confirmation' => 'Newpassword123',
         ]);
 
         $response->assertStatus(400)

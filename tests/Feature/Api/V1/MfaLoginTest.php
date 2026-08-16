@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Models\MfaMethod;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use PragmaRX\Google2FA\Google2FA;
 
@@ -133,6 +135,17 @@ it('rechaza pedir el setup de MFA con solo el email, sin la firma emitida por /l
 
     $this->getJson('/api/v1/mfa/setup?email='.urlencode($user->email))
         ->assertStatus(403);
+});
+
+it('el secreto TOTP se guarda cifrado en la base de datos, no en texto plano', function (): void {
+    $user = crearUsuarioConRol('Cajera');
+    [$mfaMethodId, $secretKey] = configurarSegundoFactor($this, $user);
+
+    $valorCrudoEnBd = DB::table('mfa_methods')->where('id', $mfaMethodId)->value('secret');
+    $valorViaEloquent = MfaMethod::query()->find($mfaMethodId)->secret;
+
+    expect($valorCrudoEnBd)->not->toBe($secretKey)
+        ->and($valorViaEloquent)->toBe($secretKey);
 });
 
 it('no reexpone ni regenera el secreto TOTP de una cuenta cuyo segundo factor ya está verificado', function (): void {

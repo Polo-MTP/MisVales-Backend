@@ -24,6 +24,10 @@ final class MfaMethod extends Model
     use HasUuids;
 
     protected $casts = [
+        // El secreto TOTP es, junto con la contraseña, el segundo factor completo de la
+        // cuenta: antes se guardaba en texto plano en la BD. Laravel lo cifra/descifra
+        // solo con APP_KEY, transparente para el resto del código (MfaService, Google2FA...).
+        'secret' => 'encrypted',
         'factor_step' => 'integer',
         'is_verified' => 'boolean',
         'is_active' => 'boolean',

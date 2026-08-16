@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'session_id',
     'action',
     'resource',
+    'ip_address',
 ])]
 final class AuditLog extends Model
 {
