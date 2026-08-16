@@ -32,3 +32,6 @@ CLAUDE.md
 
 # SQLite databases
 database/*.sqlite
+
+# PHPStan cache
+/tmp/
