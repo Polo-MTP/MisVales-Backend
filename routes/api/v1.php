@@ -245,7 +245,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
     // ============================================================
     Route::prefix('vales')->group(function (): void {
         Route::get('/', [ValeController::class, 'index'])
-            ->middleware('role:Distribuidora,Coordinador,Gerente de Sucursal,Gerente General')
+            ->middleware('role:Distribuidora,Cajera,Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.vales.index');
 
         Route::post('/', [ValeController::class, 'store'])
@@ -271,11 +271,11 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
     // ============================================================
     Route::prefix('relaciones')->group(function (): void {
         Route::get('/', [RelacionController::class, 'index'])
-            ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General')
+            ->middleware('role:Cajera,Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.relaciones.index');
 
         Route::get('{relacion}', [RelacionController::class, 'show'])
-            ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General')
+            ->middleware('role:Cajera,Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.relaciones.show');
 
         // Disparo manual del corte (el disparo normal es automático vía comando programado). Administrador

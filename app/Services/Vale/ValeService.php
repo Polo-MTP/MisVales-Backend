@@ -118,8 +118,9 @@ final class ValeService
     }
 
     /**
-     * Lista vales. Para el rol Distribuidora, solo los suyos; para roles de staff,
-     * todos (opcionalmente filtrados por distribuidora_id/estado).
+     * Lista vales. Para el rol Distribuidora, solo los suyos; para Cajera y Gerente de Sucursal,
+     * solo los de distribuidoras de su propia sucursal; para Coordinador/Gerente General, todos
+     * (opcionalmente filtrados por distribuidora_id/estado).
      *
      * @param  array<string, mixed>  $filters
      */
@@ -127,9 +128,18 @@ final class ValeService
     {
         $query = Vale::query()->with(['distribuidora', 'cliente.datosPersonales', 'producto']);
 
-        if ($usuario->role?->name === 'Distribuidora') {
+        $role = $usuario->role?->name;
+
+        if ($role === 'Distribuidora') {
             $distribuidora = $usuario->distribuidora;
             $query->where('distribuidora_id', $distribuidora?->id ?? 0);
+        } elseif (in_array($role, ['Cajera', 'Gerente de Sucursal'], true)) {
+            $sucursalId = $usuario->sucursal_id ?? 0;
+            $query->whereHas('distribuidora', fn ($q) => $q->where('sucursal_id', $sucursalId));
+
+            if (! empty($filters['distribuidora_id'])) {
+                $query->where('distribuidora_id', (int) $filters['distribuidora_id']);
+            }
         } elseif (! empty($filters['distribuidora_id'])) {
             $query->where('distribuidora_id', (int) $filters['distribuidora_id']);
         }

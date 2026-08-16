@@ -44,7 +44,9 @@ final class ConciliacionBancariaService
         $spreadsheet = IOFactory::load($archivo->getRealPath());
         // formatData=false: se necesitan los valores crudos (el banco exporta fechas como serial
         // de Excel o como texto según la fila, y montos formateados como texto "$2,100" no castean a float).
-        $filas = $spreadsheet->getActiveSheet()->toArray(null, true, false, false);
+        // calculateFormulas=false: es un archivo externo (banco); una celda que por casualidad empiece
+        // con "=" debe leerse tal cual, nunca evaluarse como fórmula.
+        $filas = $spreadsheet->getActiveSheet()->toArray(null, false, false, false);
 
         $encabezado = array_map(
             fn ($valor) => Str::of((string) $valor)->lower()->trim()->toString(),

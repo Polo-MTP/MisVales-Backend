@@ -183,6 +183,18 @@ it('concilia un abono bancario, liquida la relación y genera puntos por pago an
         ->and($relacion->puntos_generados)->toBeGreaterThanOrEqual(0);
 });
 
+it('no evalúa como fórmula una referencia del banco que por casualidad empiece con "="', function (): void {
+    $cajera = User::factory()->create();
+
+    $archivo = crearExcelBanco([
+        [1, 'Abono raro', '=1+1', 500, 'F999', '13/2/2026', '10:00', 'Transferencia'],
+    ]);
+
+    app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, $cajera);
+
+    expect(\App\Models\AbonoConciliacion::first()->referencia_leida)->toBe('=1+1');
+});
+
 it('deja el abono sin coincidencia cuando la referencia no existe', function (): void {
     $cajera = User::factory()->create();
 

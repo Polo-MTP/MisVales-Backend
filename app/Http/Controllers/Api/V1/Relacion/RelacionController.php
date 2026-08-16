@@ -23,7 +23,16 @@ final class RelacionController extends ApiController
 
     public function index(Request $request): JsonResponse
     {
+        /** @var User $usuario */
+        $usuario = $request->user();
+
         $query = Relacion::query()->with(['distribuidora', 'sucursal', 'categoriaSnapshot']);
+
+        // La cajera necesita poder buscar la relación de un pago sin adivinar el ID a mano
+        // (ver flujo de conciliación manual), pero solo dentro de su propia sucursal.
+        if ($usuario->role?->name === 'Cajera') {
+            $query->where('sucursal_id', $usuario->sucursal_id ?? 0);
+        }
 
         if ($request->filled('distribuidora_id')) {
             $query->where('distribuidora_id', $request->integer('distribuidora_id'));
@@ -31,6 +40,10 @@ final class RelacionController extends ApiController
 
         if ($request->filled('estado')) {
             $query->where('estado', $request->string('estado'));
+        }
+
+        if ($request->filled('referencia_pago')) {
+            $query->where('referencia_pago', 'like', '%'.$request->string('referencia_pago').'%');
         }
 
         $relaciones = $query->latest('fecha_corte')->paginate((int) $request->input('per_page', 15));
@@ -41,8 +54,15 @@ final class RelacionController extends ApiController
         );
     }
 
-    public function show(Relacion $relacion): JsonResponse
+    public function show(Relacion $relacion, Request $request): JsonResponse
     {
+        /** @var User $usuario */
+        $usuario = $request->user();
+
+        if ($usuario->role?->name === 'Cajera' && $relacion->sucursal_id !== $usuario->sucursal_id) {
+            abort(403, 'No puedes ver relaciones de otra sucursal.');
+        }
+
         $relacion->load(['distribuidora', 'sucursal', 'categoriaSnapshot', 'detalles.vale', 'detalles.cliente.datosPersonales', 'detalles.producto']);
 
         return $this->success(
