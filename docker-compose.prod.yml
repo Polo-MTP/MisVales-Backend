@@ -1,0 +1,91 @@
+# Ambiente de PRODUCCIÓN. Código copiado a la imagen en build time (inmutable, sin
+# volumen de código), APP_DEBUG=false, dependencias sin --dev, OPcache activo.
+#
+# Uso:
+#   cp .env.production.example .env.production
+#   php artisan key:generate --show   # imprime una llave sin escribir ningún .env; pégala
+#                                      # en APP_KEY= dentro de .env.production
+#   # editar el resto de .env.production: APP_URL, DB_PASSWORD, DB_ROOT_PASSWORD,
+#   # CORS_ALLOWED_ORIGINS, MAIL_*...
+#   docker compose -f docker-compose.prod.yml --env-file .env.production build
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+#   docker compose -f docker-compose.prod.yml exec app php artisan migrate --force
+#   → http://localhost:8081
+#
+# Puertos distintos a docker-compose.yml (8080/3307) a propósito: para poder tener
+# ambos ambientes corriendo al mismo tiempo en la misma máquina durante una revisión.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: misvales-app-prod
+    working_dir: /var/www
+    restart: unless-stopped
+    environment:
+      APP_NAME: ${APP_NAME:-MisVales}
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: ${APP_KEY:?corre "php artisan key:generate --show" fuera de Docker (no escribe .env, solo imprime la llave) y pégala aquí}
+      APP_URL: ${APP_URL:?debes definir el dominio real en .env.production}
+      LOG_LEVEL: ${LOG_LEVEL:-error}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_DATABASE: ${DB_DATABASE:-misvales_prod}
+      DB_USERNAME: ${DB_USERNAME:-misvales}
+      DB_PASSWORD: ${DB_PASSWORD:?debes definir DB_PASSWORD en .env.production}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?debes definir el dominio real del frontend en .env.production}
+      MAIL_MAILER: ${MAIL_MAILER:-smtp}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-}
+      MAIL_FROM_NAME: ${APP_NAME:-MisVales}
+    volumes:
+      # storage/ y bootstrap/cache/ sí necesitan persistir (logs, cache de config,
+      # archivos subidos) aunque el resto del código venga horneado en la imagen.
+      - misvales-storage-prod:/var/www/storage
+    depends_on:
+      - mysql
+    networks:
+      - misvales-prod
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: misvales-nginx-prod
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    volumes:
+      - ./public:/var/www/public:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+    networks:
+      - misvales-prod
+
+  mysql:
+    image: mysql:8.0
+    container_name: misvales-mysql-prod
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-misvales_prod}
+      MYSQL_USER: ${DB_USERNAME:-misvales}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?debes definir DB_PASSWORD en .env.production}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?debes definir DB_ROOT_PASSWORD en .env.production}
+    ports:
+      - "3308:3306"
+    volumes:
+      - misvales-mysql-prod-data:/var/lib/mysql
+    networks:
+      - misvales-prod
+
+volumes:
+  misvales-mysql-prod-data:
+  misvales-storage-prod:
+
+networks:
+  misvales-prod:

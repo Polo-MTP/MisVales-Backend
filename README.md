@@ -33,11 +33,10 @@ A production-ready, API-only Laravel 13 starter kit following the 2025-2026 REST
 
 ### With Docker (Recommended)
 
-```bash
-# Clone the repository
-git clone https://github.com/grazulex/laravel-api-kit.git
-cd laravel-api-kit
+Ver [ENVIRONMENTS.md](ENVIRONMENTS.md) para el detalle completo de los dos ambientes
+(desarrollo y producción) y por qué difieren.
 
+```bash
 # Copy environment file
 cp .env.example .env
 
@@ -57,6 +56,9 @@ docker compose run --rm app php artisan migrate
 # Run tests to verify installation
 docker compose run --rm app ./vendor/bin/pest
 ```
+
+→ `http://localhost:8080`. Para el ambiente de producción (`docker-compose.prod.yml`,
+`http://localhost:8081`), ver [ENVIRONMENTS.md](ENVIRONMENTS.md).
 
 ### Without Docker
 
@@ -773,17 +775,9 @@ API_DOCS_URL=http://localhost:8080/docs/api
 
 ### Docker Production
 
-```dockerfile
-# Example production Dockerfile additions
-FROM php:8.3-fpm-alpine
-
-# Install opcache for performance
-RUN docker-php-ext-install opcache
-
-# Production PHP settings
-COPY docker/php/opcache.ini /usr/local/etc/php/conf.d/
-COPY docker/php/php.ini /usr/local/etc/php/conf.d/
-```
+Ya implementado — ver [ENVIRONMENTS.md](ENVIRONMENTS.md): `docker-compose.prod.yml` +
+el target `production` de `Dockerfile` (código horneado en la imagen, `composer install
+--no-dev`, OPcache con `validate_timestamps=0`, `docker/php/production.ini`).
 
 ## Extending the Kit
 
