@@ -8,6 +8,7 @@ use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\LogApiRequests;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\VerifyVpnAccess;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -19,6 +20,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -35,6 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'active' => EnsureUserIsActive::class,
             'role' => CheckRole::class,
             'security.headers' => SecurityHeaders::class,
+            'vpn' => VerifyVpnAccess::class,
         ]);
 
         // El alias por sí solo no aplica el middleware a ninguna ruta: hay que
@@ -44,6 +48,26 @@ return Application::configure(basePath: dirname(__DIR__))
             TrimStrings::class,
             ConvertEmptyStringsToNull::class,
         ]);
+
+        // Detrás del balanceador nuevo, sin esto $request->ip() siempre regresa la IP
+        // del balanceador para TODAS las peticiones — rompe throttle:auth (5/min pasa
+        // de ser por usuario a compartido entre todos), el ip_address de login_attempts
+        // y de audit_log, y cualquier check de IP-VPN. Vacío por defecto (no confía en
+        // nadie) hasta que infra dé la IP interna real del balanceador; nunca usar '*'
+        // aquí, eso permitiría spoofear la IP vía X-Forwarded-For desde cualquier lado.
+        //
+        // env() directo aquí (no config()) a propósito: withMiddleware() corre antes de
+        // que el contenedor tenga el binding 'config' registrado — usar config() aquí
+        // literalmente tumba el boot de la app ("Target class [config] does not exist"),
+        // ya lo comprobé. bootstrap/app.php es de los pocos lugares donde env() directo
+        // es el patrón correcto (así lo muestra la propia guía de Laravel para esto).
+        $middleware->trustProxies(
+            at: array_values(array_filter(array_map('trim', explode(',', (string) env('TRUSTED_PROXIES', ''))))),
+            headers: Request::HEADER_X_FORWARDED_FOR
+                | Request::HEADER_X_FORWARDED_HOST
+                | Request::HEADER_X_FORWARDED_PORT
+                | Request::HEADER_X_FORWARDED_PROTO,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // App 100% API: cualquier excepción se renderiza como JSON, nunca como la
@@ -68,11 +92,26 @@ return Application::configure(basePath: dirname(__DIR__))
             'message' => 'No autenticado. Inicia sesión para continuar.',
         ], 401));
 
-        // Cubre tanto los abort($codigo, 'mensaje') usados en toda la app (403, 404,
-        // 409, 422...) como los 404/405 nativos de Laravel (ruta o modelo inexistente,
-        // método HTTP no permitido). El mensaje de un abort() es siempre texto que el
-        // propio desarrollador escribió pensando en el usuario final, así que es seguro
-        // devolverlo tal cual.
+        // NotFoundHttpException/MethodNotAllowedHttpException las lanza Laravel mismo
+        // (ruta inexistente, modelo no encontrado por route-model-binding, método HTTP
+        // no soportado) — su mensaje NUNCA lo escribió nadie pensando en el usuario:
+        // trae el nombre completo de la clase del modelo ("No query results for model
+        // [App\Models\Relacion] 999") o la lista de métodos permitidos de la ruta. Van
+        // antes que el HttpExceptionInterface genérico de abajo para que las atrape
+        // primero (son subclases de HttpException, matchearían ahí también si no).
+        $exceptions->render(fn (NotFoundHttpException $e, Request $request): JsonResponse => response()->json([
+            'success' => false,
+            'message' => 'El recurso solicitado no existe.',
+        ], 404));
+
+        $exceptions->render(fn (MethodNotAllowedHttpException $e, Request $request): JsonResponse => response()->json([
+            'success' => false,
+            'message' => 'Método HTTP no permitido para esta ruta.',
+        ], 405));
+
+        // Cubre los abort($codigo, 'mensaje') usados en toda la app (403, 409, 422...).
+        // El mensaje de un abort() sí es siempre texto que el propio desarrollador
+        // escribió pensando en el usuario final, así que es seguro devolverlo tal cual.
         $exceptions->render(fn (HttpExceptionInterface $e, Request $request): JsonResponse => response()->json([
             'success' => false,
             'message' => $e->getMessage() !== '' ? $e->getMessage() : 'No se pudo procesar la solicitud.',
