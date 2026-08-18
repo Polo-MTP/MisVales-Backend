@@ -15,6 +15,7 @@ describe('Forgot Password', function (): void {
 
         $response = $this->postJson('/api/v1/forgot-password', [
             'email' => $user->email,
+            'recaptcha' => 'bypass-recaptcha',
         ]);
 
         $response->assertStatus(200)
@@ -27,6 +28,7 @@ describe('Forgot Password', function (): void {
     it('fails with non-existent email', function (): void {
         $response = $this->postJson('/api/v1/forgot-password', [
             'email' => 'nonexistent@example.com',
+            'recaptcha' => 'bypass-recaptcha',
         ]);
 
         $response->assertStatus(422);
@@ -39,6 +41,7 @@ describe('Forgot Password', function (): void {
         for ($i = 0; $i < 7; $i++) {
             $response = $this->postJson('/api/v1/forgot-password', [
                 'email' => $user->email,
+                'recaptcha' => 'bypass-recaptcha',
             ]);
         }
 
@@ -58,6 +61,7 @@ describe('Reset Password', function (): void {
             'token' => $token,
             'password' => 'Newpassword123',
             'password_confirmation' => 'Newpassword123',
+            'recaptcha' => 'bypass-recaptcha',
         ]);
 
         $response->assertStatus(200)
@@ -81,6 +85,7 @@ describe('Reset Password', function (): void {
             'token' => 'invalid-token',
             'password' => 'Newpassword123',
             'password_confirmation' => 'Newpassword123',
+            'recaptcha' => 'bypass-recaptcha',
         ]);
 
         $response->assertStatus(400)
@@ -99,6 +104,7 @@ describe('Reset Password', function (): void {
             'token' => $token,
             'password' => 'newpassword123',
             'password_confirmation' => 'differentpassword',
+            'recaptcha' => 'bypass-recaptcha',
         ]);
 
         $response->assertStatus(422);
@@ -110,6 +116,7 @@ describe('Reset Password', function (): void {
             'token' => 'some-token',
             'password' => 'Newpassword123',
             'password_confirmation' => 'Newpassword123',
+            'recaptcha' => 'bypass-recaptcha',
         ]);
 
         $response->assertStatus(400)

@@ -23,8 +23,8 @@ it('un intento de login fallido no genera ruido en audit_log (User no está en e
     $auditCountTrasCrear = AuditLog::where('resource', 'User#'.$user->id)->count();
     expect($auditCountTrasCrear)->toBe(1);
 
-    $this->postJson('/api/v1/login', ['email' => $user->email, 'password' => 'incorrecta'])->assertStatus(401);
-    $this->postJson('/api/v1/login', ['email' => $user->email, 'password' => 'incorrecta'])->assertStatus(401);
+    $this->postJson('/api/v1/login', ['email' => $user->email, 'password' => 'incorrecta', 'recaptcha' => 'bypass-recaptcha'])->assertStatus(401);
+    $this->postJson('/api/v1/login', ['email' => $user->email, 'password' => 'incorrecta', 'recaptcha' => 'bypass-recaptcha'])->assertStatus(401);
 
     // failed_attempts sube y el user se guarda en cada intento — si User estuviera en el
     // observer genérico (created/updated/deleted), esto habría agregado dos filas más

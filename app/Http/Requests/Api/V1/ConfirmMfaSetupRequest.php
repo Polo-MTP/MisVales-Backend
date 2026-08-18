@@ -11,7 +11,7 @@ use Illuminate\Foundation\Http\FormRequest;
 /**
  * @property string $mfa_method_id
  * @property string $code
- * @property string|null $recaptcha
+ * @property string $recaptcha
  */
 final class ConfirmMfaSetupRequest extends FormRequest
 {
@@ -28,7 +28,7 @@ final class ConfirmMfaSetupRequest extends FormRequest
         return [
             'mfa_method_id' => ['required', 'uuid', 'exists:mfa_methods,id'],
             'code' => ['required', 'numeric', 'digits:6'],
-            'recaptcha' => ['nullable', 'string', new Recaptcha()],
+            'recaptcha' => ['required', 'string', new Recaptcha()],
         ];
     }
 

@@ -22,6 +22,7 @@ describe('Login', function (): void {
         $response = $this->postJson('/api/v1/login', [
             'email' => $user->email,
             'password' => 'Password123!',
+            'recaptcha' => 'bypass-recaptcha',
         ]);
 
         $response->assertStatus(200)
@@ -48,6 +49,7 @@ describe('Login', function (): void {
         $response = $this->postJson('/api/v1/login', [
             'email' => $user->email,
             'password' => 'Password123!',
+            'recaptcha' => 'bypass-recaptcha',
         ]);
 
         $response->assertStatus(200)
@@ -69,6 +71,7 @@ describe('Login', function (): void {
         $response = $this->postJson('/api/v1/login', [
             'email' => $user->email,
             'password' => 'wrongpassword',
+            'recaptcha' => 'bypass-recaptcha',
         ]);
 
         $response->assertStatus(401)
@@ -82,6 +85,7 @@ describe('Login', function (): void {
         $response = $this->postJson('/api/v1/login', [
             'email' => 'nonexistent@example.com',
             'password' => 'Password123!',
+            'recaptcha' => 'bypass-recaptcha',
         ]);
 
         $response->assertStatus(401);

@@ -45,7 +45,7 @@ function crearUsuarioConRol(string $nombreRol, string $password = 'Password123!'
  */
 function configurarSegundoFactor(Tests\TestCase $test, User $user, string $password = 'Password123!'): array
 {
-    $loginData = $test->postJson('/api/v1/login', ['email' => $user->email, 'password' => $password])
+    $loginData = $test->postJson('/api/v1/login', ['email' => $user->email, 'password' => $password, 'recaptcha' => 'bypass-recaptcha'])
         ->assertStatus(200)
         ->assertJson(['data' => ['requires_setup' => true]])
         ->json('data');
@@ -59,6 +59,7 @@ function configurarSegundoFactor(Tests\TestCase $test, User $user, string $passw
     $test->postJson('/api/v1/mfa/setup/confirm', [
         'mfa_method_id' => $setup['mfa_method_id'],
         'code' => $codigo,
+        'recaptcha' => 'bypass-recaptcha',
     ])->assertStatus(200)->assertJson(['success' => true]);
 
     // El setup en sí ya consumió 3 de los 5 cupos del throttle:auth (login + mfa/setup +
@@ -73,7 +74,7 @@ function configurarSegundoFactor(Tests\TestCase $test, User $user, string $passw
 it('un usuario nuevo con rol de 2 factores debe configurar MFA antes de poder iniciar sesión', function (): void {
     $user = crearUsuarioConRol('Cajera');
 
-    $this->postJson('/api/v1/login', ['email' => $user->email, 'password' => 'Password123!'])
+    $this->postJson('/api/v1/login', ['email' => $user->email, 'password' => 'Password123!', 'recaptcha' => 'bypass-recaptcha'])
         ->assertStatus(200)
         ->assertJson(['success' => true, 'data' => ['requires_setup' => true, 'email' => $user->email]]);
 });
@@ -83,13 +84,13 @@ it('flujo completo de 2 factores: setup, confirmar y login con código entrega e
 
     [$mfaMethodId, $secretKey] = configurarSegundoFactor($this, $user);
 
-    $login = $this->postJson('/api/v1/login', ['email' => $user->email, 'password' => 'Password123!'])
+    $login = $this->postJson('/api/v1/login', ['email' => $user->email, 'password' => 'Password123!', 'recaptcha' => 'bypass-recaptcha'])
         ->assertStatus(200)
         ->assertJson(['success' => true, 'data' => ['requires_mfa' => true, 'mfa_method_id' => $mfaMethodId]]);
 
     $codigo = (new Google2FA())->getCurrentOtp($secretKey);
 
-    $this->postJson('/api/v1/mfa/verify', ['mfa_method_id' => $mfaMethodId, 'code' => $codigo])
+    $this->postJson('/api/v1/mfa/verify', ['mfa_method_id' => $mfaMethodId, 'code' => $codigo, 'recaptcha' => 'bypass-recaptcha'])
         ->assertStatus(200)
         ->assertJsonStructure(['success', 'message', 'data' => ['user' => ['id', 'email'], 'token']])
         ->assertJson(['success' => true]);
@@ -99,10 +100,10 @@ it('rechaza un código TOTP incorrecto en la verificación de login', function (
     $user = crearUsuarioConRol('Cajera');
     [$mfaMethodId] = configurarSegundoFactor($this, $user);
 
-    $this->postJson('/api/v1/login', ['email' => $user->email, 'password' => 'Password123!'])
+    $this->postJson('/api/v1/login', ['email' => $user->email, 'password' => 'Password123!', 'recaptcha' => 'bypass-recaptcha'])
         ->assertStatus(200);
 
-    $this->postJson('/api/v1/mfa/verify', ['mfa_method_id' => $mfaMethodId, 'code' => '000000'])
+    $this->postJson('/api/v1/mfa/verify', ['mfa_method_id' => $mfaMethodId, 'code' => '000000', 'recaptcha' => 'bypass-recaptcha'])
         ->assertStatus(401)
         ->assertJson(['success' => false, 'message' => 'El código de la App es incorrecto.']);
 });
@@ -111,20 +112,20 @@ it('flujo completo de 3 factores: tras el TOTP pide un código por correo antes 
     $user = crearUsuarioConRol('Gerente General');
     [$mfaMethodId, $secretKey] = configurarSegundoFactor($this, $user);
 
-    $this->postJson('/api/v1/login', ['email' => $user->email, 'password' => 'Password123!'])
+    $this->postJson('/api/v1/login', ['email' => $user->email, 'password' => 'Password123!', 'recaptcha' => 'bypass-recaptcha'])
         ->assertStatus(200)
         ->assertJson(['data' => ['requires_mfa' => true]]);
 
     $codigo = (new Google2FA())->getCurrentOtp($secretKey);
 
-    $this->postJson('/api/v1/mfa/verify', ['mfa_method_id' => $mfaMethodId, 'code' => $codigo])
+    $this->postJson('/api/v1/mfa/verify', ['mfa_method_id' => $mfaMethodId, 'code' => $codigo, 'recaptcha' => 'bypass-recaptcha'])
         ->assertStatus(200)
         ->assertJson(['success' => true, 'data' => ['requires_email_otp' => true, 'user_id' => $user->id]]);
 
     $codigoCorreo = Cache::get('email_otp_'.$user->id);
     expect($codigoCorreo)->not->toBeNull();
 
-    $this->postJson('/api/v1/mfa/email/verify', ['user_id' => $user->id, 'code' => $codigoCorreo])
+    $this->postJson('/api/v1/mfa/email/verify', ['user_id' => $user->id, 'code' => $codigoCorreo, 'recaptcha' => 'bypass-recaptcha'])
         ->assertStatus(200)
         ->assertJsonStructure(['success', 'message', 'data' => ['user' => ['id', 'email'], 'token']])
         ->assertJson(['success' => true]);
@@ -152,7 +153,7 @@ it('no reexpone ni regenera el secreto TOTP de una cuenta cuyo segundo factor ya
     $user = crearUsuarioConRol('Cajera');
     configurarSegundoFactor($this, $user);
 
-    $loginData = $this->postJson('/api/v1/login', ['email' => $user->email, 'password' => 'Password123!'])
+    $loginData = $this->postJson('/api/v1/login', ['email' => $user->email, 'password' => 'Password123!', 'recaptcha' => 'bypass-recaptcha'])
         ->assertStatus(200)
         ->assertJson(['data' => ['requires_mfa' => true]])
         ->json('data');

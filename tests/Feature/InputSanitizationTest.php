@@ -22,5 +22,6 @@ it('recorta espacios al inicio/final de los campos de texto antes de validar', f
     $this->postJson('/api/v1/login', [
         'email' => '  '.$user->email.'  ',
         'password' => 'Passw0rd1',
+        'recaptcha' => 'bypass-recaptcha',
     ])->assertStatus(200);
 });

@@ -28,12 +28,13 @@ permitidos, body de ejemplo, respuesta esperada y un `curl` listo para copiar.
 - **Rate limiting**: `throttle:auth` (5/min) en login y MFA; `throttle:authenticated` (120/min) en
   rutas protegidas; `throttle:6,1` en verificación/recuperación de email.
 - **reCAPTCHA**: los formularios públicos/pre-auth (login, forgot-password, reset-password,
-  mfa/verify, mfa/email/verify, mfa/setup/confirm) aceptan un campo `recaptcha` **opcional**
-  (`nullable`, regla `App\Rules\Recaptcha`, ver `app/Rules/Recaptcha.php`). Si se envía, se valida
-  contra `https://www.google.com/recaptcha/api/siteverify` (Google reCAPTCHA v3, `score >= 0.5`).
+  mfa/verify, mfa/email/verify, mfa/setup/confirm) exigen un campo `recaptcha` **requerido**
+  (regla `App\Rules\Recaptcha`, ver `app/Rules/Recaptcha.php`). Se valida contra
+  `https://www.google.com/recaptcha/api/siteverify` (Google reCAPTCHA v3, `score >= 0.5`).
   En `local`/`testing`, si no hay `RECAPTCHA_SECRET_KEY` configurada o se manda
-  `"bypass-recaptcha"`, la verificación se omite. **Falta agregar `RECAPTCHA_SECRET_KEY` a
-  `.env.production.example`** para activarlo en producción.
+  `"bypass-recaptcha"`, la verificación se omite (pero el campo debe seguir enviándose, ya
+  que es `required`). **Falta agregar `RECAPTCHA_SECRET_KEY` a `.env.production.example`**
+  para activarlo en producción.
 - **Roles**: el middleware `role:...` (`app/Http/Middleware/CheckRole.php`) exige que el usuario
   autenticado tenga uno de los roles listados; si no, responde `403`.
 - **VPN**: dos endpoints de decisión (edición de cliente y conciliación manual) llevan el
@@ -63,7 +64,8 @@ curl -X POST "$BASE_URL/login" \
   -H "Accept: application/json" -H "Content-Type: application/json" \
   -d '{"email":"usuario@ejemplo.com","password":"Password123!","recaptcha":"bypass-recaptcha"}'
 ```
-`recaptcha` es opcional; ver nota de reCAPTCHA arriba.
+`recaptcha` es requerido; ver nota de reCAPTCHA arriba. Sin él, la petición falla con `422`
+antes de siquiera revisar las credenciales.
 
 Éxito (login de un solo factor):
 ```json
@@ -103,7 +105,7 @@ Auth requerido, ruta **firmada** (`middleware: signed`) — la URL completa con 
 la genera Laravel al enviar el correo de verificación; no se arma a mano.
 
 ### `POST /forgot-password`
-Público (`throttle:6,1`). Body: `{ "email": "...", "recaptcha": "..." (opcional) }`. Envía el
+Público (`throttle:6,1`). Body: `{ "email": "...", "recaptcha": "..." (requerido) }`. Envía el
 enlace de restablecimiento.
 
 ### `POST /reset-password`
@@ -112,6 +114,7 @@ Público (`throttle:6,1`).
 curl -X POST "$BASE_URL/reset-password" -H "Accept: application/json" -H "Content-Type: application/json" \
   -d '{"token":"...","email":"usuario@ejemplo.com","password":"NuevaPassword123!","password_confirmation":"NuevaPassword123!","recaptcha":"bypass-recaptcha"}'
 ```
+`recaptcha` es requerido.
 Token inválido/expirado → `400` con mensaje descriptivo.
 
 ---
@@ -119,11 +122,11 @@ Token inválido/expirado → `400` con mensaje descriptivo.
 ## 02. MFA
 
 ### `POST /mfa/verify`
-Público (`throttle:auth`). Body: `{ "mfa_method_id": "3", "code": "123456", "recaptcha": "..." (opcional) }`.
+Público (`throttle:auth`). Body: `{ "mfa_method_id": "3", "code": "123456", "recaptcha": "..." (requerido) }`.
 Puede requerir un tercer factor (`requires_email_otp`) o devolver el token final.
 
 ### `POST /mfa/email/verify`
-Público. Body: `{ "user_id": 1, "code": "123456", "recaptcha": "..." (opcional) }`. Segundo paso
+Público. Body: `{ "user_id": 1, "code": "123456", "recaptcha": "..." (requerido) }`. Segundo paso
 del reto (OTP por correo).
 
 ### `GET /mfa/setup`
@@ -131,7 +134,7 @@ Público, ruta **firmada**. Query: `email`, `expires`, `signature`. La URL compl
 login cuando `requires_setup: true`. Devuelve el secreto/QR para vincular la app TOTP.
 
 ### `POST /mfa/setup/confirm`
-Auth requerido. Body: `{ "mfa_method_id": "3", "code": "123456", "recaptcha": "..." (opcional) }`.
+Auth requerido. Body: `{ "mfa_method_id": "3", "code": "123456", "recaptcha": "..." (requerido) }`.
 Valida el primer código generado por la app del usuario y marca el método como verificado.
 
 ---

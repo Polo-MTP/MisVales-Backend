@@ -27,7 +27,7 @@ final class ResetPasswordRequest extends FormRequest
             'token' => ['required', 'string'],
             'email' => ['required', 'email'],
             'password' => ['required', 'confirmed', Password::defaults()],
-            'recaptcha' => ['nullable', 'string', new Recaptcha()],
+            'recaptcha' => ['required', 'string', new Recaptcha()],
         ];
     }
 }

@@ -11,7 +11,7 @@ use Illuminate\Foundation\Http\FormRequest;
 /**
  * @property string $email
  * @property string $password
- * @property string|null $recaptcha
+ * @property string $recaptcha
  */
 final class LoginRequest extends FormRequest
 {
@@ -28,7 +28,7 @@ final class LoginRequest extends FormRequest
         return [
             'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
-            'recaptcha' => ['nullable', 'string', new Recaptcha()],
+            'recaptcha' => ['required', 'string', new Recaptcha()],
         ];
     }
 
@@ -41,6 +41,7 @@ final class LoginRequest extends FormRequest
             'email.required' => 'El correo electrónico es obligatorio.',
             'email.email' => 'El formato del correo es inválido.',
             'password.required' => 'La contraseña es obligatoria.',
+            'recaptcha.required' => 'La verificación anti-robots (reCAPTCHA) es obligatoria.',
         ];
     }
 }
