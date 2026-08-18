@@ -29,7 +29,15 @@ services:
       APP_DEBUG: "false"
       APP_KEY: ${APP_KEY:?corre "php artisan key:generate --show" fuera de Docker (no escribe .env, solo imprime la llave) y pégala aquí}
       APP_URL: ${APP_URL:?debes definir el dominio real en .env.production}
+      APP_LOCALE: ${APP_LOCALE:-es}
+      APP_FALLBACK_LOCALE: ${APP_FALLBACK_LOCALE:-es}
       LOG_LEVEL: ${LOG_LEVEL:-error}
+      # Vacíos por default para poder probar este build localmente sin un balanceador/VPN
+      # real delante. En el droplet real detrás del balanceador, TRUSTED_PROXIES si es
+      # obligatorio (ver nota en .env.production.example) — el :?required intencionalmente
+      # no está aquí para no bloquear pruebas locales del build de producción.
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      VPN_ALLOWED_CIDRS: ${VPN_ALLOWED_CIDRS:-}
       DB_CONNECTION: mysql
       DB_HOST: mysql
       DB_PORT: "3306"
