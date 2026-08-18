@@ -53,8 +53,10 @@ return [
                 'username' => env('DB_USERNAME_READ', env('DB_USERNAME', 'root')),
                 'password' => env('DB_PASSWORD_READ', env('DB_PASSWORD', '')),
             ] : null,
-            'write' => env('DB_HOST_WRITE') ? [
-                'host' => [env('DB_HOST_WRITE', env('DB_HOST', '127.0.0.1'))],
+            'write' => env('DB_HOST_READ') ? [
+                'host'     => [env('DB_HOST_WRITE', env('DB_HOST', '127.0.0.1'))],
+                'username' => env('DB_USERNAME', 'root'),
+                'password' => env('DB_PASSWORD', ''),
             ] : null,
             'sticky'       => env('DB_HOST_READ') ? true : null,
 
