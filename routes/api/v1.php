@@ -75,12 +75,15 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.alta_proveedor.store');
 
+        // Dictamen de verificación y decisión de gerencia: ambos son parte de la cadena de
+        // autorización del alta (igual que las demás decisiones de autorización de la API,
+        // solo deben contestar desde la red interna/VPN).
         Route::post('solicitudes/{solicitud}/verificar', [SolicitudProveedorController::class, 'verificar'])
-            ->middleware('role:Verificador,Gerente de Sucursal,Gerente General')
+            ->middleware(['role:Verificador,Gerente de Sucursal,Gerente General', 'vpn'])
             ->name('api.v1.alta_proveedor.verificar');
 
         Route::post('solicitudes/{solicitud}/aprobar', [SolicitudProveedorController::class, 'aprobarORechazar'])
-            ->middleware('role:Gerente de Sucursal,Gerente General')
+            ->middleware(['role:Gerente de Sucursal,Gerente General', 'vpn'])
             ->name('api.v1.alta_proveedor.aprobar');
 
         // Subida real del archivo de una evidencia (logo, fachada, identificación, etc.).
@@ -228,12 +231,12 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware('role:Gerente General')
             ->name('api.v1.distribuidoras.destroy');
 
-        // Acciones específicas
+        // Acciones específicas — decisiones de autorización: solo VPN, igual que el resto.
         Route::put('{distribuidora}/estado', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'cambiarEstado'])
-            ->middleware('role:Verificador,Gerente de Sucursal,Gerente General')
+            ->middleware(['role:Verificador,Gerente de Sucursal,Gerente General', 'vpn'])
             ->name('api.v1.distribuidoras.estado');
         Route::put('{distribuidora}/credito', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'asignarCredito'])
-            ->middleware('role:Gerente de Sucursal,Gerente General')
+            ->middleware(['role:Gerente de Sucursal,Gerente General', 'vpn'])
             ->name('api.v1.distribuidoras.credito');
         Route::get('{distribuidora}/saldo-disponible', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'saldoDisponible'])
             ->middleware('role:Cajera,Distribuidora,Gerente de Sucursal,Gerente General')
@@ -264,8 +267,9 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware('role:Distribuidora')
             ->name('api.v1.vales.store');
 
+        // Decisión de autorización: solo VPN, igual que el resto.
         Route::put('{vale}/autorizar', [ValeController::class, 'autorizar'])
-            ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General')
+            ->middleware(['role:Coordinador,Gerente de Sucursal,Gerente General', 'vpn'])
             ->name('api.v1.vales.autorizar');
 
         // La distribuidora activa/desactiva sus propios vales sin autorización de nadie más.
@@ -296,8 +300,9 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware('role:Gerente General')
             ->name('api.v1.relaciones.generar');
 
+        // Decisión de autorización: solo VPN, igual que el resto.
         Route::post('{relacion}/perdonar', [RelacionController::class, 'perdonar'])
-            ->middleware('role:Gerente de Sucursal,Gerente General')
+            ->middleware(['role:Gerente de Sucursal,Gerente General', 'vpn'])
             ->name('api.v1.relaciones.perdonar');
     });
 
