@@ -1,0 +1,1028 @@
+{
+  "info": {
+    "name": "MisVales API v1",
+    "description": "Colección de pruebas para la API de MisVales-Backend (Laravel + Sanctum). Todas las rutas cuelgan de {{base_url}} = http://localhost:8000/api/v1. El login guarda automáticamente el token en la variable de colección `token`; el resto de las peticiones lo usan vía Bearer Auth heredado.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000/api/v1" },
+    { "key": "token", "value": "" },
+    { "key": "distribuidora_id", "value": "1" },
+    { "key": "cliente_id", "value": "1" },
+    { "key": "producto_id", "value": "1" },
+    { "key": "vale_id", "value": "1" },
+    { "key": "relacion_id", "value": "1" },
+    { "key": "abono_id", "value": "1" },
+    { "key": "solicitud_id", "value": "1" },
+    { "key": "solicitud_edicion_id", "value": "1" },
+    { "key": "solicitud_conciliacion_id", "value": "1" },
+    { "key": "convenio_bancario_id", "value": "1" },
+    { "key": "categoria_id", "value": "1" },
+    { "key": "mfa_method_id", "value": "1" },
+    { "key": "clave_config", "value": "comision_base_pct" },
+    { "key": "verify_id", "value": "1" },
+    { "key": "verify_hash", "value": "" },
+    { "key": "recaptcha", "value": "bypass-recaptcha" }
+  ],
+  "item": [
+    {
+      "name": "01. Auth",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"usuario@ejemplo.com\",\n  \"password\": \"Password123!\",\n  \"recaptcha\": \"{{recaptcha}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/login", "host": ["{{base_url}}"], "path": ["login"] },
+            "description": "Autentica al usuario. Si el rol requiere MFA (factor_count > 1), responde con requires_mfa o requires_setup en vez de token. recaptcha es opcional (nullable); en local/testing sin RECAPTCHA_SECRET_KEY configurada, 'bypass-recaptcha' omite la verificación."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    if (json.data && json.data.token) {",
+                  "        pm.collectionVariables.set('token', json.data.token);",
+                  "    }",
+                  "    if (json.data && json.data.mfa_method_id) {",
+                  "        pm.collectionVariables.set('mfa_method_id', json.data.mfa_method_id);",
+                  "    }",
+                  "}",
+                  "pm.test('Status is 200 or 401', function () {",
+                  "    pm.expect([200, 401, 403]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/logout", "host": ["{{base_url}}"], "path": ["logout"] },
+            "description": "Revoca el token de acceso actual (Sanctum)."
+          }
+        },
+        {
+          "name": "Me (usuario autenticado)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/me", "host": ["{{base_url}}"], "path": ["me"] }
+          }
+        },
+        {
+          "name": "Reenviar verificación de email",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"usuario@ejemplo.com\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/email/resend", "host": ["{{base_url}}"], "path": ["email", "resend"] }
+          }
+        },
+        {
+          "name": "Verificar email (URL firmada)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/email/verify/{{verify_id}}/{{verify_hash}}?expires=&signature=",
+              "host": ["{{base_url}}"],
+              "path": ["email", "verify", "{{verify_id}}", "{{verify_hash}}"],
+              "query": [{ "key": "expires", "value": "" }, { "key": "signature", "value": "" }]
+            },
+            "description": "Ruta firmada (middleware 'signed'): la URL completa con expires/signature la genera el backend y llega por correo/API, no se arma a mano en producción."
+          }
+        },
+        {
+          "name": "Forgot password",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"usuario@ejemplo.com\",\n  \"recaptcha\": \"{{recaptcha}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/forgot-password", "host": ["{{base_url}}"], "path": ["forgot-password"] }
+          }
+        },
+        {
+          "name": "Reset password",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"token-recibido-por-correo\",\n  \"email\": \"usuario@ejemplo.com\",\n  \"password\": \"NuevaPassword123!\",\n  \"password_confirmation\": \"NuevaPassword123!\",\n  \"recaptcha\": \"{{recaptcha}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/reset-password", "host": ["{{base_url}}"], "path": ["reset-password"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02. MFA",
+      "item": [
+        {
+          "name": "Verificar código MFA (TOTP)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mfa_method_id\": \"{{mfa_method_id}}\",\n  \"code\": \"123456\",\n  \"recaptcha\": \"{{recaptcha}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/mfa/verify", "host": ["{{base_url}}"], "path": ["mfa", "verify"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    if (json.data && json.data.token) { pm.collectionVariables.set('token', json.data.token); }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verificar OTP por correo (3er factor)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": 1,\n  \"code\": \"123456\",\n  \"recaptcha\": \"{{recaptcha}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/mfa/email/verify", "host": ["{{base_url}}"], "path": ["mfa", "email", "verify"] }
+          }
+        },
+        {
+          "name": "Ver datos de setup MFA (URL firmada)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/mfa/setup?email=usuario@ejemplo.com&expires=&signature=",
+              "host": ["{{base_url}}"],
+              "path": ["mfa", "setup"],
+              "query": [
+                { "key": "email", "value": "usuario@ejemplo.com" },
+                { "key": "expires", "value": "" },
+                { "key": "signature", "value": "" }
+              ]
+            },
+            "description": "Ruta firmada: el setup_url completo (con expires/signature) lo devuelve el login cuando requires_setup=true."
+          }
+        },
+        {
+          "name": "Confirmar setup MFA",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mfa_method_id\": \"{{mfa_method_id}}\",\n  \"code\": \"123456\",\n  \"recaptcha\": \"{{recaptcha}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/mfa/setup/confirm", "host": ["{{base_url}}"], "path": ["mfa", "setup", "confirm"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. Usuarios",
+      "item": [
+        {
+          "name": "Listar usuarios (filtro por rol)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/usuarios?filter[role]=Verificador",
+              "host": ["{{base_url}}"],
+              "path": ["usuarios"],
+              "query": [{ "key": "filter[role]", "value": "Verificador" }]
+            },
+            "description": "Roles permitidos: Coordinador, Verificador, Gerente de Sucursal, Gerente General."
+          }
+        }
+      ]
+    },
+    {
+      "name": "04. Alta de Proveedor",
+      "item": [
+        {
+          "name": "Listar solicitudes",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/alta-proveedor/solicitudes?filter[estado]=en_verificacion&include=datosPersonales.direccion,sucursal",
+              "host": ["{{base_url}}"],
+              "path": ["alta-proveedor", "solicitudes"],
+              "query": [
+                { "key": "filter[estado]", "value": "en_verificacion" },
+                { "key": "include", "value": "datosPersonales.direccion,sucursal" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Ver solicitud",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/alta-proveedor/solicitudes/{{solicitud_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["alta-proveedor", "solicitudes", "{{solicitud_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Crear solicitud",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"razon_social\": \"Abarrotes El Sol SA de CV\",\n  \"rfc\": \"AES010101AB1\",\n  \"nombre\": \"Juan\",\n  \"apellido_paterno\": \"Pérez\",\n  \"apellido_materno\": \"Gómez\",\n  \"curp\": \"PEGJ800101HDFRRN01\",\n  \"fecha_nacimiento\": \"1980-01-01\",\n  \"lugar_nacimiento\": \"CDMX\",\n  \"calle\": \"Av. Reforma 123\",\n  \"colonia\": \"Centro\",\n  \"numero_ext\": \"123\",\n  \"numero_int\": null,\n  \"codigo_postal\": \"06000\",\n  \"estado\": \"CDMX\",\n  \"ciudad\": \"Ciudad de México\",\n  \"datos_familiares\": [],\n  \"datos_vehiculos\": [],\n  \"datos_vivienda\": [],\n  \"referencia_laboral\": \"Comercio propio, 5 años\",\n  \"verificador_id\": null,\n  \"evidencias\": []\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/alta-proveedor/solicitudes", "host": ["{{base_url}}"], "path": ["alta-proveedor", "solicitudes"] },
+            "description": "Roles: Coordinador, Gerente de Sucursal, Gerente General."
+          }
+        },
+        {
+          "name": "Verificar solicitud (dictamen de campo)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cumple\": true,\n  \"comentario_verificador\": \"Domicilio y negocio verificados en visita física.\",\n  \"dispositivo\": \"App móvil verificador\",\n  \"evidencias\": [\n    { \"tipo_documento\": \"fachada\", \"url_archivo\": \"https://storage.test/evidencias/fachada.jpg\" }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/alta-proveedor/solicitudes/{{solicitud_id}}/verificar",
+              "host": ["{{base_url}}"],
+              "path": ["alta-proveedor", "solicitudes", "{{solicitud_id}}", "verificar"]
+            },
+            "description": "Roles: Verificador, Gerente de Sucursal, Gerente General."
+          }
+        },
+        {
+          "name": "Aprobar o rechazar solicitud",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"aprobado\",\n  \"comentario_gerente\": \"Cumple perfil crediticio.\",\n  \"limite_credito_asignado\": 15000,\n  \"email\": \"nueva.distribuidora@ejemplo.com\",\n  \"password\": \"Password123!\",\n  \"dispositivo\": \"Portal web gerencia\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/alta-proveedor/solicitudes/{{solicitud_id}}/aprobar",
+              "host": ["{{base_url}}"],
+              "path": ["alta-proveedor", "solicitudes", "{{solicitud_id}}", "aprobar"]
+            },
+            "description": "Roles: Gerente de Sucursal, Gerente General. decision: 'aprobado' | 'rechazado'. email/password/limite_credito_asignado son requeridos solo si se aprueba."
+          }
+        },
+        {
+          "name": "Subir evidencia (archivo)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "archivo", "type": "file", "src": [] },
+                { "key": "tipo_documento", "value": "identificacion", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/alta-proveedor/solicitudes/{{solicitud_id}}/evidencias",
+              "host": ["{{base_url}}"],
+              "path": ["alta-proveedor", "solicitudes", "{{solicitud_id}}", "evidencias"]
+            },
+            "description": "multipart/form-data. archivo: jpg/jpeg/png/pdf, máx 5MB."
+          }
+        }
+      ]
+    },
+    {
+      "name": "05. Distribuidora - Clientes",
+      "item": [
+        {
+          "name": "Mi perfil de distribuidora",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/distribuidora/perfil", "host": ["{{base_url}}"], "path": ["distribuidora", "perfil"] },
+            "description": "Roles: Distribuidora, Gerente General."
+          }
+        },
+        {
+          "name": "Listar clientes",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/distribuidora/clientes", "host": ["{{base_url}}"], "path": ["distribuidora", "clientes"] }
+          }
+        },
+        {
+          "name": "Registrar cliente",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"María\",\n  \"apellido_paterno\": \"López\",\n  \"apellido_materno\": \"Ramírez\",\n  \"curp\": \"LORM900202MDFPMR05\",\n  \"fecha_nacimiento\": \"1990-02-02\",\n  \"lugar_nacimiento\": \"Puebla\",\n  \"calle\": \"Calle 5 de Mayo 45\",\n  \"colonia\": \"Centro\",\n  \"numero_ext\": \"45\",\n  \"numero_int\": null,\n  \"codigo_postal\": \"72000\",\n  \"estado\": \"Puebla\",\n  \"ciudad\": \"Puebla\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/distribuidora/clientes", "host": ["{{base_url}}"], "path": ["distribuidora", "clientes"] },
+            "description": "Roles: Distribuidora, Gerente General."
+          }
+        },
+        {
+          "name": "Listar solicitudes de edición",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/distribuidora/clientes/ediciones", "host": ["{{base_url}}"], "path": ["distribuidora", "clientes", "ediciones"] },
+            "description": "Roles: Cajera, Coordinador, Gerente de Sucursal, Gerente General."
+          }
+        },
+        {
+          "name": "Ver cliente",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/distribuidora/clientes/{{cliente_id}}", "host": ["{{base_url}}"], "path": ["distribuidora", "clientes", "{{cliente_id}}"] }
+          }
+        },
+        {
+          "name": "Actualizar cliente",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"datos_personales\": {\n    \"apellido_materno\": \"Ramírez Ortiz\"\n  },\n  \"direccion\": {\n    \"numero_int\": \"3B\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/distribuidora/clientes/{{cliente_id}}", "host": ["{{base_url}}"], "path": ["distribuidora", "clientes", "{{cliente_id}}"] },
+            "description": "Roles: Distribuidora, Gerente General."
+          }
+        },
+        {
+          "name": "Cambiar estado del cliente",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": false\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/distribuidora/clientes/{{cliente_id}}/estado", "host": ["{{base_url}}"], "path": ["distribuidora", "clientes", "{{cliente_id}}", "estado"] }
+          }
+        },
+        {
+          "name": "Solicitar edición de cliente (cajera)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"datos_personales\": { \"apellido_materno\": \"Ramírez Ortiz\" },\n  \"direccion\": { \"colonia\": \"Centro Histórico\" },\n  \"motivo\": \"El cliente indicó error de captura en apellido y colonia.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/distribuidora/clientes/{{cliente_id}}/solicitar-edicion",
+              "host": ["{{base_url}}"],
+              "path": ["distribuidora", "clientes", "{{cliente_id}}", "solicitar-edicion"]
+            },
+            "description": "Rol: Cajera."
+          }
+        },
+        {
+          "name": "Decidir solicitud de edición",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"aprobada\",\n  \"comentario\": \"Cambios validados contra identificación.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/distribuidora/clientes/ediciones/{{solicitud_edicion_id}}/decidir",
+              "host": ["{{base_url}}"],
+              "path": ["distribuidora", "clientes", "ediciones", "{{solicitud_edicion_id}}", "decidir"]
+            },
+            "description": "Roles: Coordinador, Gerente de Sucursal, Gerente General. Requiere estar dentro de la VPN configurada (middleware 'vpn')."
+          }
+        },
+        {
+          "name": "Aplicar edición ya autorizada",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"solicitud_id\": {{solicitud_edicion_id}}\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/distribuidora/clientes/{{cliente_id}}/editar-datos",
+              "host": ["{{base_url}}"],
+              "path": ["distribuidora", "clientes", "{{cliente_id}}", "editar-datos"]
+            },
+            "description": "Rol: Cajera."
+          }
+        }
+      ]
+    },
+    {
+      "name": "06. Configuraciones",
+      "item": [
+        {
+          "name": "Listar configuraciones vigentes",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/configuraciones", "host": ["{{base_url}}"], "path": ["configuraciones"] },
+            "description": "Roles: Gerente General, Gerente de Sucursal."
+          }
+        },
+        {
+          "name": "Cambiar valor de configuración",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clave\": \"comision_base_pct\",\n  \"valor\": \"10\",\n  \"tipo_dato\": \"decimal\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/configuraciones", "host": ["{{base_url}}"], "path": ["configuraciones"] },
+            "description": "Rol: Gerente General."
+          }
+        },
+        {
+          "name": "Historial de una clave",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/configuraciones/historial/{{clave_config}}", "host": ["{{base_url}}"], "path": ["configuraciones", "historial", "{{clave_config}}"] },
+            "description": "Rol: Gerente General."
+          }
+        },
+        {
+          "name": "Fechas vigentes (todas o por sucursal)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/configuraciones/fechas?sucursal_id={{sucursal_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["configuraciones", "fechas"],
+              "query": [{ "key": "sucursal_id", "value": "{{sucursal_id}}", "disabled": true }]
+            },
+            "description": "Roles: Gerente General, Gerente de Sucursal. Omite sucursal_id para ver todas."
+          }
+        },
+        {
+          "name": "Cambiar fechas de corte",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sucursal_id\": null,\n  \"dia_corte\": 15,\n  \"dia_limite_pago\": 20,\n  \"dias_pago_anticipado\": 5\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/configuraciones/fechas", "host": ["{{base_url}}"], "path": ["configuraciones", "fechas"] },
+            "description": "Rol: Gerente General. sucursal_id null = regla global (fallback)."
+          }
+        },
+        {
+          "name": "Historial de fechas",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/configuraciones/fechas/historial", "host": ["{{base_url}}"], "path": ["configuraciones", "fechas", "historial"] },
+            "description": "Rol: Gerente General."
+          }
+        }
+      ]
+    },
+    {
+      "name": "07. Distribuidoras - Historial de Estado",
+      "item": [
+        {
+          "name": "Historial de estado de una distribuidora",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/distribuidoras/{{distribuidora_id}}/historial-estado", "host": ["{{base_url}}"], "path": ["distribuidoras", "{{distribuidora_id}}", "historial-estado"] },
+            "description": "Roles: Gerente General, Gerente de Sucursal, Distribuidora."
+          }
+        }
+      ]
+    },
+    {
+      "name": "08. Productos",
+      "item": [
+        {
+          "name": "Listar productos",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/productos?activos=true",
+              "host": ["{{base_url}}"],
+              "path": ["productos"],
+              "query": [{ "key": "activos", "value": "true" }]
+            },
+            "description": "Abierto a cualquier usuario autenticado. ?activos=false incluye desactivados."
+          }
+        },
+        {
+          "name": "Ver producto",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/productos/{{producto_id}}", "host": ["{{base_url}}"], "path": ["productos", "{{producto_id}}"] },
+            "description": "Rol: Gerente General."
+          }
+        },
+        {
+          "name": "Crear producto",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"monto\": 2000,\n  \"quincenas\": 4,\n  \"variante\": \"estandar\",\n  \"descripcion\": \"Vale digital de 2000 a 4 quincenas\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/productos", "host": ["{{base_url}}"], "path": ["productos"] },
+            "description": "Rol: Gerente General. monto debe ser múltiplo de 100."
+          }
+        },
+        {
+          "name": "Actualizar producto",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"descripcion\": \"Vale digital de 2000 a 4 quincenas (actualizado)\",\n  \"activo\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/productos/{{producto_id}}", "host": ["{{base_url}}"], "path": ["productos", "{{producto_id}}"] },
+            "description": "Rol: Gerente General."
+          }
+        },
+        {
+          "name": "Desactivar producto",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/productos/{{producto_id}}", "host": ["{{base_url}}"], "path": ["productos", "{{producto_id}}"] },
+            "description": "Rol: Gerente General. Baja lógica (activo=false), no elimina el registro."
+          }
+        }
+      ]
+    },
+    {
+      "name": "09. Categorías de Distribuidora",
+      "item": [
+        {
+          "name": "Listar categorías activas",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/categorias-distribuidoras", "host": ["{{base_url}}"], "path": ["categorias-distribuidoras"] },
+            "description": "Roles: Gerente de Sucursal, Gerente General."
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Distribuidoras - Gestión Avanzada",
+      "item": [
+        {
+          "name": "Listar distribuidoras",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/distribuidoras", "host": ["{{base_url}}"], "path": ["distribuidoras"] },
+            "description": "Roles: Coordinador, Verificador, Gerente de Sucursal, Gerente General, Cajera."
+          }
+        },
+        {
+          "name": "Ver distribuidora",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/distribuidoras/{{distribuidora_id}}", "host": ["{{base_url}}"], "path": ["distribuidoras", "{{distribuidora_id}}"] }
+          }
+        },
+        {
+          "name": "Actualizar distribuidora",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"comentarios_verificador\": \"Domicilio confirmado en segunda visita.\",\n  \"datos_extras\": {\n    \"referencia_laboral\": \"Negocio propio, 8 años en el giro.\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/distribuidoras/{{distribuidora_id}}", "host": ["{{base_url}}"], "path": ["distribuidoras", "{{distribuidora_id}}"] },
+            "description": "Roles: Coordinador, Gerente de Sucursal, Gerente General."
+          }
+        },
+        {
+          "name": "Eliminar (desactivar) distribuidora",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/distribuidoras/{{distribuidora_id}}", "host": ["{{base_url}}"], "path": ["distribuidoras", "{{distribuidora_id}}"] },
+            "description": "Rol: Gerente General. Desactiva lógicamente (estado=INACTIVO)."
+          }
+        },
+        {
+          "name": "Cambiar estado",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"ACTIVO\",\n  \"motivo\": \"Cumple requisitos y crédito asignado.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/distribuidoras/{{distribuidora_id}}/estado", "host": ["{{base_url}}"], "path": ["distribuidoras", "{{distribuidora_id}}", "estado"] },
+            "description": "estado: EN_VERIFICACION (solo Verificador) | RECHAZADO (Verificador/Gerente Sucursal) | ACTIVO | MOROSO (Gerente Sucursal/General)."
+          }
+        },
+        {
+          "name": "Asignar crédito y categoría",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"limite_credito\": 20000,\n  \"categoria_id\": {{categoria_id}}\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/distribuidoras/{{distribuidora_id}}/credito", "host": ["{{base_url}}"], "path": ["distribuidoras", "{{distribuidora_id}}", "credito"] },
+            "description": "Roles: Gerente de Sucursal, Gerente General."
+          }
+        },
+        {
+          "name": "Saldo disponible",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/distribuidoras/{{distribuidora_id}}/saldo-disponible", "host": ["{{base_url}}"], "path": ["distribuidoras", "{{distribuidora_id}}", "saldo-disponible"] },
+            "description": "Roles: Cajera, Distribuidora, Gerente de Sucursal, Gerente General."
+          }
+        },
+        {
+          "name": "Historial de movimientos de puntos",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/distribuidoras/{{distribuidora_id}}/puntos", "host": ["{{base_url}}"], "path": ["distribuidoras", "{{distribuidora_id}}", "puntos"] },
+            "description": "Roles: Cajera, Distribuidora, Gerente de Sucursal, Gerente General."
+          }
+        },
+        {
+          "name": "Canjear puntos",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cantidad\": 100,\n  \"motivo\": \"Canje por producto de mostrador\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/distribuidoras/{{distribuidora_id}}/puntos/canjear", "host": ["{{base_url}}"], "path": ["distribuidoras", "{{distribuidora_id}}", "puntos", "canjear"] },
+            "description": "Rol: Cajera."
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Vales",
+      "item": [
+        {
+          "name": "Listar vales",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/vales?estado=solicitado&per_page=15",
+              "host": ["{{base_url}}"],
+              "path": ["vales"],
+              "query": [
+                { "key": "estado", "value": "solicitado" },
+                { "key": "per_page", "value": "15" },
+                { "key": "distribuidora_id", "value": "{{distribuidora_id}}", "disabled": true }
+              ]
+            },
+            "description": "Roles: Distribuidora, Cajera, Coordinador, Gerente de Sucursal, Gerente General."
+          }
+        },
+        {
+          "name": "Solicitar vale",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cliente_id\": {{cliente_id}},\n  \"producto_id\": {{producto_id}},\n  \"tipo\": \"pre-vale\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/vales", "host": ["{{base_url}}"], "path": ["vales"] },
+            "description": "Rol: Distribuidora. tipo: 'pre-vale' | 'vale-digital'."
+          }
+        },
+        {
+          "name": "Autorizar vale",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/vales/{{vale_id}}/autorizar", "host": ["{{base_url}}"], "path": ["vales", "{{vale_id}}", "autorizar"] },
+            "description": "Roles: Coordinador, Gerente de Sucursal, Gerente General."
+          }
+        },
+        {
+          "name": "Desactivar vale propio",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/vales/{{vale_id}}/desactivar", "host": ["{{base_url}}"], "path": ["vales", "{{vale_id}}", "desactivar"] },
+            "description": "Rol: Distribuidora. Solo mientras el vale sigue en 'solicitado'."
+          }
+        },
+        {
+          "name": "Reactivar vale propio",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/vales/{{vale_id}}/activar", "host": ["{{base_url}}"], "path": ["vales", "{{vale_id}}", "activar"] },
+            "description": "Rol: Distribuidora."
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Relaciones (Cortes)",
+      "item": [
+        {
+          "name": "Listar relaciones",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/relaciones?per_page=15",
+              "host": ["{{base_url}}"],
+              "path": ["relaciones"],
+              "query": [
+                { "key": "per_page", "value": "15" },
+                { "key": "distribuidora_id", "value": "{{distribuidora_id}}", "disabled": true },
+                { "key": "estado", "value": "pendiente", "disabled": true },
+                { "key": "referencia_pago", "value": "", "disabled": true }
+              ]
+            },
+            "description": "Roles: Cajera, Coordinador, Gerente de Sucursal, Gerente General."
+          }
+        },
+        {
+          "name": "Ver relación (detalle)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/relaciones/{{relacion_id}}", "host": ["{{base_url}}"], "path": ["relaciones", "{{relacion_id}}"] }
+          }
+        },
+        {
+          "name": "Generar corte",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"distribuidora_id\": {{distribuidora_id}},\n  \"fecha_corte\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/relaciones/generar", "host": ["{{base_url}}"], "path": ["relaciones", "generar"] },
+            "description": "Rol: Gerente General. Omite distribuidora_id para generar el corte del día de todas las que correspondan."
+          }
+        },
+        {
+          "name": "Perdonar recargo/interés",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motivo\": \"Cliente reportó falla bancaria comprobable.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/relaciones/{{relacion_id}}/perdonar", "host": ["{{base_url}}"], "path": ["relaciones", "{{relacion_id}}", "perdonar"] },
+            "description": "Roles: Gerente de Sucursal, Gerente General."
+          }
+        }
+      ]
+    },
+    {
+      "name": "13. Conciliación Bancaria",
+      "item": [
+        {
+          "name": "Listar abonos",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/conciliaciones?per_page=20",
+              "host": ["{{base_url}}"],
+              "path": ["conciliaciones"],
+              "query": [
+                { "key": "per_page", "value": "20" },
+                { "key": "estado", "value": "sin_coincidencia", "disabled": true },
+                { "key": "relacion_id", "value": "{{relacion_id}}", "disabled": true }
+              ]
+            },
+            "description": "Roles: Cajera, Coordinador, Gerente de Sucursal, Gerente General."
+          }
+        },
+        {
+          "name": "Importar archivo del banco",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "archivo", "type": "file", "src": [] },
+                { "key": "convenio_bancario_id", "value": "{{convenio_bancario_id}}", "type": "text" }
+              ]
+            },
+            "url": { "raw": "{{base_url}}/conciliaciones/importar", "host": ["{{base_url}}"], "path": ["conciliaciones", "importar"] },
+            "description": "Roles: Cajera, Gerente de Sucursal, Gerente General. archivo: xlsx/xls/csv, máx 10MB."
+          }
+        },
+        {
+          "name": "Listar autorizaciones de conciliación manual",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/conciliaciones/autorizaciones", "host": ["{{base_url}}"], "path": ["conciliaciones", "autorizaciones"] },
+            "description": "Roles: Cajera, Coordinador, Gerente de Sucursal, Gerente General."
+          }
+        },
+        {
+          "name": "Solicitar autorización manual",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"relacion_id\": {{relacion_id}},\n  \"motivo\": \"La referencia no coincidió por error de captura del banco.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/conciliaciones/{{abono_id}}/solicitar-autorizacion", "host": ["{{base_url}}"], "path": ["conciliaciones", "{{abono_id}}", "solicitar-autorizacion"] },
+            "description": "Rol: Cajera."
+          }
+        },
+        {
+          "name": "Decidir autorización de conciliación",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"aprobada\",\n  \"comentario\": \"Referencia validada manualmente contra el estado de cuenta.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/conciliaciones/autorizaciones/{{solicitud_conciliacion_id}}/decidir", "host": ["{{base_url}}"], "path": ["conciliaciones", "autorizaciones", "{{solicitud_conciliacion_id}}", "decidir"] },
+            "description": "Roles: Coordinador, Gerente de Sucursal, Gerente General. Requiere estar dentro de la VPN configurada."
+          }
+        },
+        {
+          "name": "Ejecutar conciliación manual",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"solicitud_id\": {{solicitud_conciliacion_id}}\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/conciliaciones/{{abono_id}}/conciliar-manual", "host": ["{{base_url}}"], "path": ["conciliaciones", "{{abono_id}}", "conciliar-manual"] },
+            "description": "Rol: Cajera (debe ser quien solicitó la autorización)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "14. Reportes",
+      "item": [
+        {
+          "name": "Distribuidoras morosas",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/reportes/morosos", "host": ["{{base_url}}"], "path": ["reportes", "morosos"] },
+            "description": "Roles: Cajera, Coordinador, Gerente de Sucursal, Gerente General."
+          }
+        }
+      ]
+    },
+    {
+      "name": "15. Notificaciones",
+      "item": [
+        {
+          "name": "Listar notificaciones",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/notificaciones", "host": ["{{base_url}}"], "path": ["notificaciones"] },
+            "description": "Roles: Gerente de Sucursal, Gerente General, Administrador."
+          }
+        }
+      ]
+    },
+    {
+      "name": "16. Admin",
+      "item": [
+        {
+          "name": "Historial de accesos",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/admin/historical-data", "host": ["{{base_url}}"], "path": ["admin", "historical-data"] },
+            "description": "Rol: Administrador."
+          }
+        },
+        {
+          "name": "Log de auditoría",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/admin/logs?per_page=20",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "logs"],
+              "query": [
+                { "key": "per_page", "value": "20" },
+                { "key": "user_id", "value": "", "disabled": true },
+                { "key": "action", "value": "", "disabled": true }
+              ]
+            },
+            "description": "Rol: Administrador."
+          }
+        }
+      ]
+    }
+  ]
+}

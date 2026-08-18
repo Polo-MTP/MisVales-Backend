@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Rules\Recaptcha;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * @property int $user_id
  * @property string $code
+ * @property string|null $recaptcha
  */
 final class VerifyOtpRequest extends FormRequest
 {
@@ -26,6 +28,7 @@ final class VerifyOtpRequest extends FormRequest
         return [
             'user_id' => ['required', 'integer'],
             'code' => ['required', 'numeric', 'digits:6'],
+            'recaptcha' => ['nullable', 'string', new Recaptcha()],
         ];
     }
 
