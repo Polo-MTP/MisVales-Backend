@@ -45,26 +45,39 @@ return [
             'transaction_mode' => 'DEFERRED',
         ],
 
-        'mysql' => [
-            'driver' => 'mysql',
-            'url' => env('DB_URL'),
-            'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '3306'),
-            'database' => env('DB_DATABASE', 'laravel'),
-            'username' => env('DB_USERNAME', 'root'),
-            'password' => env('DB_PASSWORD', ''),
-            'unix_socket' => env('DB_SOCKET', ''),
-            'charset' => env('DB_CHARSET', 'utf8mb4'),
-            'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
-            'prefix' => '',
+        'mysql' => array_filter([
+            // Read/write split: solo se activa si DB_HOST_READ está definido en el .env.
+            // En local (sin esa variable) Laravel usa el 'host' único de abajo y no truena.
+            'read' => env('DB_HOST_READ') ? [
+                'host'     => [env('DB_HOST_READ')],
+                'username' => env('DB_USERNAME_READ', env('DB_USERNAME', 'root')),
+                'password' => env('DB_PASSWORD_READ', env('DB_PASSWORD', '')),
+            ] : null,
+            'write' => env('DB_HOST_WRITE') ? [
+                'host' => [env('DB_HOST_WRITE', env('DB_HOST', '127.0.0.1'))],
+            ] : null,
+            'sticky'       => env('DB_HOST_READ') ? true : null,
+
+            'driver'       => 'mysql',
+            'url'          => env('DB_URL'),
+            'host'         => env('DB_HOST', '127.0.0.1'),
+            'port'         => env('DB_PORT', '3306'),
+            'database'     => env('DB_DATABASE', 'laravel'),
+            'username'     => env('DB_USERNAME', 'root'),
+            'password'     => env('DB_PASSWORD', ''),
+            'unix_socket'  => env('DB_SOCKET', ''),
+            'charset'      => env('DB_CHARSET', 'utf8mb4'),
+            'collation'    => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix'       => '',
             'prefix_indexes' => true,
-            'strict' => true,
-            'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? array_filter([
+            'strict'       => true,
+            'engine'       => null,
+            'options'      => extension_loaded('pdo_mysql') ? array_filter([
                 (PHP_VERSION_ID >= 80500 ? \Pdo\Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
                 (PHP_VERSION_ID >= 80500 ? \Pdo\Mysql::ATTR_SSL_VERIFY_SERVER_CERT : PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT) => true,
             ]) : [],
-        ],
+        ]),
+
 
         'mariadb' => [
             'driver' => 'mariadb',
