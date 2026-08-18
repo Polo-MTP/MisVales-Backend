@@ -24,6 +24,13 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
+// Public status endpoint (server identification - no auth, no rate limit)
+Route::get('status', function () {
+    return response()->json([
+        'server' => config('app.server_number', '?'),
+    ]);
+})->name('api.v1.status');
+
 // Public routes with auth rate limiter (5/min - brute force protection)
 Route::middleware('throttle:auth')->group(function (): void {
     Route::post('login', [AuthController::class, 'login'])->name('api.v1.login');
@@ -34,6 +41,7 @@ Route::middleware('throttle:auth')->group(function (): void {
     Route::get('mfa/setup', [MfaController::class, 'showSetup'])->middleware('signed')->name('api.v1.mfa.setup');
     Route::post('mfa/setup/confirm', [MfaController::class, 'confirmSetup'])->name('api.v1.mfa.setup.confirm');
 });
+
 
 // Protected routes for active authenticated users (120/min)
 Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(function (): void {
