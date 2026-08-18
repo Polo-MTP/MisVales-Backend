@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             ConfiguracionSeeder::class,        // Configuraciones globales
             MfaSeeder::class,                  // MFA (si aplica)
             MorosidadDemoSeeder::class,        // Distribuidoras/vales/relaciones vencidas para probar reportes/morosos
+            EquipoDemoSeeder::class,           // Cuentas reales del equipo, roles intercalados
         ]);
     }
 }
