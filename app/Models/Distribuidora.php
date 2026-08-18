@@ -47,84 +47,117 @@ final class Distribuidora extends Model
 
     // ─── Relaciones ─────────────────────────────────────────────
 
-    // La relación con User (ahora es el usuario dueño de la distribuidora,
-    // pero puede ser el coordinador o el representante)
+    /**
+     * Usuario dueño de la distribuidora (puede ser el coordinador o el representante).
+     */
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(User::class, 'usuario_id');
     }
 
+    /**
+     * Sucursal a la que pertenece la distribuidora.
+     */
     public function sucursal(): BelongsTo
     {
         return $this->belongsTo(Sucursal::class);
     }
 
+    /**
+     * Usuario con rol Coordinador asignado a la distribuidora.
+     */
     public function coordinador(): BelongsTo
     {
         return $this->belongsTo(User::class, 'coordinador_id');
     }
 
+    /**
+     * Usuario que verificó la solicitud de alta de la distribuidora.
+     */
     public function verificador(): BelongsTo
     {
         return $this->belongsTo(User::class, 'verificador_id');
     }
 
+    /**
+     * Usuario que aprobó el alta de la distribuidora.
+     */
     public function aprobador(): BelongsTo
     {
         return $this->belongsTo(User::class, 'aprobado_por');
     }
 
+    /**
+     * Categoría de la distribuidora (define su porcentaje de comisión).
+     */
     public function categoria(): BelongsTo
     {
         return $this->belongsTo(CategoriaDistribuidora::class, 'categoria_id');
     }
 
-    // Datos adicionales del solicitante capturados durante el alta (familiares, vehículo, vivienda, referencia laboral)
+    /**
+     * Datos adicionales del solicitante capturados durante el alta
+     * (familiares, vehículo, vivienda, referencia laboral).
+     */
     public function datosExtras(): HasOne
     {
         return $this->hasOne(DistribuidorDatosExtras::class);
     }
 
-    // Historial de estados (tabla historial_estado_distribuidora)
+    /**
+     * Historial de cambios de estado de la distribuidora.
+     */
     public function historialEstados(): HasMany
     {
         return $this->hasMany(HistorialEstadoDistribuidora::class);
     }
 
-    // Historial de clientes (la que ya tenías)
+    /**
+     * Historial de clientes que han pertenecido a esta distribuidora.
+     */
     public function historialClientes(): HasMany
     {
         return $this->hasMany(HistorialClienteDistr::class, 'distribuidor_id');
     }
 
-    // Vales solicitados por esta distribuidora
+    /**
+     * Vales solicitados por esta distribuidora.
+     */
     public function vales(): HasMany
     {
         return $this->hasMany(Vale::class);
     }
 
-    // Relaciones (cortes/estados de cuenta) generadas para esta distribuidora
+    /**
+     * Relaciones (cortes/estados de cuenta) generadas para esta distribuidora.
+     */
     public function relaciones(): HasMany
     {
         return $this->hasMany(Relacion::class);
     }
 
+    /**
+     * Movimientos de puntos de fidelidad de la distribuidora.
+     */
     public function puntosMovimientos(): HasMany
     {
         return $this->hasMany(PuntoMovimiento::class);
     }
 
+    /**
+     * Perdones de recargo/interés otorgados a esta distribuidora.
+     */
     public function relacionPerdones(): HasMany
     {
         return $this->hasMany(RelacionPerdon::class);
     }
 
-    // ─── Accesor (crédito disponible calculado) ──────────────
-
+    /**
+     * Crédito disponible: límite de crédito menos el monto de vales que aún cuentan
+     * contra el crédito (mismo criterio de "pendiente" que usa RelacionCalculoService).
+     */
     public function getCreditoDisponibleAttribute(): float
     {
-        // Mismo conjunto de estados que RelacionCalculoService considera "vales pendientes"
-        // ('activo' no es un valor válido del enum vales.estado, nunca hacía match).
         $totalEnUso = $this->vales()
             ->where('activo', true)
             ->whereIn('estado', ['autorizado', 'parcial', 'vencido'])
@@ -133,8 +166,11 @@ final class Distribuidora extends Model
         return max(0, (float) $this->limite_credito - (float) $totalEnUso);
     }
 
-    // ─── Métodos de negocio ────────────────────────────────────
-
+    /**
+     * Verifica si la distribuidora puede solicitar un vale por el monto indicado:
+     * debe estar activa/en verificación, tener crédito disponible suficiente y,
+     * si es su primer vale, no exceder el porcentaje máximo configurable ('regla_50_pct').
+     */
     public function puedeSolicitarVale(float $montoSolicitado, bool $esPrimerVale = false): bool
     {
         // Solo pueden solicitar si están activas o en verificación

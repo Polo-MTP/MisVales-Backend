@@ -20,6 +20,9 @@ use Illuminate\Support\Facades\Storage;
  */
 final class EvidenciaController extends ApiController
 {
+    /**
+     * Sube el archivo de una evidencia y la asocia a la solicitud de alta de proveedor.
+     */
     public function store(SubirEvidenciaRequest $request, SolicitudProveedor $solicitud): JsonResponse
     {
         /** @var User $usuario */

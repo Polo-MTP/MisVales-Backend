@@ -36,26 +36,41 @@ final class AbonoConciliacion extends Model
         'fecha_pago' => 'date',
     ];
 
+    /**
+     * Relación (corte) a la que pertenece este abono.
+     */
     public function relacion(): BelongsTo
     {
         return $this->belongsTo(Relacion::class);
     }
 
+    /**
+     * Convenio bancario por el que se recibió el pago.
+     */
     public function convenioBancario(): BelongsTo
     {
         return $this->belongsTo(ConvenioBancario::class);
     }
 
+    /**
+     * Usuario que concilió manualmente el abono.
+     */
     public function conciliadoPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'conciliado_por');
     }
 
+    /**
+     * Usuario que autorizó la conciliación manual.
+     */
     public function autorizadoPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'autorizado_por');
     }
 
+    /**
+     * Usuario que subió el lote de conciliación.
+     */
     public function subidoPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'subido_por');

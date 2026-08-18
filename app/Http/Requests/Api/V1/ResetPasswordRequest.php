@@ -9,6 +9,9 @@ use Illuminate\Validation\Rules\Password;
 
 final class ResetPasswordRequest extends FormRequest
 {
+    /**
+     * Cualquier visitante con un token válido puede restablecer la contraseña.
+     */
     public function authorize(): bool
     {
         return true;

@@ -13,6 +13,9 @@ final class GenerarCortesRelaciones extends Command
 
     protected $description = 'Genera la relación (corte) de todas las distribuidoras cuya sucursal tiene hoy su día de corte configurado.';
 
+    /**
+     * Genera el corte del día (o de la fecha indicada) para las distribuidoras que correspondan.
+     */
     public function handle(RelacionCalculoService $relacionCalculoService): int
     {
         $fecha = $this->option('fecha');

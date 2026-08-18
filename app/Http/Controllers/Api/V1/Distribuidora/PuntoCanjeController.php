@@ -20,6 +20,9 @@ final class PuntoCanjeController extends ApiController
         private readonly PuntoCanjeService $puntoCanjeService,
     ) {}
 
+    /**
+     * Lista el historial de movimientos de puntos de la distribuidora.
+     */
     public function index(Request $request, Distribuidora $distribuidora): JsonResponse
     {
         /** @var User $usuario */
@@ -33,6 +36,9 @@ final class PuntoCanjeController extends ApiController
         );
     }
 
+    /**
+     * Canjea puntos de fidelidad de la distribuidora, registrando el movimiento correspondiente.
+     */
     public function canjear(CanjearPuntosRequest $request, Distribuidora $distribuidora): JsonResponse
     {
         /** @var User $usuario */

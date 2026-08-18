@@ -20,6 +20,9 @@ final class ThirdFactorMail extends Mailable
         public string $rol = 'tu cuenta',
     ) {}
 
+    /**
+     * Define el asunto del correo del código de tercer factor.
+     */
     public function envelope(): Envelope
     {
         return new Envelope(
@@ -27,6 +30,9 @@ final class ThirdFactorMail extends Mailable
         );
     }
 
+    /**
+     * Renderiza la vista del correo con el código y el rol del destinatario.
+     */
     public function content(): Content
     {
         return new Content(
@@ -35,6 +41,9 @@ final class ThirdFactorMail extends Mailable
         );
     }
 
+    /**
+     * @return array<int, mixed>
+     */
     public function attachments(): array
     {
         return [];

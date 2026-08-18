@@ -9,6 +9,9 @@ use Symfony\Component\HttpFoundation\Response;
 
 trait ApiResponse
 {
+    /**
+     * Respuesta JSON de éxito estándar de la API.
+     */
     protected function success(
         mixed $data = null,
         string $message = 'Success',
@@ -21,6 +24,9 @@ trait ApiResponse
         ], $code);
     }
 
+    /**
+     * Respuesta JSON de éxito con código 201, para recursos recién creados.
+     */
     protected function created(
         mixed $data = null,
         string $message = 'Resource created successfully'
@@ -28,6 +34,9 @@ trait ApiResponse
         return $this->success($data, $message, Response::HTTP_CREATED);
     }
 
+    /**
+     * Respuesta JSON 204 sin contenido.
+     */
     protected function noContent(): JsonResponse
     {
         return response()->json(null, Response::HTTP_NO_CONTENT);
@@ -53,16 +62,25 @@ trait ApiResponse
         return response()->json($response, $code);
     }
 
+    /**
+     * Respuesta JSON 404.
+     */
     protected function notFound(string $message = 'Resource not found'): JsonResponse
     {
         return $this->error($message, Response::HTTP_NOT_FOUND);
     }
 
+    /**
+     * Respuesta JSON 401.
+     */
     protected function unauthorized(string $message = 'Unauthorized'): JsonResponse
     {
         return $this->error($message, Response::HTTP_UNAUTHORIZED);
     }
 
+    /**
+     * Respuesta JSON 403.
+     */
     protected function forbidden(string $message = 'Forbidden'): JsonResponse
     {
         return $this->error($message, Response::HTTP_FORBIDDEN);

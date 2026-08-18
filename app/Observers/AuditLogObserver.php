@@ -25,21 +25,33 @@ use Illuminate\Database\Eloquent\Model;
  */
 final class AuditLogObserver
 {
+    /**
+     * Registra en auditoría y notificaciones la creación del modelo.
+     */
     public function created(Model $model): void
     {
         $this->registrar('creado', $model);
     }
 
+    /**
+     * Registra en auditoría y notificaciones la actualización del modelo.
+     */
     public function updated(Model $model): void
     {
         $this->registrar('actualizado', $model);
     }
 
+    /**
+     * Registra en auditoría y notificaciones la eliminación del modelo.
+     */
     public function deleted(Model $model): void
     {
         $this->registrar('eliminado', $model);
     }
 
+    /**
+     * Escribe el AuditLog y la Notificacion correspondientes al evento del modelo.
+     */
     private function registrar(string $evento, Model $model): void
     {
         $accion = class_basename($model).'.'.$evento;

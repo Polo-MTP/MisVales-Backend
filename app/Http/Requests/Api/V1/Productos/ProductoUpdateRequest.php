@@ -7,11 +7,18 @@ use Illuminate\Validation\Rule;
 
 class ProductoUpdateRequest extends FormRequest
 {
+    /**
+     * Solo el Gerente General puede editar productos del catálogo.
+     */
     public function authorize(): bool
     {
         $user = $this->user();
         return $user && $user->role->name === 'Gerente General';
     }
+
+    /**
+     * @return array<string, mixed>
+     */
     public function rules(): array
     {
         $id = $this->route('producto');

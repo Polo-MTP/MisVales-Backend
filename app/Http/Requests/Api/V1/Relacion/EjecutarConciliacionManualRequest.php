@@ -8,6 +8,10 @@ use Illuminate\Foundation\Http\FormRequest;
 
 final class EjecutarConciliacionManualRequest extends FormRequest
 {
+    /**
+     * Cualquier usuario autenticado puede ejecutar la conciliación (requiere una
+     * solicitud ya autorizada, validado en el Service).
+     */
     public function authorize(): bool
     {
         return true;

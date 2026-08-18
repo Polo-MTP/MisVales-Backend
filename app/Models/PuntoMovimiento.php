@@ -29,16 +29,25 @@ final class PuntoMovimiento extends Model
         'valor_punto_snapshot' => 'decimal:2',
     ];
 
+    /**
+     * Distribuidora dueña de este movimiento de puntos.
+     */
     public function distribuidora(): BelongsTo
     {
         return $this->belongsTo(Distribuidora::class);
     }
 
+    /**
+     * Relación (corte) que originó el movimiento, si aplica.
+     */
     public function relacion(): BelongsTo
     {
         return $this->belongsTo(Relacion::class);
     }
 
+    /**
+     * Usuario que registró el movimiento.
+     */
     public function registradoPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'registrado_por');

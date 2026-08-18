@@ -37,21 +37,33 @@ final class Vale extends Model
         'fecha_autorizacion' => 'datetime',
     ];
 
+    /**
+     * Distribuidora que solicitó este vale.
+     */
     public function distribuidora(): BelongsTo
     {
         return $this->belongsTo(Distribuidora::class);
     }
 
+    /**
+     * Cliente para el cual se solicitó este vale.
+     */
     public function cliente(): BelongsTo
     {
-        return $this->belongsTo(Cliente::class); // asumiendo que tienes modelo Cliente
+        return $this->belongsTo(Cliente::class);
     }
 
+    /**
+     * Producto del catálogo con el que se generó este vale.
+     */
     public function producto(): BelongsTo
     {
         return $this->belongsTo(Producto::class);
     }
 
+    /**
+     * Cuotas (detalles de corte) generadas para este vale.
+     */
     public function relacionDetalles(): HasMany
     {
         return $this->hasMany(RelacionDetalle::class);

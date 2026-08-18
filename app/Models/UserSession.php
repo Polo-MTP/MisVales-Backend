@@ -31,11 +31,17 @@ final class UserSession extends Model
         'last_activity_at' => 'datetime',
     ];
 
+    /**
+     * Usuario dueño de esta sesión.
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * Acciones auditadas registradas durante esta sesión.
+     */
     public function auditLogs(): HasMany
     {
         return $this->hasMany(AuditLog::class, 'session_id');

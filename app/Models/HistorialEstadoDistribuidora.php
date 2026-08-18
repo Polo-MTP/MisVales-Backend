@@ -29,11 +29,17 @@ final class HistorialEstadoDistribuidora extends Model
         'fecha' => 'datetime',
     ];
 
+    /**
+     * Distribuidora cuyo estado cambió.
+     */
     public function distribuidora(): BelongsTo
     {
         return $this->belongsTo(Distribuidora::class);
     }
 
+    /**
+     * Usuario que realizó el cambio de estado.
+     */
     public function cambiadoPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cambiado_por');

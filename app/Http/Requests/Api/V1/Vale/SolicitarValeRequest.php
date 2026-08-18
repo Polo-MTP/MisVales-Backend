@@ -9,6 +9,10 @@ use Illuminate\Validation\Rule;
 
 final class SolicitarValeRequest extends FormRequest
 {
+    /**
+     * Cualquier usuario autenticado puede solicitar un vale (la pertenencia de cliente/crédito
+     * disponible se valida en el Service).
+     */
     public function authorize(): bool
     {
         return true;

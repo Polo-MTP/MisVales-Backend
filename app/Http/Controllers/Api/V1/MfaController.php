@@ -20,6 +20,9 @@ use PragmaRX\Google2FA\Google2FA;
 
 final class MfaController extends ApiController
 {
+    /**
+     * Verifica el código MFA (TOTP) del reto de login; puede requerir un OTP por correo adicional.
+     */
     public function verify(VerifyMfaRequest $request, MfaService $mfaService): JsonResponse
     {
         Log::debug('MfaController: Iniciando verificación de código MFA', [
@@ -59,6 +62,9 @@ final class MfaController extends ApiController
         );
     }
 
+    /**
+     * Verifica el código OTP enviado por correo como segundo paso del reto MFA.
+     */
     public function verifyEmailOtp(VerifyOtpRequest $request, EmailOtpService $emailOtpService): JsonResponse
     {
         Log::debug('MfaController: Iniciando verificación de código OTP por correo', [
@@ -91,6 +97,9 @@ final class MfaController extends ApiController
         );
     }
 
+    /**
+     * Genera los datos (secreto/QR) para que el usuario configure su método MFA.
+     */
     public function showSetup(Request $request, MfaService $mfaService): JsonResponse
     {
         $email = $request->query('email');
@@ -113,6 +122,9 @@ final class MfaController extends ApiController
         );
     }
 
+    /**
+     * Confirma el setup de MFA validando el primer código generado por el dispositivo del usuario.
+     */
     public function confirmSetup(ConfirmMfaSetupRequest $request): JsonResponse
     {
         Log::debug('MfaController: Confirmando configuración MFA', [

@@ -23,6 +23,10 @@ use Illuminate\Support\Facades\Password;
 
 final class AuthController extends ApiController
 {
+    /**
+     * Autentica al usuario; puede devolver un token directo o pedir un reto MFA/setup
+     * según la configuración de la cuenta.
+     */
     public function login(LoginRequest $request, LoginService $loginService): JsonResponse
     {
         Log::debug('AuthController: Iniciando proceso de login', [
@@ -68,6 +72,9 @@ final class AuthController extends ApiController
         );
     }
 
+    /**
+     * Cierra la sesión actual del usuario autenticado.
+     */
     public function logout(Request $request, LoginService $loginService): JsonResponse
     {
         /** @var User|null $user */
@@ -82,6 +89,9 @@ final class AuthController extends ApiController
         return $this->success(message: (string) $result['message']);
     }
 
+    /**
+     * Devuelve los datos del usuario autenticado.
+     */
     public function me(Request $request): JsonResponse
     {
         /** @var User $user */
@@ -90,6 +100,9 @@ final class AuthController extends ApiController
         return $this->success(new UserResource($user->load('role')));
     }
 
+    /**
+     * Marca el email del usuario autenticado como verificado.
+     */
     public function verifyEmail(VerifyEmailRequest $request): JsonResponse
     {
         /** @var User $user */
@@ -106,6 +119,9 @@ final class AuthController extends ApiController
         return $this->success(message: 'Email verificado exitosamente.');
     }
 
+    /**
+     * Reenvía el correo de verificación de email al usuario indicado.
+     */
     public function resendVerificationEmail(ResendVerificationRequest $request): JsonResponse
     {
         /** @var User|null $user */
@@ -124,6 +140,9 @@ final class AuthController extends ApiController
         return $this->success(message: 'Correo de verificación reenviado exitosamente.');
     }
 
+    /**
+     * Envía el enlace de restablecimiento de contraseña al correo indicado.
+     */
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
         $status = Password::sendResetLink(
@@ -137,6 +156,9 @@ final class AuthController extends ApiController
         return $this->error('No se pudo enviar el enlace de restablecimiento.', 500);
     }
 
+    /**
+     * Restablece la contraseña usando el token enviado por correo y revoca los tokens de API existentes.
+     */
     public function resetPassword(ResetPasswordRequest $request): JsonResponse
     {
         $status = Password::reset(

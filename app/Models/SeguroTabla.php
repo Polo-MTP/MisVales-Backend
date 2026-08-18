@@ -27,11 +27,17 @@ final class SeguroTabla extends Model
         'activo' => 'boolean',
     ];
 
+    /**
+     * Limita la consulta a rangos de seguro vigentes.
+     */
     public function scopeActivo($query)
     {
         return $query->where('activo', true);
     }
 
+    /**
+     * Filtra al rango de seguro cuyo intervalo [monto_desde, monto_hasta] cubre el monto dado.
+     */
     public function scopeParaMonto($query, float $monto)
     {
         return $query->where('monto_desde', '<=', $monto)

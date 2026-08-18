@@ -17,6 +17,9 @@ final class Role extends Model
 {
     use HasFactory;
 
+    /**
+     * Usuarios que tienen asignado este rol.
+     */
     public function users(): HasMany
     {
         return $this->hasMany(User::class);

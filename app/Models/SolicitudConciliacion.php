@@ -30,21 +30,33 @@ final class SolicitudConciliacion extends Model
         'fecha_decision' => 'datetime',
     ];
 
+    /**
+     * Abono de conciliación al que se refiere esta solicitud.
+     */
     public function abono(): BelongsTo
     {
         return $this->belongsTo(AbonoConciliacion::class, 'abono_conciliacion_id');
     }
 
+    /**
+     * Corte (Relacion) afectado por la conciliación solicitada.
+     */
     public function relacion(): BelongsTo
     {
         return $this->belongsTo(Relacion::class);
     }
 
+    /**
+     * Usuario que solicitó la conciliación manual.
+     */
     public function solicitante(): BelongsTo
     {
         return $this->belongsTo(User::class, 'solicitado_por');
     }
 
+    /**
+     * Usuario que autorizó o rechazó la solicitud.
+     */
     public function autorizador(): BelongsTo
     {
         return $this->belongsTo(User::class, 'autorizado_por');

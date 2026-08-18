@@ -26,11 +26,17 @@ final class HistorialClienteDistr extends Model
         'fecha_fin' => 'datetime',
     ];
 
+    /**
+     * Distribuidora a la que estuvo/está asignado el cliente en este periodo.
+     */
     public function distribuidora(): BelongsTo
     {
         return $this->belongsTo(Distribuidora::class, 'distribuidor_id');
     }
 
+    /**
+     * Cliente al que corresponde este periodo de historial.
+     */
     public function cliente(): BelongsTo
     {
         return $this->belongsTo(Cliente::class, 'cliente_id');

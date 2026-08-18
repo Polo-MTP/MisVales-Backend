@@ -9,11 +9,18 @@ use App\Models\User;
 
 final class DistribuidoraPolicy
 {
+    /**
+     * Roles con acceso al listado de distribuidoras.
+     */
     public function viewAny(User $user): bool
     {
         return in_array($user->role?->name, ['Coordinador', 'Gerente de Sucursal', 'Gerente General', 'Verificador', 'Administrador'], true);
     }
 
+    /**
+     * Gerente General/Administrador ven cualquiera; el resto solo la suya (por sucursal,
+     * coordinador o verificador asignado, o si sigue en verificación).
+     */
     public function view(User $user, Distribuidora $distribuidora): bool
     {
         $role = $user->role?->name;
@@ -33,11 +40,18 @@ final class DistribuidoraPolicy
         return false;
     }
 
+    /**
+     * Roles que pueden dar de alta una distribuidora.
+     */
     public function create(User $user): bool
     {
         return in_array($user->role?->name, ['Coordinador', 'Gerente de Sucursal', 'Gerente General'], true);
     }
 
+    /**
+     * Gerente General edita cualquiera; Gerente de Sucursal solo las de su sucursal;
+     * Coordinador solo las suyas y mientras sigan en captura/verificación.
+     */
     public function update(User $user, Distribuidora $distribuidora): bool
     {
         $role = $user->role?->name;
@@ -54,11 +68,18 @@ final class DistribuidoraPolicy
         return false;
     }
 
+    /**
+     * Solo el Gerente General puede eliminar una distribuidora.
+     */
     public function delete(User $user, Distribuidora $distribuidora): bool
     {
         return $user->role?->name === 'Gerente General';
     }
 
+    /**
+     * Gerente General cambia cualquier estado; Gerente de Sucursal solo de su sucursal;
+     * Verificador solo mientras la distribuidora está en captura y en su sucursal.
+     */
     public function cambiarEstado(User $user, Distribuidora $distribuidora): bool
     {
         $role = $user->role?->name;
@@ -75,6 +96,9 @@ final class DistribuidoraPolicy
         return false;
     }
 
+    /**
+     * Gerente General asigna crédito a cualquiera; Gerente de Sucursal solo a las de su sucursal.
+     */
     public function asignarCredito(User $user, Distribuidora $distribuidora): bool
     {
         $role = $user->role?->name;

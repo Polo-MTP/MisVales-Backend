@@ -25,6 +25,9 @@ final class DistribuidorDatosExtras extends Model
         'datos_vivienda' => 'array',
     ];
 
+    /**
+     * Distribuidora dueña de estos datos extra.
+     */
     public function distribuidora(): BelongsTo
     {
         return $this->belongsTo(Distribuidora::class);

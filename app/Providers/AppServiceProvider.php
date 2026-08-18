@@ -24,11 +24,17 @@ use Illuminate\Validation\Rules\Password;
 
 final class AppServiceProvider extends ServiceProvider
 {
+    /**
+     * Sin bindings propios de la aplicación por ahora.
+     */
     public function register(): void
     {
         //
     }
 
+    /**
+     * Configura rate limiting, auditoría de modelos y política de contraseñas al arrancar la app.
+     */
     public function boot(): void
     {
         $this->configureRateLimiting();
@@ -46,6 +52,9 @@ final class AppServiceProvider extends ServiceProvider
         Password::defaults(fn (): Password => Password::min(8)->mixedCase()->numbers());
     }
 
+    /**
+     * Límites de tasa por defecto de la API: general, login y endpoints autenticados.
+     */
     private function configureRateLimiting(): void
     {
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(60)->by($request->user()?->id ?: $request->ip()));

@@ -26,16 +26,25 @@ class Producto extends Model
         'activo' => 'boolean',
     ];
 
+    /**
+     * Usuario que dio de alta este producto.
+     */
     public function creador(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    /**
+     * Vales generados a partir de este producto.
+     */
     public function vales(): HasMany
     {
         return $this->hasMany(Vale::class);
     }
 
+    /**
+     * Limita la consulta a productos activos (catálogo disponible para solicitar vales).
+     */
     public function scopeActivo($query)
     {
         return $query->where('activo', true);

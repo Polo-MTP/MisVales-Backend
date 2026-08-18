@@ -26,16 +26,25 @@ final class RelacionPerdon extends Model
         'numero_perdon' => 'integer',
     ];
 
+    /**
+     * Distribuidora beneficiada por el perdón.
+     */
     public function distribuidora(): BelongsTo
     {
         return $this->belongsTo(Distribuidora::class);
     }
 
+    /**
+     * Corte (Relacion) sobre el que se aplica el perdón de recargo/interés.
+     */
     public function relacion(): BelongsTo
     {
         return $this->belongsTo(Relacion::class);
     }
 
+    /**
+     * Usuario que autorizó el perdón.
+     */
     public function autorizadoPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'autorizado_por');

@@ -58,41 +58,65 @@ final class User extends Authenticatable implements MustVerifyEmail
 
     use Notifiable;
 
+    /**
+     * Rol que determina los permisos del usuario.
+     */
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
     }
 
+    /**
+     * Sucursal a la que pertenece el usuario.
+     */
     public function sucursal(): BelongsTo
     {
         return $this->belongsTo(Sucursal::class, 'sucursal_id');
     }
 
+    /**
+     * Distribuidora de la que este usuario es dueño (rol Distribuidora).
+     */
     public function distribuidora(): HasOne
     {
         return $this->hasOne(Distribuidora::class, 'usuario_id');
     }
 
+    /**
+     * Datos personales del usuario.
+     */
     public function datosPersonales(): BelongsTo
     {
         return $this->belongsTo(DatosPersonales::class, 'datos_id');
     }
 
+    /**
+     * Métodos de autenticación multifactor registrados por el usuario.
+     */
     public function mfaMethods(): HasMany
     {
         return $this->hasMany(MfaMethod::class);
     }
 
+    /**
+     * Sesiones (tokens) activas o históricas del usuario.
+     */
     public function sessions(): HasMany
     {
         return $this->hasMany(UserSession::class);
     }
 
+    /**
+     * Acciones auditadas realizadas por el usuario.
+     */
     public function auditLogs(): HasMany
     {
         return $this->hasMany(AuditLog::class);
     }
 
+    /**
+     * Intentos de login asociados a este usuario.
+     */
     public function loginAttempts(): HasMany
     {
         return $this->hasMany(LoginAttempt::class);

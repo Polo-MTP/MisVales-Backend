@@ -8,6 +8,10 @@ use Illuminate\Foundation\Http\FormRequest;
 
 final class SolicitarEdicionClienteRequest extends FormRequest
 {
+    /**
+     * Cualquier usuario autenticado puede proponer la edición (la pertenencia del cliente
+     * se valida en el Service).
+     */
     public function authorize(): bool
     {
         return true;

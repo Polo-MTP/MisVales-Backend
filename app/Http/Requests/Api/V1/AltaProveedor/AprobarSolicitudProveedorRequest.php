@@ -9,6 +9,10 @@ use Illuminate\Validation\Rules\Password;
 
 final class AprobarSolicitudProveedorRequest extends FormRequest
 {
+    /**
+     * Cualquier usuario autenticado puede enviar la solicitud (la restricción de rol
+     * gerencial se aplica en el controller/policy).
+     */
     public function authorize(): bool
     {
         return true;

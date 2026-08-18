@@ -32,11 +32,17 @@ final class ConfiguracionFechas extends Model
         'vigente_hasta' => 'date',
     ];
 
+    /**
+     * Sucursal a la que aplica esta configuración de fechas.
+     */
     public function sucursal(): BelongsTo
     {
         return $this->belongsTo(Sucursal::class, 'sucursal_id');
     }
 
+    /**
+     * Usuario que registró o modificó esta configuración.
+     */
     public function modificadoPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'modificado_por');

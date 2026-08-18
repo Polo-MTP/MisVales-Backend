@@ -8,6 +8,10 @@ use Illuminate\Foundation\Http\FormRequest;
 
 final class UpdateConfiguracionFechasRequest extends FormRequest
 {
+    /**
+     * Cualquier usuario autenticado puede enviar la solicitud (la restricción de rol
+     * se aplica en el controller/policy).
+     */
     public function authorize(): bool
     {
         return true;

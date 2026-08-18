@@ -19,6 +19,9 @@ final class ValeController extends ApiController
         private readonly ValeService $valeService
     ) {}
 
+    /**
+     * Lista los vales visibles para el usuario según su rol.
+     */
     public function index(Request $request): JsonResponse
     {
         /** @var User $usuario */
@@ -32,6 +35,9 @@ final class ValeController extends ApiController
         );
     }
 
+    /**
+     * Registra la solicitud de un vale; queda pendiente de autorización.
+     */
     public function store(SolicitarValeRequest $request): JsonResponse
     {
         /** @var User $usuario */
@@ -45,6 +51,9 @@ final class ValeController extends ApiController
         );
     }
 
+    /**
+     * Autoriza un vale solicitado.
+     */
     public function autorizar(Vale $vale, Request $request): JsonResponse
     {
         /** @var User $usuario */
@@ -58,6 +67,9 @@ final class ValeController extends ApiController
         );
     }
 
+    /**
+     * Desactiva un vale propio mientras siga en estado 'solicitado'.
+     */
     public function desactivar(Vale $vale, Request $request): JsonResponse
     {
         /** @var User $usuario */
@@ -71,6 +83,9 @@ final class ValeController extends ApiController
         );
     }
 
+    /**
+     * Reactiva un vale propio previamente desactivado.
+     */
     public function activar(Vale $vale, Request $request): JsonResponse
     {
         /** @var User $usuario */

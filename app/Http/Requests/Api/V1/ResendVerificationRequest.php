@@ -8,6 +8,9 @@ use Illuminate\Foundation\Http\FormRequest;
 
 final class ResendVerificationRequest extends FormRequest
 {
+    /**
+     * Cualquier visitante puede solicitar el reenvío del correo de verificación.
+     */
     public function authorize(): bool
     {
         return true;

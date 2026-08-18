@@ -9,6 +9,9 @@ use Illuminate\Validation\Rule;
 
 final class DistribuidoraUpdateRequest extends FormRequest
 {
+    /**
+     * Solo Coordinador, Gerente de Sucursal o Gerente General pueden editar una distribuidora.
+     */
     public function authorize(): bool
     {
         $user = $this->user();
@@ -16,6 +19,9 @@ final class DistribuidoraUpdateRequest extends FormRequest
         return $user && in_array($user->role->name, ['Coordinador', 'Gerente de Sucursal', 'Gerente General']);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function rules(): array
     {
         $id = $this->route('distribuidora')?->id;

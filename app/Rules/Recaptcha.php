@@ -9,6 +9,10 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
+/**
+ * Valida un token de reCAPTCHA contra el endpoint de verificación de Google.
+ * Se omite en local/testing si no hay clave secreta configurada o se envía 'bypass-recaptcha'.
+ */
 final class Recaptcha implements ValidationRule
 {
     public function validate(string $attribute, mixed $value, Closure $fail): void

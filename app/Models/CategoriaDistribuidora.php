@@ -23,6 +23,9 @@ final class CategoriaDistribuidora extends Model
         'activo' => 'boolean',
     ];
 
+    /**
+     * Distribuidoras clasificadas en esta categoría.
+     */
     public function distribuidoras(): HasMany
     {
         return $this->hasMany(Distribuidora::class, 'categoria_id');

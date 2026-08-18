@@ -24,11 +24,17 @@ final class AuditLog extends Model
 
     protected $table = 'audit_log';
 
+    /**
+     * Usuario que realizó la acción registrada.
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * Sesión bajo la cual se realizó la acción.
+     */
     public function session(): BelongsTo
     {
         return $this->belongsTo(UserSession::class, 'session_id');

@@ -7,6 +7,9 @@ namespace App\Rules;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 
+/**
+ * Exige minúscula, mayúscula, número y carácter especial en la contraseña.
+ */
 final class SecurePassword implements ValidationRule
 {
     public function validate(string $attribute, mixed $value, Closure $fail): void

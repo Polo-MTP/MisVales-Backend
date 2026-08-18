@@ -21,11 +21,17 @@ final class Notificacion extends Model
 
     protected $table = 'notificaciones';
 
+    /**
+     * Sucursal a la que pertenece esta notificación.
+     */
     public function sucursal(): BelongsTo
     {
         return $this->belongsTo(Sucursal::class);
     }
 
+    /**
+     * Usuario que generó la acción notificada.
+     */
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(User::class);

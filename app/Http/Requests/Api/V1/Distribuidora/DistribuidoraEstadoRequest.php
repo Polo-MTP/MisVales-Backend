@@ -9,6 +9,10 @@ use Illuminate\Validation\Rule;
 
 final class DistribuidoraEstadoRequest extends FormRequest
 {
+    /**
+     * Cada estado destino solo lo puede asignar cierto rol: EN_VERIFICACION el Verificador,
+     * RECHAZADO Verificador o Gerente de Sucursal, ACTIVO/MOROSO Gerente de Sucursal o General.
+     */
     public function authorize(): bool
     {
         $user = $this->user();
@@ -23,6 +27,9 @@ final class DistribuidoraEstadoRequest extends FormRequest
         return $permisos[$estado] ?? false;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function rules(): array
     {
         return [

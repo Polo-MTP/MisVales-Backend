@@ -21,6 +21,9 @@ final class ClienteController extends ApiController
         private readonly ClienteService $clienteService
     ) {}
 
+    /**
+     * Lista los clientes visibles para el usuario según su rol/distribuidora.
+     */
     public function index(Request $request): JsonResponse
     {
         /** @var User $usuario */
@@ -34,6 +37,9 @@ final class ClienteController extends ApiController
         );
     }
 
+    /**
+     * Registra un nuevo cliente para la distribuidora del usuario autenticado.
+     */
     public function store(StoreClienteRequest $request): JsonResponse
     {
         /** @var User $usuario */
@@ -47,6 +53,9 @@ final class ClienteController extends ApiController
         );
     }
 
+    /**
+     * Muestra el detalle de un cliente, validando que sea visible para el usuario.
+     */
     public function show(int $id, Request $request): JsonResponse
     {
         /** @var User $usuario */
@@ -60,6 +69,9 @@ final class ClienteController extends ApiController
         );
     }
 
+    /**
+     * Actualiza los datos de un cliente existente.
+     */
     public function update(int $id, UpdateClienteRequest $request): JsonResponse
     {
         /** @var User $usuario */
@@ -75,6 +87,9 @@ final class ClienteController extends ApiController
         );
     }
 
+    /**
+     * Activa o desactiva un cliente.
+     */
     public function cambiarEstado(int $id, Request $request): JsonResponse
     {
         $request->validate([
@@ -94,6 +109,9 @@ final class ClienteController extends ApiController
         );
     }
 
+    /**
+     * Devuelve (creando si hace falta) el perfil de distribuidora del usuario autenticado.
+     */
     public function miPerfil(Request $request): JsonResponse
     {
         /** @var User $usuario */

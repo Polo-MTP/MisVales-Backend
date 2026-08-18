@@ -17,6 +17,9 @@ final class NotificacionController extends ApiController
         private readonly NotificacionService $notificacionService,
     ) {}
 
+    /**
+     * Lista las notificaciones visibles para el usuario autenticado.
+     */
     public function index(Request $request): JsonResponse
     {
         /** @var User $usuario */

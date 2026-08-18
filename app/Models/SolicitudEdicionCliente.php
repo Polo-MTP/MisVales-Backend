@@ -31,16 +31,25 @@ final class SolicitudEdicionCliente extends Model
         'fecha_decision' => 'datetime',
     ];
 
+    /**
+     * Cliente cuyos datos se propone editar.
+     */
     public function cliente(): BelongsTo
     {
         return $this->belongsTo(Cliente::class);
     }
 
+    /**
+     * Usuario que propuso la edición.
+     */
     public function solicitante(): BelongsTo
     {
         return $this->belongsTo(User::class, 'solicitado_por');
     }
 
+    /**
+     * Usuario que autorizó o rechazó la edición.
+     */
     public function autorizador(): BelongsTo
     {
         return $this->belongsTo(User::class, 'autorizado_por');

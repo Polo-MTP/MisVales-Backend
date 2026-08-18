@@ -10,6 +10,9 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class EnsureUserIsActive
 {
+    /**
+     * Si el usuario fue desactivado, revoca su token de acceso actual y rechaza la petición.
+     */
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();

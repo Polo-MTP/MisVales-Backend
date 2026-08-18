@@ -8,6 +8,10 @@ use Illuminate\Foundation\Http\FormRequest;
 
 final class CanjearPuntosRequest extends FormRequest
 {
+    /**
+     * Cualquier usuario autenticado puede solicitar el canje (la pertenencia a la
+     * distribuidora se valida en el Service).
+     */
     public function authorize(): bool
     {
         return true;

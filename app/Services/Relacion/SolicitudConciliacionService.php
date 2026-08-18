@@ -22,6 +22,9 @@ final class SolicitudConciliacionService
         private readonly ConciliacionBancariaService $conciliacionBancariaService,
     ) {}
 
+    /**
+     * Crea la solicitud de autorización para conciliar manualmente un abono sin coincidencia.
+     */
     public function solicitar(AbonoConciliacion $abono, int $relacionId, string $motivo, User $cajera): SolicitudConciliacion
     {
         if ($abono->estado !== 'sin_coincidencia') {
@@ -44,6 +47,10 @@ final class SolicitudConciliacionService
         return $solicitud->fresh(['abono', 'relacion', 'solicitante']);
     }
 
+    /**
+     * Autoriza o rechaza una solicitud de conciliación manual pendiente, restringido a
+     * autorizadores de la misma sucursal (salvo Gerente General).
+     */
     public function decidir(SolicitudConciliacion $solicitud, string $decision, ?string $comentario, User $autorizador): SolicitudConciliacion
     {
         if ($solicitud->estado !== 'pendiente') {
@@ -66,6 +73,9 @@ final class SolicitudConciliacionService
         return $solicitud->fresh(['abono', 'relacion', 'solicitante', 'autorizador']);
     }
 
+    /**
+     * Ejecuta la conciliación manual ya autorizada; solo la cajera que la solicitó puede hacerlo.
+     */
     public function ejecutar(SolicitudConciliacion $solicitud, User $cajera): AbonoConciliacion
     {
         if ($solicitud->estado !== 'aprobada') {

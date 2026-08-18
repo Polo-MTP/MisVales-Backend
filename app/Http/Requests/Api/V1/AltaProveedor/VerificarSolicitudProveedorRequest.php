@@ -8,6 +8,10 @@ use Illuminate\Foundation\Http\FormRequest;
 
 final class VerificarSolicitudProveedorRequest extends FormRequest
 {
+    /**
+     * Cualquier usuario autenticado puede enviar el dictamen (la restricción de rol
+     * Verificador se aplica en el controller/policy).
+     */
     public function authorize(): bool
     {
         return true;

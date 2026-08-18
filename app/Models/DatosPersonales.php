@@ -30,16 +30,25 @@ final class DatosPersonales extends Model
         'fecha_nacimiento' => 'date',
     ];
 
+    /**
+     * Dirección asociada a estos datos personales.
+     */
     public function direccion(): BelongsTo
     {
         return $this->belongsTo(Direccion::class, 'direccion_id');
     }
 
+    /**
+     * Cuenta de usuario vinculada a estos datos personales.
+     */
     public function usuario(): HasOne
     {
         return $this->hasOne(User::class, 'datos_id');
     }
 
+    /**
+     * Solicitudes de alta de proveedor hechas con estos datos personales.
+     */
     public function solicitudes(): HasMany
     {
         return $this->hasMany(SolicitudProveedor::class, 'datos_id');

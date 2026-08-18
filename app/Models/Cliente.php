@@ -24,11 +24,17 @@ final class Cliente extends Model
         'estado' => 'boolean',
     ];
 
+    /**
+     * Datos personales del cliente.
+     */
     public function datosPersonales(): BelongsTo
     {
         return $this->belongsTo(DatosPersonales::class, 'datos_id');
     }
 
+    /**
+     * Historial de distribuidoras a las que ha pertenecido el cliente.
+     */
     public function historialDistribuidoras(): HasMany
     {
         return $this->hasMany(HistorialClienteDistr::class, 'cliente_id');

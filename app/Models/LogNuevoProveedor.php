@@ -32,11 +32,17 @@ final class LogNuevoProveedor extends Model
         'fecha_hora' => 'datetime',
     ];
 
+    /**
+     * Solicitud de alta de proveedor sobre la que se registró este log.
+     */
     public function solicitud(): BelongsTo
     {
         return $this->belongsTo(SolicitudProveedor::class, 'solicitud_id');
     }
 
+    /**
+     * Usuario que realizó la acción registrada en el log.
+     */
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(User::class, 'modificado_por');

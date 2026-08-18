@@ -22,6 +22,9 @@ final class PuntoCanjeService
         private readonly ConfiguracionService $configuracionService,
     ) {}
 
+    /**
+     * Descuenta puntos acumulados de la distribuidora y registra el movimiento de canje.
+     */
     public function canjear(Distribuidora $distribuidora, int $cantidad, string $motivo, User $cajera): PuntoMovimiento
     {
         $this->verificarAcceso($distribuidora, $cajera);
@@ -74,6 +77,10 @@ final class PuntoCanjeService
         return $query->latest('id')->paginate((int) ($filters['per_page'] ?? 15));
     }
 
+    /**
+     * Verifica que el usuario tenga permiso para operar los puntos de esta distribuidora
+     * (dueño si es rol Distribuidora, misma sucursal si es Gerente de Sucursal/Cajera).
+     */
     private function verificarAcceso(Distribuidora $distribuidora, User $usuario): void
     {
         $role = $usuario->role?->name;

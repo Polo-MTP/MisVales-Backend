@@ -8,6 +8,9 @@ use Illuminate\Foundation\Http\FormRequest;
 
 final class StoreClienteRequest extends FormRequest
 {
+    /**
+     * Cualquier usuario autenticado puede registrar un cliente para su distribuidora.
+     */
     public function authorize(): bool
     {
         return true;
@@ -23,6 +26,9 @@ final class StoreClienteRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function rules(): array
     {
         return [

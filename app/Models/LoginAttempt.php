@@ -28,6 +28,9 @@ final class LoginAttempt extends Model
         'factor_step' => 'integer',
     ];
 
+    /**
+     * Registra un intento de login (éxito o fallo) tomando IP/user-agent de la request actual.
+     */
     public static function record(?int $userId, string $email, string $status, int $factorStep = 1, ?string $failureReason = null): void
     {
         self::query()->create([
@@ -41,6 +44,9 @@ final class LoginAttempt extends Model
         ]);
     }
 
+    /**
+     * Usuario asociado al intento de login (null si el email no correspondía a ningún usuario).
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

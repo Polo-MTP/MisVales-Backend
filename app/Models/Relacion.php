@@ -56,46 +56,73 @@ final class Relacion extends Model
         'puntos_generados' => 'integer',
     ];
 
+    /**
+     * Distribuidora a la que pertenece este corte.
+     */
     public function distribuidora(): BelongsTo
     {
         return $this->belongsTo(Distribuidora::class);
     }
 
+    /**
+     * Sucursal bajo la cual se generó el corte.
+     */
     public function sucursal(): BelongsTo
     {
         return $this->belongsTo(Sucursal::class);
     }
 
+    /**
+     * Categoría de la distribuidora tal como estaba al momento del corte (snapshot).
+     */
     public function categoriaSnapshot(): BelongsTo
     {
         return $this->belongsTo(CategoriaDistribuidora::class, 'categoria_id_snapshot');
     }
 
+    /**
+     * Usuario/proceso que generó este corte.
+     */
     public function generadaPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'generada_por');
     }
 
+    /**
+     * Detalle por vale (cuotas) que compone este corte.
+     */
     public function detalles(): HasMany
     {
         return $this->hasMany(RelacionDetalle::class);
     }
 
+    /**
+     * Abonos de conciliación bancaria recibidos para este corte.
+     */
     public function abonos(): HasMany
     {
         return $this->hasMany(AbonoConciliacion::class);
     }
 
+    /**
+     * Movimientos de puntos de fidelidad generados por este corte.
+     */
     public function puntosMovimientos(): HasMany
     {
         return $this->hasMany(PuntoMovimiento::class);
     }
 
+    /**
+     * Perdón de recargo/interés otorgado sobre este corte, si lo hay.
+     */
     public function perdon(): HasOne
     {
         return $this->hasOne(RelacionPerdon::class);
     }
 
+    /**
+     * Saldo pendiente por cobrar: total a pagar menos lo ya abonado.
+     */
     public function getSaldoPendienteAttribute(): float
     {
         return max(0, (float) $this->total_a_pagar - (float) $this->total_abonado);

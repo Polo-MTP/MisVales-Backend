@@ -22,6 +22,9 @@ final class MfaType extends Model
         'is_active' => 'boolean',
     ];
 
+    /**
+     * Métodos de MFA registrados de este tipo.
+     */
     public function mfaMethods(): HasMany
     {
         return $this->hasMany(MfaMethod::class, 'mfa_type_id');

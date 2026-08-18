@@ -21,6 +21,9 @@ final class RelacionController extends ApiController
         private readonly RelacionEstadoService $relacionEstadoService,
     ) {}
 
+    /**
+     * Lista los cortes (relaciones), filtrables por distribuidora, estado y referencia de pago.
+     */
     public function index(Request $request): JsonResponse
     {
         /** @var User $usuario */
@@ -54,6 +57,9 @@ final class RelacionController extends ApiController
         );
     }
 
+    /**
+     * Muestra el detalle de un corte con sus cuotas por vale.
+     */
     public function show(Relacion $relacion, Request $request): JsonResponse
     {
         /** @var User $usuario */
@@ -71,6 +77,10 @@ final class RelacionController extends ApiController
         );
     }
 
+    /**
+     * Genera el corte de una distribuidora específica, o el corte del día para todas
+     * las distribuidoras que correspondan, si no se indica distribuidora_id.
+     */
     public function generar(Request $request): JsonResponse
     {
         $request->validate([
@@ -104,6 +114,10 @@ final class RelacionController extends ApiController
         }
     }
 
+    /**
+     * Otorga un perdón de recargo/interés sobre el corte, o lo marca como pérdida si se
+     * alcanzó el límite de perdones permitidos.
+     */
     public function perdonar(Request $request, Relacion $relacion): JsonResponse
     {
         $request->validate([

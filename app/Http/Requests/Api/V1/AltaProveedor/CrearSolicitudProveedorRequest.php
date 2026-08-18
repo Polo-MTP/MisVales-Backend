@@ -8,6 +8,9 @@ use Illuminate\Foundation\Http\FormRequest;
 
 final class CrearSolicitudProveedorRequest extends FormRequest
 {
+    /**
+     * Cualquier usuario autenticado puede capturar una solicitud de alta de proveedor.
+     */
     public function authorize(): bool
     {
         return true;

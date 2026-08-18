@@ -8,6 +8,9 @@ use Illuminate\Foundation\Http\FormRequest;
 
 final class SubirEvidenciaRequest extends FormRequest
 {
+    /**
+     * Cualquier usuario autenticado puede subir evidencias.
+     */
     public function authorize(): bool
     {
         return true;

@@ -13,6 +13,9 @@ final class MarcarRelacionesVencidas extends Command
 
     protected $description = 'Marca como vencidas las relaciones pendientes/parciales cuya fecha límite de pago ya pasó.';
 
+    /**
+     * Marca como vencidas las relaciones cuya fecha límite de pago ya pasó.
+     */
     public function handle(RelacionEstadoService $relacionEstadoService): int
     {
         $total = $relacionEstadoService->marcarVencidas($this->option('fecha'));

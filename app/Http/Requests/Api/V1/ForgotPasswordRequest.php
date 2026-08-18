@@ -8,6 +8,9 @@ use Illuminate\Foundation\Http\FormRequest;
 
 final class ForgotPasswordRequest extends FormRequest
 {
+    /**
+     * Cualquier visitante puede solicitar el restablecimiento de contraseña.
+     */
     public function authorize(): bool
     {
         return true;

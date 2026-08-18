@@ -23,6 +23,9 @@ final class SolicitudEdicionClienteController extends ApiController
         private readonly SolicitudEdicionClienteService $solicitudEdicionClienteService,
     ) {}
 
+    /**
+     * Lista las solicitudes de edición de cliente visibles para el usuario.
+     */
     public function index(Request $request): JsonResponse
     {
         /** @var User $usuario */
@@ -36,6 +39,9 @@ final class SolicitudEdicionClienteController extends ApiController
         );
     }
 
+    /**
+     * Propone una edición de datos de cliente; queda pendiente de autorización.
+     */
     public function store(SolicitarEdicionClienteRequest $request, int $id): JsonResponse
     {
         /** @var User $usuario */
@@ -57,6 +63,9 @@ final class SolicitudEdicionClienteController extends ApiController
         );
     }
 
+    /**
+     * Autoriza o rechaza una solicitud de edición de cliente pendiente.
+     */
     public function decidir(DecidirSolicitudEdicionClienteRequest $request, SolicitudEdicionCliente $solicitud): JsonResponse
     {
         /** @var User $usuario */
@@ -79,6 +88,9 @@ final class SolicitudEdicionClienteController extends ApiController
         }
     }
 
+    /**
+     * Aplica al cliente los cambios de una solicitud de edición ya autorizada.
+     */
     public function aplicar(Request $request, int $id): JsonResponse
     {
         /** @var User $usuario */

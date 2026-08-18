@@ -117,6 +117,10 @@ final class ConciliacionBancariaService
         ];
     }
 
+    /**
+     * Crea el abono a partir de una fila ya normalizada, buscando la relación por su
+     * referencia de pago; si hay coincidencia, aplica el abono de inmediato.
+     */
     private function procesarFila(array $datos, ?int $convenioBancarioId, User $usuario, string $lote): AbonoConciliacion
     {
         if ($datos['referencia'] === '' || $datos['monto'] <= 0) {
@@ -146,6 +150,10 @@ final class ConciliacionBancariaService
         return $abono;
     }
 
+    /**
+     * Suma el abono al total de la relación y actualiza su estado (parcial/liquidada) según
+     * el margen de tolerancia configurado; si queda liquidada, dispara puntos/penalización.
+     */
     private function aplicarAbono(Relacion $relacion, float $monto, Carbon $fechaAbono): void
     {
         DB::transaction(function () use ($relacion, $monto, $fechaAbono): void {
@@ -219,6 +227,10 @@ final class ConciliacionBancariaService
         }
     }
 
+    /**
+     * Otorga puntos de fidelidad por pago anticipado, calculados sobre el total de productos
+     * otorgados en el corte según los divisores/multiplicadores configurables.
+     */
     private function generarPuntos(Relacion $relacion): void
     {
         $divisor = (float) ($this->configuracionService->obtenerValorVigente('puntos_divisor') ?? 1200);
@@ -243,6 +255,9 @@ final class ConciliacionBancariaService
         $relacion->update(['puntos_generados' => $puntos]);
     }
 
+    /**
+     * Descuenta un porcentaje configurable de los puntos acumulados por pago fuera de tiempo.
+     */
     private function penalizarPuntos(Relacion $relacion): void
     {
         $pct = (float) ($this->configuracionService->obtenerValorVigente('puntos_penalizacion_pct') ?? 20);
@@ -286,6 +301,9 @@ final class ConciliacionBancariaService
             ->sum('monto');
     }
 
+    /**
+     * Indica si una fila del Excel no tiene ningún valor útil (fin del listado o fila de relleno).
+     */
     private function filaVacia(array $fila): bool
     {
         return count(array_filter($fila, fn ($v) => $v !== null && $v !== '')) === 0;
@@ -315,6 +333,9 @@ final class ConciliacionBancariaService
         return Carbon::parse((string) $valor)->format('Y-m-d');
     }
 
+    /**
+     * Tolerante a formatos mixtos: serial de Excel (numérico) o texto de hora.
+     */
     private function parsearHora(mixed $valor): ?string
     {
         if ($valor === null || $valor === '') {
@@ -332,6 +353,10 @@ final class ConciliacionBancariaService
         }
     }
 
+    /**
+     * Normaliza el texto libre de "tipo de pago" del banco a uno de los valores esperados
+     * por el sistema, tolerando variaciones y errores de captura conocidos.
+     */
     private function normalizarTipoPago(string $valor): string
     {
         $valor = Str::of($valor)->lower()->ascii()->toString();

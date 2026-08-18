@@ -24,6 +24,9 @@ final class Direccion extends Model
 
     protected $table = 'direcciones';
 
+    /**
+     * Registro de datos personales que usa esta dirección.
+     */
     public function datosPersonales(): HasOne
     {
         return $this->hasOne(DatosPersonales::class, 'direccion_id');

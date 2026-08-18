@@ -27,6 +27,9 @@ final class ConciliacionController extends ApiController
         private readonly SolicitudConciliacionService $solicitudConciliacionService,
     ) {}
 
+    /**
+     * Lista los abonos de conciliación bancaria, filtrables por estado y relación.
+     */
     public function index(Request $request): JsonResponse
     {
         $query = AbonoConciliacion::query()->with(['convenioBancario', 'autorizadoPor']);
@@ -47,6 +50,9 @@ final class ConciliacionController extends ApiController
         );
     }
 
+    /**
+     * Importa un archivo de movimientos bancarios y concilia automáticamente los abonos que coincidan.
+     */
     public function importar(ImportarConciliacionRequest $request): JsonResponse
     {
         /** @var User $usuario */
@@ -64,6 +70,9 @@ final class ConciliacionController extends ApiController
         );
     }
 
+    /**
+     * Lista las solicitudes de conciliación manual visibles para el usuario.
+     */
     public function listarAutorizaciones(Request $request): JsonResponse
     {
         /** @var User $usuario */
@@ -77,6 +86,9 @@ final class ConciliacionController extends ApiController
         );
     }
 
+    /**
+     * Solicita autorización para conciliar manualmente un abono que no coincidió automáticamente.
+     */
     public function solicitarAutorizacion(SolicitarConciliacionRequest $request, AbonoConciliacion $abono): JsonResponse
     {
         /** @var User $usuario */
@@ -99,6 +111,9 @@ final class ConciliacionController extends ApiController
         }
     }
 
+    /**
+     * Autoriza o rechaza una solicitud de conciliación manual.
+     */
     public function decidirAutorizacion(DecidirSolicitudConciliacionRequest $request, SolicitudConciliacion $solicitud): JsonResponse
     {
         /** @var User $usuario */
@@ -121,6 +136,9 @@ final class ConciliacionController extends ApiController
         }
     }
 
+    /**
+     * Ejecuta la conciliación manual ya autorizada, marcando el abono como conciliado.
+     */
     public function conciliarManual(EjecutarConciliacionManualRequest $request, AbonoConciliacion $abono): JsonResponse
     {
         /** @var User $usuario */

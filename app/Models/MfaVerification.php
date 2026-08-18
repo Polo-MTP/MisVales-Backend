@@ -26,6 +26,9 @@ final class MfaVerification extends Model
         'expires_at' => 'datetime',
     ];
 
+    /**
+     * Método de MFA para el que se generó este código de verificación.
+     */
     public function mfaMethod(): BelongsTo
     {
         return $this->belongsTo(MfaMethod::class);

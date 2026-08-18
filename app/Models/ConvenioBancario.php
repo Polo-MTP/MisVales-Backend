@@ -26,6 +26,9 @@ final class ConvenioBancario extends Model
         'activo' => 'boolean',
     ];
 
+    /**
+     * Sucursal dueña de este convenio bancario.
+     */
     public function sucursal(): BelongsTo
     {
         return $this->belongsTo(Sucursal::class);

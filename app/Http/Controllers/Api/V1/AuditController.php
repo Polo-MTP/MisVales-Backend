@@ -15,6 +15,9 @@ final class AuditController extends ApiController
         private readonly AuditService $auditService
     ) {}
 
+    /**
+     * Devuelve el historial reciente de intentos de login (últimos 10 días).
+     */
     public function getHistoricalData(): JsonResponse
     {
         $logs = $this->auditService->getHistoricalLoginData(10);
@@ -25,6 +28,9 @@ final class AuditController extends ApiController
         );
     }
 
+    /**
+     * Lista el log de auditoría paginado, filtrable por usuario y acción.
+     */
     public function getAuditLog(Request $request): JsonResponse
     {
         $logs = $this->auditService->getAuditLog(

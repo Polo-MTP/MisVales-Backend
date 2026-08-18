@@ -10,6 +10,9 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class CheckRole
 {
+    /**
+     * Bloquea la petición si no hay usuario autenticado o su rol no está en la lista permitida.
+     */
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
         $user = $request->user();

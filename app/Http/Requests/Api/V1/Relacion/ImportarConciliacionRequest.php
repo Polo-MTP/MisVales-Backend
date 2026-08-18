@@ -8,11 +8,17 @@ use Illuminate\Foundation\Http\FormRequest;
 
 final class ImportarConciliacionRequest extends FormRequest
 {
+    /**
+     * Cualquier usuario autenticado puede importar el archivo de conciliación.
+     */
     public function authorize(): bool
     {
         return true;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function rules(): array
     {
         return [

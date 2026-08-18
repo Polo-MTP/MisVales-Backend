@@ -19,6 +19,10 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 final class SolicitudProveedorController extends ApiController
 {
+    /**
+     * Lista solicitudes de alta de proveedor con filtros/orden vía QueryBuilder. Gerente
+     * General y Administrador ven todas las sucursales; el resto de roles solo la suya.
+     */
     public function index(Request $request): JsonResponse
     {
         /** @var User $user */
@@ -47,6 +51,10 @@ final class SolicitudProveedorController extends ApiController
         return $this->success(SolicitudProveedorResource::collection($solicitudes));
     }
 
+    /**
+     * Muestra el detalle de una solicitud, restringido a usuarios de la misma sucursal
+     * salvo Gerente General/Administrador.
+     */
     public function show(SolicitudProveedor $solicitud, Request $request): JsonResponse
     {
         /** @var User $user */
@@ -62,6 +70,9 @@ final class SolicitudProveedorController extends ApiController
         return $this->success(new SolicitudProveedorResource($solicitud));
     }
 
+    /**
+     * Captura una nueva solicitud de alta de proveedor.
+     */
     public function store(CrearSolicitudProveedorRequest $request, SolicitudProveedorService $service): JsonResponse
     {
         /** @var User $user */
@@ -72,6 +83,9 @@ final class SolicitudProveedorController extends ApiController
         return $this->created(new SolicitudProveedorResource($solicitud), 'Solicitud de nuevo proveedor capturada exitosamente.');
     }
 
+    /**
+     * Registra el dictamen de verificación de campo sobre la solicitud.
+     */
     public function verificar(SolicitudProveedor $solicitud, VerificarSolicitudProveedorRequest $request, SolicitudProveedorService $service): JsonResponse
     {
         /** @var User $user */
@@ -82,6 +96,9 @@ final class SolicitudProveedorController extends ApiController
         return $this->success(new SolicitudProveedorResource($solicitudActualizada), 'Verificación registrada y dictaminada exitosamente.');
     }
 
+    /**
+     * Registra la decisión final de gerencia (aprobar o rechazar) sobre la solicitud.
+     */
     public function aprobarORechazar(SolicitudProveedor $solicitud, AprobarSolicitudProveedorRequest $request, SolicitudProveedorService $service): JsonResponse
     {
         /** @var User $user */

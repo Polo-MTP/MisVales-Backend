@@ -33,11 +33,17 @@ final class MfaMethod extends Model
         'is_active' => 'boolean',
     ];
 
+    /**
+     * Tipo de factor de autenticación (TOTP, etc.) que representa este método.
+     */
     public function type(): BelongsTo
     {
         return $this->belongsTo(MfaType::class, 'mfa_type_id');
     }
 
+    /**
+     * Usuario dueño de este método de MFA.
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

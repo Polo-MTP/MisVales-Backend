@@ -28,6 +28,9 @@ final class Configuracion extends Model
         'vigente_hasta' => 'date',
     ];
 
+    /**
+     * Usuario que registró o modificó este valor de configuración.
+     */
     public function modificadoPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'modificado_por');

@@ -10,11 +10,18 @@ use Illuminate\Validation\Rule;
 
 final class UpdateClienteRequest extends FormRequest
 {
+    /**
+     * Cualquier usuario autenticado puede enviar la solicitud (la restricción real ocurre
+     * en el Service, que valida que el cliente pertenezca al usuario).
+     */
     public function authorize(): bool
     {
         return true;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function messages(): array
     {
         return [

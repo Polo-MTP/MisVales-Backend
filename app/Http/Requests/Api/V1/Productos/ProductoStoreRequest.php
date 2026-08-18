@@ -7,11 +7,18 @@ use Illuminate\Validation\Rule;
 
 class ProductoStoreRequest extends FormRequest
 {
+    /**
+     * Solo el Gerente General puede crear productos del catálogo.
+     */
     public function authorize(): bool
     {
         $user = $this->user();
         return $user && $user->role->name === 'Gerente General';
     }
+
+    /**
+     * @return array<string, mixed>
+     */
     public function rules(): array
     {
         return [
@@ -31,6 +38,9 @@ class ProductoStoreRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function messages(): array
     {
         return [

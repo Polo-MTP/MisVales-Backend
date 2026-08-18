@@ -28,16 +28,25 @@ final class HistorialCoordinador extends Model
         'fecha_fin' => 'datetime',
     ];
 
+    /**
+     * Usuario distribuidor al que se le asignó el coordinador en este periodo.
+     */
     public function distribuidor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'distribuidor_id');
     }
 
+    /**
+     * Usuario coordinador asignado en este periodo.
+     */
     public function coordinador(): BelongsTo
     {
         return $this->belongsTo(User::class, 'coordinador_id');
     }
 
+    /**
+     * Usuario que realizó la asignación.
+     */
     public function asignador(): BelongsTo
     {
         return $this->belongsTo(User::class, 'asignado_por');

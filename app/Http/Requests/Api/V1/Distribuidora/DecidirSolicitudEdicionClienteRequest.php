@@ -9,6 +9,10 @@ use Illuminate\Validation\Rule;
 
 final class DecidirSolicitudEdicionClienteRequest extends FormRequest
 {
+    /**
+     * Cualquier usuario autenticado puede enviar la decisión (la restricción de rol
+     * autorizador se aplica en el Service).
+     */
     public function authorize(): bool
     {
         return true;

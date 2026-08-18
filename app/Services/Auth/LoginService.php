@@ -108,6 +108,9 @@ final class LoginService
         ];
     }
 
+    /**
+     * Indica si la cuenta sigue dentro de la ventana de bloqueo temporal por intentos fallidos.
+     */
     private function laCuentaEstaBloqueada(User $user): bool
     {
         return $user->is_locked && $user->locked_until && $user->locked_until > now();

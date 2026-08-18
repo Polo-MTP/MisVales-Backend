@@ -47,36 +47,57 @@ final class SolicitudProveedor extends Model
         'datos_vivienda' => 'array',
     ];
 
+    /**
+     * Sucursal donde se capturó la solicitud.
+     */
     public function sucursal(): BelongsTo
     {
         return $this->belongsTo(Sucursal::class, 'sucursal_id');
     }
 
+    /**
+     * Datos personales del solicitante.
+     */
     public function datosPersonales(): BelongsTo
     {
         return $this->belongsTo(DatosPersonales::class, 'datos_id');
     }
 
+    /**
+     * Usuario coordinador asignado a la solicitud.
+     */
     public function coordinador(): BelongsTo
     {
         return $this->belongsTo(User::class, 'coordinador_id');
     }
 
+    /**
+     * Usuario que verificó la solicitud.
+     */
     public function verificador(): BelongsTo
     {
         return $this->belongsTo(User::class, 'verificador_id');
     }
 
+    /**
+     * Usuario gerente que tomó la decisión final sobre la solicitud.
+     */
     public function gerente(): BelongsTo
     {
         return $this->belongsTo(User::class, 'gerente_id');
     }
 
+    /**
+     * Bitácora de cambios sobre esta solicitud.
+     */
     public function logs(): HasMany
     {
         return $this->hasMany(LogNuevoProveedor::class, 'solicitud_id');
     }
 
+    /**
+     * Evidencias (documentos) adjuntas a esta solicitud.
+     */
     public function evidencias(): HasMany
     {
         return $this->hasMany(Evidencia::class, 'solicitud_id');
