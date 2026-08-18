@@ -16,6 +16,7 @@ use App\Models\SolicitudProveedor;
 use App\Models\User;
 use App\Models\Vale;
 use App\Observers\AuditLogObserver;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -40,6 +41,22 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureRateLimiting();
         $this->configureAuditLog();
         $this->configurePasswordPolicy();
+        $this->configurePasswordResetUrl();
+    }
+
+    /**
+     * Password::sendResetLink() arma el link por defecto apuntando a una ruta con nombre
+     * 'password.reset' — como esta API no tiene vistas propias, sin este override el correo
+     * termina apuntando a la URL de la API (GET, mientras la ruta real es POST-only) en vez
+     * de a la pantalla del frontend que el usuario debe ver.
+     */
+    private function configurePasswordResetUrl(): void
+    {
+        ResetPassword::createUrlUsing(function (User $user, string $token): string {
+            $frontendUrl = rtrim((string) config('app.frontend_url'), '/');
+
+            return "{$frontendUrl}/auth/reset-password?token={$token}&email=".urlencode($user->email);
+        });
     }
 
     /**

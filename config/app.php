@@ -58,6 +58,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Frontend URL
+    |--------------------------------------------------------------------------
+    |
+    | Base del SPA que consume esta API. Se usa para armar enlaces que el
+    | usuario abre en el navegador (ej. el link de restablecimiento de
+    | contraseña) — esos NO deben apuntar a esta API, sino a la pantalla
+    | del frontend que llama de vuelta al endpoint correspondiente.
+    |
+    */
+
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:4200'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |
