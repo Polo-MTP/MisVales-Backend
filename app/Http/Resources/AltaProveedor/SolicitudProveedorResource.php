@@ -57,6 +57,8 @@ final class SolicitudProveedorResource extends JsonResource
                     'codigo_postal' => $this->datosPersonales?->direccion?->codigo_postal,
                     'estado' => $this->datosPersonales?->direccion?->estado,
                     'ciudad' => $this->datosPersonales?->direccion?->ciudad,
+                    'latitud' => $this->datosPersonales?->direccion?->latitud,
+                    'longitud' => $this->datosPersonales?->direccion?->longitud,
                 ],
             ],
             'coordinador' => [

@@ -53,6 +53,8 @@ final class DistribuidoraResource extends JsonResource
                     'codigo_postal' => $this->usuario?->datosPersonales?->direccion?->codigo_postal,
                     'estado' => $this->usuario?->datosPersonales?->direccion?->estado,
                     'ciudad' => $this->usuario?->datosPersonales?->direccion?->ciudad,
+                    'latitud' => $this->usuario?->datosPersonales?->direccion?->latitud,
+                    'longitud' => $this->usuario?->datosPersonales?->direccion?->longitud,
                 ],
             ],
             'datos_extras' => new DistribuidorDatosExtrasResource($this->whenLoaded('datosExtras')),

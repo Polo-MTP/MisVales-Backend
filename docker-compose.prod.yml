@@ -51,6 +51,9 @@ services:
       # (no 'bypass-recaptcha', que solo funciona en local/testing) fallará siempre, porque
       # Google rechaza la verificación con secret vacío.
       RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}
+      # Vacío por default: sin ella, las direcciones simplemente no obtienen latitud/longitud
+      # (GeocodingService lo maneja como no-op), no bloquea nada más del build ni del flujo.
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
       MAIL_MAILER: ${MAIL_MAILER:-smtp}
       MAIL_HOST: ${MAIL_HOST:-}
       MAIL_PORT: ${MAIL_PORT:-587}

@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Models\AbonoConciliacion;
 use App\Models\AuditLog;
 use App\Models\Cliente;
+use App\Models\Direccion;
 use App\Models\Distribuidora;
 use App\Models\PuntoMovimiento;
 use App\Models\Relacion;
@@ -16,6 +17,7 @@ use App\Models\SolicitudProveedor;
 use App\Models\User;
 use App\Models\Vale;
 use App\Observers\AuditLogObserver;
+use App\Observers\DireccionObserver;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -42,6 +44,16 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureAuditLog();
         $this->configurePasswordPolicy();
         $this->configurePasswordResetUrl();
+        $this->configureGeocoding();
+    }
+
+    /**
+     * Geocodifica automáticamente cada dirección nueva o editada (ver DireccionObserver),
+     * para que el Verificador pueda ver el pin en el mapa durante la visita física.
+     */
+    private function configureGeocoding(): void
+    {
+        Direccion::observe(DireccionObserver::class);
     }
 
     /**
