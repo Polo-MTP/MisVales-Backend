@@ -55,6 +55,10 @@ services:
       # (GeocodingService lo maneja como no-op), no bloquea nada más del build ni del flujo.
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
       MAIL_MAILER: ${MAIL_MAILER:-smtp}
+      # Requerida solo si MAIL_MAILER=resend. Sin ella, Mail::send() lanza excepción y
+      # MfaService devuelve 500 al intentar enviar el código del tercer factor por correo
+      # (afecta a los roles con factor_count=3: Gerente de Sucursal, Gerente General, Administrador).
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
       MAIL_HOST: ${MAIL_HOST:-}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}
