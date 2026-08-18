@@ -29,6 +29,7 @@ services:
       APP_DEBUG: "false"
       APP_KEY: ${APP_KEY:?corre "php artisan key:generate --show" fuera de Docker (no escribe .env, solo imprime la llave) y pégala aquí}
       APP_URL: ${APP_URL:?debes definir el dominio real en .env.production}
+      FRONTEND_URL: ${FRONTEND_URL:?debes definir el dominio real del frontend en .env.production}
       APP_LOCALE: ${APP_LOCALE:-es}
       APP_FALLBACK_LOCALE: ${APP_FALLBACK_LOCALE:-es}
       LOG_LEVEL: ${LOG_LEVEL:-error}
@@ -45,6 +46,11 @@ services:
       DB_USERNAME: ${DB_USERNAME:-misvales}
       DB_PASSWORD: ${DB_PASSWORD:?debes definir DB_PASSWORD en .env.production}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?debes definir el dominio real del frontend en .env.production}
+      # Vacío por default para no bloquear el build antes de tener las llaves de Google
+      # reCAPTCHA. OJO: mientras esté vacío, cualquier login/reset/MFA con reCAPTCHA real
+      # (no 'bypass-recaptcha', que solo funciona en local/testing) fallará siempre, porque
+      # Google rechaza la verificación con secret vacío.
+      RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}
       MAIL_MAILER: ${MAIL_MAILER:-smtp}
       MAIL_HOST: ${MAIL_HOST:-}
       MAIL_PORT: ${MAIL_PORT:-587}

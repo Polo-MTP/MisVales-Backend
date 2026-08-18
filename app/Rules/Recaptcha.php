@@ -27,7 +27,7 @@ final class Recaptcha implements ValidationRule
                 ->withoutVerifying()
                 ->timeout(5)
                 ->post('https://www.google.com/recaptcha/api/siteverify', [
-                    'secret' => config('services.recaptcha.secret', env('RECAPTCHA_SECRET_KEY')),
+                    'secret' => config('services.recaptcha.secret'),
                     'response' => $value,
                 ]);
         } catch (Throwable) {
