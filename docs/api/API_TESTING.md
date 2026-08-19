@@ -33,12 +33,14 @@ permitidos, body de ejemplo, respuesta esperada y un `curl` listo para copiar.
   `https://www.google.com/recaptcha/api/siteverify` (Google reCAPTCHA v3, `score >= 0.5`).
   En `local`/`testing`, si no hay `RECAPTCHA_SECRET_KEY` configurada o se manda
   `"bypass-recaptcha"`, la verificación se omite (pero el campo debe seguir enviándose, ya
-  que es `required`). **Falta agregar `RECAPTCHA_SECRET_KEY` a `.env.production.example`**
-  para activarlo en producción.
+  que es `required`).
 - **Roles**: el middleware `role:...` (`app/Http/Middleware/CheckRole.php`) exige que el usuario
   autenticado tenga uno de los roles listados; si no, responde `403`.
-- **VPN**: dos endpoints de decisión (edición de cliente y conciliación manual) llevan el
-  middleware `vpn` además del rol — en producción solo responden desde la red interna.
+- **VPN**: 8 endpoints de autorización llevan el middleware `vpn` además del rol — en producción
+  solo responden desde la red interna. Son los que deciden algo a nombre de un tercero
+  (aprobar/rechazar, cambiar estado, asignar crédito, perdonar). La excepción es
+  `PUT /vales/{vale}/autorizar`: aunque también es una autorización, la ejecuta la Cajera en
+  caja, no gerencia, así que **sí responde desde la red pública** (ver sección de Vales).
 
 ### Flujo recomendado para probar de punta a punta
 
@@ -46,7 +48,7 @@ permitidos, body de ejemplo, respuesta esperada y un `curl` listo para copiar.
 2. `POST /distribuidora/clientes` (rol Distribuidora) → crea un cliente.
 3. `POST /productos` (rol Gerente General) → crea un producto del catálogo.
 4. `POST /vales` (rol Distribuidora) → solicita un vale con ese cliente/producto.
-5. `PUT /vales/{vale}/autorizar` (rol Coordinador/Gerente) → autoriza el vale.
+5. `PUT /vales/{vale}/autorizar` (rol Coordinador/Cajera) → autoriza/paga el vale.
 6. `POST /relaciones/generar` (rol Gerente General) → genera el corte de esa distribuidora.
 7. `POST /conciliaciones/importar` o el flujo manual (`solicitar-autorizacion` → `decidir` →
    `conciliar-manual`) → concilia el pago y liquida la relación.
@@ -171,12 +173,13 @@ curl -X POST "$BASE_URL/alta-proveedor/solicitudes" -H "Authorization: Bearer $T
 `201` con `SolicitudProveedorResource`.
 
 ### `POST /alta-proveedor/solicitudes/{solicitud}/verificar`
-Roles: Verificador, Gerente de Sucursal, Gerente General. Body: `cumple` (bool),
+Roles: Verificador, Gerente de Sucursal, Gerente General **+ VPN**. Body: `cumple` (bool),
 `comentario_verificador`, opcionalmente `datos_personales{}`/`direccion{}` editados y `evidencias[]`.
 
 ### `POST /alta-proveedor/solicitudes/{solicitud}/aprobar`
-Roles: Gerente de Sucursal, Gerente General. `decision`: `aprobado` | `rechazado`. Si es `aprobado`,
-son requeridos `limite_credito_asignado`, `email`, `password` (se crea el acceso de la distribuidora).
+Roles: Gerente de Sucursal, Gerente General **+ VPN**. `decision`: `aprobado` | `rechazado`. Si es
+`aprobado`, son requeridos `limite_credito_asignado`, `email`, `password` (se crea el acceso de la
+distribuidora).
 
 ### `POST /alta-proveedor/solicitudes/{solicitud}/evidencias`
 Roles: Coordinador, Verificador, Gerente de Sucursal, Gerente General. `multipart/form-data`:
@@ -331,14 +334,15 @@ Roles: Coordinador, Gerente de Sucursal, Gerente General. Acepta `datos_personal
 Rol: Gerente General. Desactiva lógicamente (`estado=INACTIVO`).
 
 ### `PUT /distribuidoras/{distribuidora}/estado`
-Cada estado destino exige un rol distinto (autorización por política + `DistribuidoraEstadoRequest`):
+**+ VPN**. Cada estado destino exige un rol distinto (autorización por política +
+`DistribuidoraEstadoRequest`):
 - `EN_VERIFICACION` → solo Verificador
 - `RECHAZADO` → Verificador o Gerente de Sucursal
 - `ACTIVO` / `MOROSO` → Gerente de Sucursal o Gerente General
 
 ### `PUT /distribuidoras/{distribuidora}/credito`
-Roles: Gerente de Sucursal, Gerente General. Body: `limite_credito`, `categoria_id`. Si la
-distribuidora seguía en `EN_CAPTURA`/`PENDIENTE_APROBACION`, la pasa a `ACTIVO` automáticamente.
+Roles: Gerente de Sucursal, Gerente General **+ VPN**. Body: `limite_credito`, `categoria_id`. Si
+la distribuidora seguía en `EN_CAPTURA`/`PENDIENTE_APROBACION`, la pasa a `ACTIVO` automáticamente.
 
 ### `GET /distribuidoras/{distribuidora}/saldo-disponible`
 Roles: Cajera, Distribuidora, Gerente de Sucursal, Gerente General.
@@ -372,11 +376,14 @@ curl -X POST "$BASE_URL/vales" -H "Authorization: Bearer $TOKEN" \
   -d '{"cliente_id":1,"producto_id":1,"tipo":"pre-vale"}'
 ```
 `201` con `ValeResource`, `estado: "solicitado"`. Falla `422`/`403` si el cliente no pertenece a la
-distribuidora o si excede el crédito disponible / el límite del primer vale.
+distribuidora, si excede el crédito disponible / el límite del primer vale, o si **el cliente ya
+tiene otro vale sin liquidar** (cualquier estado que no sea `pagado`) — un cliente solo puede tener
+un vale activo/pendiente a la vez.
 
 ### `PUT /vales/{vale}/autorizar`
-Roles: Coordinador, Gerente de Sucursal, Gerente General. Sin body. Pasa `estado` a `autorizado` —
-desde aquí cuenta contra el crédito disponible.
+Roles: Coordinador, Cajera (no gerencia — lo autoriza/paga quien atiende al cliente en caja). Sin
+VPN, responde desde red pública. Sin body. Pasa `estado` a `autorizado` — desde aquí cuenta contra
+el crédito disponible.
 
 ### `PUT /vales/{vale}/desactivar`
 Rol: Distribuidora (dueña del vale). Solo mientras sigue en `solicitado`.
@@ -404,8 +411,8 @@ curl -X POST "$BASE_URL/relaciones/generar" -H "Authorization: Bearer $TOKEN" \
 ```
 
 ### `POST /relaciones/{relacion}/perdonar`
-Roles: Gerente de Sucursal, Gerente General. Body opcional: `motivo`. Si se alcanza el límite de
-perdones configurado, la relación se marca como `en_perdida` en vez de perdonarse.
+Roles: Gerente de Sucursal, Gerente General **+ VPN**. Body opcional: `motivo`. Si se alcanza el
+límite de perdones configurado, la relación se marca como `en_perdida` en vez de perdonarse.
 
 ---
 

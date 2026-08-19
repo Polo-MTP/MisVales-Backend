@@ -301,7 +301,7 @@
               "host": ["{{base_url}}"],
               "path": ["alta-proveedor", "solicitudes", "{{solicitud_id}}", "verificar"]
             },
-            "description": "Roles: Verificador, Gerente de Sucursal, Gerente General."
+            "description": "Roles: Verificador, Gerente de Sucursal, Gerente General. + VPN."
           }
         },
         {
@@ -319,7 +319,7 @@
               "host": ["{{base_url}}"],
               "path": ["alta-proveedor", "solicitudes", "{{solicitud_id}}", "aprobar"]
             },
-            "description": "Roles: Gerente de Sucursal, Gerente General. decision: 'aprobado' | 'rechazado'. email/password/limite_credito_asignado son requeridos solo si se aprueba."
+            "description": "Roles: Gerente de Sucursal, Gerente General. + VPN. decision: 'aprobado' | 'rechazado'. email/password/limite_credito_asignado son requeridos solo si se aprueba."
           }
         },
         {
@@ -699,7 +699,7 @@
               "options": { "raw": { "language": "json" } }
             },
             "url": { "raw": "{{base_url}}/distribuidoras/{{distribuidora_id}}/estado", "host": ["{{base_url}}"], "path": ["distribuidoras", "{{distribuidora_id}}", "estado"] },
-            "description": "estado: EN_VERIFICACION (solo Verificador) | RECHAZADO (Verificador/Gerente Sucursal) | ACTIVO | MOROSO (Gerente Sucursal/General)."
+            "description": "+ VPN. estado: EN_VERIFICACION (solo Verificador) | RECHAZADO (Verificador/Gerente Sucursal) | ACTIVO | MOROSO (Gerente Sucursal/General)."
           }
         },
         {
@@ -713,7 +713,7 @@
               "options": { "raw": { "language": "json" } }
             },
             "url": { "raw": "{{base_url}}/distribuidoras/{{distribuidora_id}}/credito", "host": ["{{base_url}}"], "path": ["distribuidoras", "{{distribuidora_id}}", "credito"] },
-            "description": "Roles: Gerente de Sucursal, Gerente General."
+            "description": "Roles: Gerente de Sucursal, Gerente General. + VPN."
           }
         },
         {
@@ -791,7 +791,7 @@
             "method": "PUT",
             "header": [{ "key": "Accept", "value": "application/json" }],
             "url": { "raw": "{{base_url}}/vales/{{vale_id}}/autorizar", "host": ["{{base_url}}"], "path": ["vales", "{{vale_id}}", "autorizar"] },
-            "description": "Roles: Coordinador, Gerente de Sucursal, Gerente General."
+            "description": "Roles: Coordinador, Cajera (lo autoriza/paga quien atiende en caja, no gerencia). Sin VPN, responde desde red pública."
           }
         },
         {
@@ -869,7 +869,7 @@
               "options": { "raw": { "language": "json" } }
             },
             "url": { "raw": "{{base_url}}/relaciones/{{relacion_id}}/perdonar", "host": ["{{base_url}}"], "path": ["relaciones", "{{relacion_id}}", "perdonar"] },
-            "description": "Roles: Gerente de Sucursal, Gerente General."
+            "description": "Roles: Gerente de Sucursal, Gerente General. + VPN."
           }
         }
       ]
