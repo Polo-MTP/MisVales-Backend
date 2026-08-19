@@ -26,7 +26,11 @@
     { "key": "clave_config", "value": "comision_base_pct" },
     { "key": "verify_id", "value": "1" },
     { "key": "verify_hash", "value": "" },
-    { "key": "recaptcha", "value": "bypass-recaptcha" }
+    { "key": "recaptcha", "value": "bypass-recaptcha" },
+    { "key": "solicitud_transferencia_id", "value": "1" },
+    { "key": "coordinador_id", "value": "1" },
+    { "key": "coordinador_destino_id", "value": "2" },
+    { "key": "solicitud_aumento_credito_id", "value": "1" }
   ],
   "item": [
     {
@@ -475,6 +479,91 @@
             },
             "description": "Rol: Cajera."
           }
+        },
+        {
+          "name": "Solicitar transferencia de cliente",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motivo\": \"El cliente ahora compra conmigo.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/distribuidora/clientes/{{cliente_id}}/solicitar-transferencia",
+              "host": ["{{base_url}}"],
+              "path": ["distribuidora", "clientes", "{{cliente_id}}", "solicitar-transferencia"]
+            },
+            "description": "Rol: Distribuidora. La distribuidora destino solicita quedarse con un cliente que hoy pertenece a otra."
+          }
+        },
+        {
+          "name": "Listar solicitudes de transferencia",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/distribuidora/clientes/transferencias",
+              "host": ["{{base_url}}"],
+              "path": ["distribuidora", "clientes", "transferencias"]
+            },
+            "description": "Roles: Distribuidora, Coordinador, Gerente de Sucursal, Gerente General. Filtrado por rol."
+          }
+        },
+        {
+          "name": "Decidir transferencia de cliente",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"autorizada\",\n  \"comentario\": \"Cliente confirmado con el coordinador.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/distribuidora/clientes/transferencias/{{solicitud_transferencia_id}}/decidir",
+              "host": ["{{base_url}}"],
+              "path": ["distribuidora", "clientes", "transferencias", "{{solicitud_transferencia_id}}", "decidir"]
+            },
+            "description": "Roles: Coordinador, Gerente de Sucursal, Gerente General. Decide el coordinador/gerente de la distribuidora ORIGEN. Requiere estar dentro de la VPN configurada (middleware 'vpn')."
+          }
+        },
+        {
+          "name": "Aceptar (confirmar) transferencia de cliente",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"aceptada\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/distribuidora/clientes/transferencias/{{solicitud_transferencia_id}}/aceptar",
+              "host": ["{{base_url}}"],
+              "path": ["distribuidora", "clientes", "transferencias", "{{solicitud_transferencia_id}}", "aceptar"]
+            },
+            "description": "Rol: Distribuidora (debe ser quien solicitó). Al aceptar se ejecuta el movimiento real del cliente."
+          }
+        },
+        {
+          "name": "Reasignar todos los clientes de una distribuidora",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"distribuidora_destino_id\": {{distribuidora_id}}\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/distribuidoras/{{distribuidora_id}}/reasignar-clientes",
+              "host": ["{{base_url}}"],
+              "path": ["distribuidoras", "{{distribuidora_id}}", "reasignar-clientes"]
+            },
+            "description": "Rol: Coordinador. Mueve TODOS los clientes de la distribuidora de la URL a la del body; ambas deben ser suyas."
+          }
         }
       ]
     },
@@ -747,6 +836,70 @@
             "url": { "raw": "{{base_url}}/distribuidoras/{{distribuidora_id}}/puntos/canjear", "host": ["{{base_url}}"], "path": ["distribuidoras", "{{distribuidora_id}}", "puntos", "canjear"] },
             "description": "Rol: Cajera."
           }
+        },
+        {
+          "name": "Subir contrato firmado",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "archivo", "type": "file", "src": [] }]
+            },
+            "url": { "raw": "{{base_url}}/distribuidoras/{{distribuidora_id}}/contrato", "host": ["{{base_url}}"], "path": ["distribuidoras", "{{distribuidora_id}}", "contrato"] },
+            "description": "Roles: Gerente de Sucursal, Gerente General. + VPN. multipart/form-data, PDF, máx 10MB."
+          }
+        },
+        {
+          "name": "Reasignar cartera de un coordinador",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"coordinador_origen_id\": {{coordinador_id}},\n  \"coordinador_destino_id\": {{coordinador_destino_id}}\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/distribuidoras/reasignar-coordinador", "host": ["{{base_url}}"], "path": ["distribuidoras", "reasignar-coordinador"] },
+            "description": "Roles: Gerente de Sucursal, Gerente General. + VPN. Mueve toda la cartera de un coordinador a otro de la misma sucursal."
+          }
+        },
+        {
+          "name": "Solicitar aumento de crédito",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"monto_solicitado\": 5000,\n  \"motivo\": \"Buen historial de pagos\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/distribuidoras/{{distribuidora_id}}/aumento-credito", "host": ["{{base_url}}"], "path": ["distribuidoras", "{{distribuidora_id}}", "aumento-credito"] },
+            "description": "Roles: Distribuidora, Coordinador. Solo distribuidoras ACTIVO; falla si ya hay una solicitud pendiente."
+          }
+        },
+        {
+          "name": "Listar solicitudes de aumento de crédito",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/distribuidoras/aumento-credito", "host": ["{{base_url}}"], "path": ["distribuidoras", "aumento-credito"] },
+            "description": "Roles: Distribuidora, Coordinador, Gerente de Sucursal, Gerente General. Filtrado por rol."
+          }
+        },
+        {
+          "name": "Decidir aumento de crédito",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"aprobada\",\n  \"monto_otorgado\": 3000,\n  \"comentario\": \"Se otorga parcial por política de riesgo.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/distribuidoras/aumento-credito/{{solicitud_aumento_credito_id}}/decidir", "host": ["{{base_url}}"], "path": ["distribuidoras", "aumento-credito", "{{solicitud_aumento_credito_id}}", "decidir"] },
+            "description": "Roles: Gerente de Sucursal, Gerente General. + VPN. monto_otorgado requerido si se aprueba; no puede ser mayor al monto_solicitado."
+          }
         }
       ]
     },
@@ -792,11 +945,11 @@
             "header": [{ "key": "Accept", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"clabe\": \"032180000118359719\"\n}",
+              "raw": "{\n  \"clabe\": \"032180000118359719\",\n  \"ine_verificada\": true,\n  \"comprobante_domicilio_verificado\": true\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": { "raw": "{{base_url}}/vales/{{vale_id}}/validar", "host": ["{{base_url}}"], "path": ["vales", "{{vale_id}}", "validar"] },
-            "description": "Rol: Cajera. Sin VPN, responde desde red pública. Paso obligatorio antes de autorizar. clabe (18 dígitos) es opcional en el body, pero obligatoria de facto la primera vez que se valida un vale de ese cliente (si aún no tiene una guardada) — se guarda cifrada y no se vuelve a pedir después."
+            "description": "Rol: Cajera. Sin VPN, responde desde red pública. Paso obligatorio antes de autorizar. clabe (18 dígitos) es opcional en el body, pero obligatoria de facto la primera vez que se valida un vale de ese cliente (si aún no tiene una guardada) — se guarda cifrada y no se vuelve a pedir después. ine_verificada y comprobante_domicilio_verificado son requeridos (boolean); si alguno llega en false, el vale no se valida."
           }
         },
         {
@@ -974,6 +1127,20 @@
             },
             "url": { "raw": "{{base_url}}/conciliaciones/{{abono_id}}/conciliar-manual", "host": ["{{base_url}}"], "path": ["conciliaciones", "{{abono_id}}", "conciliar-manual"] },
             "description": "Rol: Cajera (debe ser quien solicitó la autorización)."
+          }
+        },
+        {
+          "name": "Levantar queja sobre un abono",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motivo\": \"Yo pagué 2000, no lo que aparece registrado.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/conciliaciones/{{abono_id}}/queja", "host": ["{{base_url}}"], "path": ["conciliaciones", "{{abono_id}}", "queja"] },
+            "description": "Rol: Distribuidora. Sin VPN. Solo informativo — avisa a la cajera, no ejecuta ninguna corrección por sí solo."
           }
         }
       ]
