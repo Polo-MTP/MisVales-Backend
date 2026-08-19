@@ -15,6 +15,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'distribuidora_destino_id',
     'solicitado_por',
     'motivo',
+    'estado',
+    'autorizado_por',
+    'comentario_autorizacion',
+    'fecha_autorizacion',
+    'fecha_aceptacion',
 ])]
 final class SolicitudTransferenciaCliente extends Model
 {

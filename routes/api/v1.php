@@ -113,6 +113,12 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware('role:Cajera,Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.distribuidora.clientes.ediciones.index');
 
+        // Misma razón: debe ir ANTES de clientes/{id}, si no el wildcard se comería
+        // "transferencias" como si fuera un id de cliente.
+        Route::get('clientes/transferencias', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudTransferenciaClienteController::class, 'index'])
+            ->middleware('role:Distribuidora,Coordinador,Gerente de Sucursal,Gerente General')
+            ->name('api.v1.distribuidora.clientes.transferencias.index');
+
         Route::get('clientes/{id}', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'show'])
             ->middleware('role:Distribuidora,Gerente General,Gerente de Sucursal,Cajera')
             ->name('api.v1.distribuidora.clientes.show');
@@ -142,6 +148,24 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
         Route::put('clientes/{id}/editar-datos', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudEdicionClienteController::class, 'aplicar'])
             ->middleware('role:Cajera')
             ->name('api.v1.distribuidora.clientes.editar_datos');
+
+        // Transferencia de un cliente entre distribuidoras: destino solicita -> coordinador/
+        // gerente de la ORIGEN autoriza -> destino confirma (el listado va arriba, junto a
+        // clientes/ediciones, por la colisión con el wildcard clientes/{id}).
+        Route::post('clientes/{cliente}/solicitar-transferencia', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudTransferenciaClienteController::class, 'store'])
+            ->middleware('role:Distribuidora')
+            ->name('api.v1.distribuidora.clientes.transferencias.store');
+
+        // Autorización del coordinador/gerente de la distribuidora origen: es una decisión de
+        // autorización, va con VPN igual que decidir_edicion.
+        Route::put('clientes/transferencias/{solicitud}/decidir', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudTransferenciaClienteController::class, 'decidir'])
+            ->middleware(['role:Coordinador,Gerente de Sucursal,Gerente General', 'vpn'])
+            ->name('api.v1.distribuidora.clientes.transferencias.decidir');
+
+        // Confirmación final de la propia distribuidora destino: autoservicio, sin VPN.
+        Route::put('clientes/transferencias/{solicitud}/aceptar', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudTransferenciaClienteController::class, 'aceptar'])
+            ->middleware('role:Distribuidora')
+            ->name('api.v1.distribuidora.clientes.transferencias.aceptar');
     });
 
     // MÓDULO 3: CONFIGURACIONES (REGLAS DE NEGOCIO Y FECHAS POR VIGENCIA)
