@@ -113,6 +113,12 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware('role:Cajera,Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.distribuidora.clientes.ediciones.index');
 
+        // Misma razón: debe ir ANTES de clientes/{id}, si no el wildcard se comería
+        // "transferencias" como si fuera un id de cliente.
+        Route::get('clientes/transferencias', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudTransferenciaClienteController::class, 'index'])
+            ->middleware('role:Distribuidora,Coordinador,Gerente de Sucursal,Gerente General')
+            ->name('api.v1.distribuidora.clientes.transferencias.index');
+
         Route::get('clientes/{id}', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'show'])
             ->middleware('role:Distribuidora,Gerente General,Gerente de Sucursal,Cajera')
             ->name('api.v1.distribuidora.clientes.show');
@@ -142,6 +148,24 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
         Route::put('clientes/{id}/editar-datos', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudEdicionClienteController::class, 'aplicar'])
             ->middleware('role:Cajera')
             ->name('api.v1.distribuidora.clientes.editar_datos');
+
+        // Transferencia de un cliente entre distribuidoras: destino solicita -> coordinador/
+        // gerente de la ORIGEN autoriza -> destino confirma (el listado va arriba, junto a
+        // clientes/ediciones, por la colisión con el wildcard clientes/{id}).
+        Route::post('clientes/{cliente}/solicitar-transferencia', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudTransferenciaClienteController::class, 'store'])
+            ->middleware('role:Distribuidora')
+            ->name('api.v1.distribuidora.clientes.transferencias.store');
+
+        // Autorización del coordinador/gerente de la distribuidora origen: es una decisión de
+        // autorización, va con VPN igual que decidir_edicion.
+        Route::put('clientes/transferencias/{solicitud}/decidir', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudTransferenciaClienteController::class, 'decidir'])
+            ->middleware(['role:Coordinador,Gerente de Sucursal,Gerente General', 'vpn'])
+            ->name('api.v1.distribuidora.clientes.transferencias.decidir');
+
+        // Confirmación final de la propia distribuidora destino: autoservicio, sin VPN.
+        Route::put('clientes/transferencias/{solicitud}/aceptar', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudTransferenciaClienteController::class, 'aceptar'])
+            ->middleware('role:Distribuidora')
+            ->name('api.v1.distribuidora.clientes.transferencias.aceptar');
     });
 
     // MÓDULO 3: CONFIGURACIONES (REGLAS DE NEGOCIO Y FECHAS POR VIGENCIA)
@@ -220,6 +244,29 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General,Cajera')
             ->name('api.v1.distribuidoras.index');
 
+        // Reasignación masiva de cartera de un coordinador a otro (p.ej. el coordinador deja
+        // la sucursal/empresa). Debe ir ANTES de {distribuidora} para no ser capturada por el
+        // wildcard. Es una decisión gerencial, no operación de rutina: va con VPN.
+        Route::post('reasignar-coordinador', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'reasignarCoordinador'])
+            ->middleware(['role:Gerente de Sucursal,Gerente General', 'vpn'])
+            ->name('api.v1.distribuidoras.reasignar_coordinador');
+
+        // Solicitud de aumento de crédito: la distribuidora (o su coordinador) pide, el
+        // gerente decide el monto otorgado. Debe ir ANTES de {distribuidora} por la misma
+        // razón que reasignar-coordinador: si no, el wildcard se comería "aumento-credito".
+        Route::get('aumento-credito', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudAumentoCreditoController::class, 'index'])
+            ->middleware('role:Distribuidora,Coordinador,Gerente de Sucursal,Gerente General')
+            ->name('api.v1.distribuidoras.aumento_credito.index');
+
+        Route::post('{distribuidora}/aumento-credito', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudAumentoCreditoController::class, 'store'])
+            ->middleware('role:Distribuidora,Coordinador')
+            ->name('api.v1.distribuidoras.aumento_credito.store');
+
+        // Decisión del gerente — decisión de autorización, va con VPN igual que el resto.
+        Route::put('aumento-credito/{solicitud}/decidir', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudAumentoCreditoController::class, 'decidir'])
+            ->middleware(['role:Gerente de Sucursal,Gerente General', 'vpn'])
+            ->name('api.v1.distribuidoras.aumento_credito.decidir');
+
         // Detalle, actualización y eliminación (con autorización por política)
         Route::get('{distribuidora}', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'show'])
             ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General')
@@ -246,6 +293,14 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
         Route::post('{distribuidora}/contrato', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'subirContrato'])
             ->middleware(['role:Gerente de Sucursal,Gerente General', 'vpn'])
             ->name('api.v1.distribuidoras.contrato');
+
+        // Reasignación masiva de cartera: el coordinador mueve TODOS los clientes de una
+        // distribuidora suya a otra suya (típicamente cuando la de origen deja de operar).
+        // No es una decisión de autorización de un tercero, es el propio coordinador operando
+        // su cartera, por eso no lleva 'vpn'.
+        Route::post('{distribuidora}/reasignar-clientes', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'reasignarTodos'])
+            ->middleware('role:Coordinador')
+            ->name('api.v1.distribuidoras.clientes.reasignar');
 
         // Historial de movimientos de puntos (generados, penalizados, canjeados, ajustes): sin
         // esto no había forma de ver cómo se llegó al saldo actual, solo el número final.

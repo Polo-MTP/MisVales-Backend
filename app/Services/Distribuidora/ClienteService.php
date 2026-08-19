@@ -236,6 +236,57 @@ final class ClienteService
     }
 
     /**
+     * Mueve de un solo golpe TODOS los clientes activos de una distribuidora a otra. Pensado
+     * para cuando una distribuidora deja de operar y el coordinador necesita reubicar su
+     * cartera sin reasignar cliente por cliente. Solo el Coordinador dueño de AMBAS
+     * distribuidoras puede hacerlo -- mover un cliente fuera de la cartera del propio
+     * coordinador es una transferencia individual con autorización (SolicitudTransferenciaCliente),
+     * no esto.
+     */
+    public function reasignarTodos(Distribuidora $origen, Distribuidora $destino, User $usuario): int
+    {
+        if ($usuario->role?->name !== 'Coordinador' || $origen->coordinador_id !== $usuario->id || $destino->coordinador_id !== $usuario->id) {
+            abort(403, 'Solo puedes reasignar clientes entre distribuidoras que tú coordinas.');
+        }
+
+        if ($origen->id === $destino->id) {
+            abort(422, 'La distribuidora destino debe ser diferente de la distribuidora de origen.');
+        }
+
+        if (! in_array($destino->estado, ['ACTIVO', 'EN_VERIFICACION'], true)) {
+            abort(422, 'La distribuidora destino no puede recibir clientes en su estado actual.');
+        }
+
+        return DB::transaction(function () use ($origen, $destino): int {
+            $historiales = HistorialClienteDistr::query()
+                ->where('distribuidor_id', $origen->id)
+                ->whereNull('fecha_fin')
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($historiales as $historial) {
+                $historial->fecha_fin = now();
+                $historial->save();
+
+                HistorialClienteDistr::query()->create([
+                    'distribuidor_id' => $destino->id,
+                    'cliente_id' => $historial->cliente_id,
+                    'fecha_inicio' => now(),
+                    'fecha_fin' => null,
+                ]);
+            }
+
+            Log::debug('ClienteService: Reasignación masiva de clientes entre distribuidoras', [
+                'origen_id' => $origen->id,
+                'destino_id' => $destino->id,
+                'total' => $historiales->count(),
+            ]);
+
+            return $historiales->count();
+        });
+    }
+
+    /**
      * Roles de staff (no son ellos mismos una distribuidora) que necesitan ver clientes de
      * varias distribuidoras a la vez -- ej. la cajera buscando a quién corregirle datos.
      */
