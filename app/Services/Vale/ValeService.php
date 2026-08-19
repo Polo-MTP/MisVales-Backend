@@ -79,7 +79,7 @@ final class ValeService
                 'fecha_solicitud' => now(),
             ]);
 
-            return $vale->fresh(['distribuidora', 'cliente.datosPersonales', 'producto']);
+            return $vale->fresh(['distribuidora', 'cliente.datosPersonales.direccion', 'producto']);
         });
     }
 
@@ -127,7 +127,7 @@ final class ValeService
         $vale->comprobante_domicilio_verificado = $comprobanteDomicilioVerificado;
         $vale->save();
 
-        return $vale->fresh(['distribuidora', 'cliente.datosPersonales', 'producto']);
+        return $vale->fresh(['distribuidora', 'cliente.datosPersonales.direccion', 'producto']);
     }
 
     /**
@@ -145,7 +145,7 @@ final class ValeService
         $vale->fecha_autorizacion = now();
         $vale->save();
 
-        return $vale->fresh(['distribuidora', 'cliente.datosPersonales', 'producto']);
+        return $vale->fresh(['distribuidora', 'cliente.datosPersonales.direccion', 'producto']);
     }
 
     /**
@@ -164,7 +164,7 @@ final class ValeService
 
         $vale->update(['activo' => false]);
 
-        return $vale->fresh(['distribuidora', 'cliente.datosPersonales', 'producto']);
+        return $vale->fresh(['distribuidora', 'cliente.datosPersonales.direccion', 'producto']);
     }
 
     public function activar(Vale $vale, User $usuario): Vale
@@ -177,7 +177,7 @@ final class ValeService
 
         $vale->update(['activo' => true]);
 
-        return $vale->fresh(['distribuidora', 'cliente.datosPersonales', 'producto']);
+        return $vale->fresh(['distribuidora', 'cliente.datosPersonales.direccion', 'producto']);
     }
 
     /**
@@ -189,7 +189,7 @@ final class ValeService
      */
     public function listar(User $usuario, array $filters = []): LengthAwarePaginator
     {
-        $query = Vale::query()->with(['distribuidora', 'cliente.datosPersonales', 'producto']);
+        $query = Vale::query()->with(['distribuidora', 'cliente.datosPersonales.direccion', 'producto']);
 
         $role = $usuario->role?->name;
 

@@ -26,9 +26,20 @@ final class ValeResource extends JsonResource
                 'razon_social' => $this->distribuidora->razon_social,
                 'numero_distribuidora' => $this->distribuidora->numero_distribuidora,
             ] : null,
+            // La cajera necesita ver estos datos para compararlos contra la INE y el
+            // comprobante de domicilio físicos antes de marcar el checklist de validación.
             'cliente' => $this->cliente ? [
                 'id' => $this->cliente->id,
-                'nombre' => trim(($this->cliente->datosPersonales?->nombre ?? '').' '.($this->cliente->datosPersonales?->apellido_paterno ?? '')),
+                'nombre' => trim(($this->cliente->datosPersonales?->nombre ?? '').' '.($this->cliente->datosPersonales?->apellido_paterno ?? '').' '.($this->cliente->datosPersonales?->apellido_materno ?? '')),
+                'curp' => $this->cliente->datosPersonales?->curp,
+                'direccion' => $this->cliente->datosPersonales?->direccion ? trim(
+                    $this->cliente->datosPersonales->direccion->calle
+                        .' '.$this->cliente->datosPersonales->direccion->numero_ext
+                        .', '.$this->cliente->datosPersonales->direccion->colonia
+                        .', CP '.$this->cliente->datosPersonales->direccion->codigo_postal
+                        .', '.$this->cliente->datosPersonales->direccion->ciudad
+                        .', '.$this->cliente->datosPersonales->direccion->estado
+                ) : null,
             ] : null,
             'producto' => $this->producto ? [
                 'id' => $this->producto->id,
