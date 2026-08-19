@@ -83,6 +83,11 @@ services:
     volumes:
       - ./public:/var/www/public:ro
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      # Mismo volumen que 'app' (ver más abajo), montado también aquí para que nginx
+      # pueda servir los archivos subidos directamente (location /storage/ en
+      # default.conf) — sin esto, nginx solo ve ./public (horneado en la imagen, no el
+      # volumen donde realmente caen los uploads) y cualquier archivo subido da 404.
+      - misvales-storage-prod:/var/www/storage:ro
     depends_on:
       - app
     networks:
