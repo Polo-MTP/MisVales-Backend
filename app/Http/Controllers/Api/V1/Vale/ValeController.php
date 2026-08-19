@@ -52,7 +52,23 @@ final class ValeController extends ApiController
     }
 
     /**
-     * Autoriza un vale solicitado.
+     * Valida los datos del cliente en persona — paso previo obligatorio para poder autorizar.
+     */
+    public function validar(Vale $vale, Request $request): JsonResponse
+    {
+        /** @var User $usuario */
+        $usuario = $request->user();
+
+        $vale = $this->valeService->validar($vale, $usuario);
+
+        return $this->success(
+            data: new ValeResource($vale),
+            message: 'Datos del cliente validados exitosamente.'
+        );
+    }
+
+    /**
+     * Autoriza (paga) un vale ya validado.
      */
     public function autorizar(Vale $vale, Request $request): JsonResponse
     {

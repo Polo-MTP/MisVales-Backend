@@ -22,9 +22,11 @@ final class Vale extends Model
         'monto',
         'quincenas',     // snapshot del producto al momento del alta
         'tipo',          // 'pre-vale' o 'vale-digital'
-        'estado',        // 'solicitado', 'autorizado', 'pagado', 'vencido', 'incidencia'
+        'estado',        // 'solicitado', 'validado', 'autorizado', 'pagado', 'vencido', 'incidencia'
         'activo',        // la distribuidora la activa/desactiva sin autorización
         'fecha_solicitud',
+        'validado_por',
+        'fecha_validacion',
         'fecha_autorizacion',
         'numero_transferencia',
     ];
@@ -34,6 +36,7 @@ final class Vale extends Model
         'quincenas' => 'integer',
         'activo' => 'boolean',
         'fecha_solicitud' => 'datetime',
+        'fecha_validacion' => 'datetime',
         'fecha_autorizacion' => 'datetime',
     ];
 
@@ -67,5 +70,13 @@ final class Vale extends Model
     public function relacionDetalles(): HasMany
     {
         return $this->hasMany(RelacionDetalle::class);
+    }
+
+    /**
+     * Cajera que validó los datos del cliente antes de autorizar el vale.
+     */
+    public function validadoPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'validado_por');
     }
 }

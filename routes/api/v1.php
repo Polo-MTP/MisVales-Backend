@@ -267,9 +267,15 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware('role:Distribuidora')
             ->name('api.v1.vales.store');
 
+        // La cajera valida en persona los datos del cliente contra el vale — paso obligatorio
+        // antes de poder autorizar/pagar. Misma razón que autorizar: responde desde red pública.
+        Route::put('{vale}/validar', [ValeController::class, 'validar'])
+            ->middleware('role:Cajera')
+            ->name('api.v1.vales.validar');
+
         // Solo la cajera autoriza/paga el vale al cliente en caja — ni Coordinador ni gerencia.
         // A diferencia de las demás decisiones de autorización, esta sí debe responder desde
-        // la red pública (la cajera no opera desde la VPN interna).
+        // la red pública (la cajera no opera desde la VPN interna). Requiere que ya esté 'validado'.
         Route::put('{vale}/autorizar', [ValeController::class, 'autorizar'])
             ->middleware('role:Cajera')
             ->name('api.v1.vales.autorizar');

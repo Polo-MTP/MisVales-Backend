@@ -84,13 +84,32 @@ final class ValeService
     }
 
     /**
-     * Autoriza un vale solicitado: a partir de aquí cuenta contra el crédito disponible
-     * de la distribuidora y queda elegible para el corte (RelacionCalculoService).
+     * La cajera valida en persona los datos del cliente contra el vale solicitado — paso
+     * obligatorio antes de poder autorizarlo/pagarlo, no se puede saltar directo a autorizar.
+     */
+    public function validar(Vale $vale, User $usuario): Vale
+    {
+        if ($vale->estado !== 'solicitado') {
+            abort(422, "Solo se pueden validar vales en estado 'solicitado' (actual: {$vale->estado}).");
+        }
+
+        $vale->estado = 'validado';
+        $vale->validado_por = $usuario->id;
+        $vale->fecha_validacion = now();
+        $vale->save();
+
+        return $vale->fresh(['distribuidora', 'cliente.datosPersonales', 'producto']);
+    }
+
+    /**
+     * Autoriza (paga) un vale ya validado: a partir de aquí cuenta contra el crédito
+     * disponible de la distribuidora y queda elegible para el corte (RelacionCalculoService).
+     * No se puede autorizar/pagar sin haber validado los datos del cliente primero.
      */
     public function autorizar(Vale $vale, User $usuario): Vale
     {
-        if ($vale->estado !== 'solicitado') {
-            abort(422, "Solo se pueden autorizar vales en estado 'solicitado' (actual: {$vale->estado}).");
+        if ($vale->estado !== 'validado') {
+            abort(422, "Solo se pueden autorizar vales ya validados (actual: {$vale->estado}). Valida los datos del cliente primero.");
         }
 
         $vale->estado = 'autorizado';
