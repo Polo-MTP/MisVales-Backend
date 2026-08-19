@@ -38,7 +38,7 @@ services:
       # obligatorio (ver nota en .env.production.example) — el :?required intencionalmente
       # no está aquí para no bloquear pruebas locales del build de producción.
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
-      VPN_ALLOWED_CIDRS: ${VPN_ALLOWED_CIDRS:-}
+      VPN_HOST: ${VPN_HOST:-}
       DB_CONNECTION: mysql
       DB_HOST: mysql
       DB_PORT: "3306"

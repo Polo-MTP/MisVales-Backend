@@ -140,7 +140,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
         // Endpoint de decisión (aprobar/rechazar) — confirmado por infra como uno de los
         // que solo debe contestar por VPN. La restricción real va en el firewall del
         // droplet; 'vpn' es la segunda capa (ver VerifyVpnAccess), no-op hasta que
-        // VPN_ALLOWED_CIDRS tenga el rango real.
+        // VPN_HOST tenga el dominio real.
         Route::put('clientes/ediciones/{solicitud}/decidir', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudEdicionClienteController::class, 'decidir'])
             ->middleware(['role:Coordinador,Gerente de Sucursal,Gerente General', 'vpn'])
             ->name('api.v1.distribuidora.clientes.decidir_edicion');
@@ -407,7 +407,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
         // Endpoint de decisión (aprobar/rechazar) — confirmado por infra como uno de los
         // que solo debe contestar por VPN. La restricción real va en el firewall del
         // droplet; 'vpn' es la segunda capa (ver VerifyVpnAccess), no-op hasta que
-        // VPN_ALLOWED_CIDRS tenga el rango real.
+        // VPN_HOST tenga el dominio real.
         Route::put('autorizaciones/{solicitud}/decidir', [ConciliacionController::class, 'decidirAutorizacion'])
             ->middleware(['role:Coordinador,Gerente de Sucursal,Gerente General', 'vpn'])
             ->name('api.v1.conciliaciones.decidir_autorizacion');

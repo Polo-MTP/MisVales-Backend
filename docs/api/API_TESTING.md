@@ -44,6 +44,11 @@ permitidos, body de ejemplo, respuesta esperada y un `curl` listo para copiar.
   caja, no gerencia, así que **sí responde desde la red pública** (ver sección de Vales). Lo mismo
   aplica a `reasignar-clientes` y a la confirmación (`aceptar`) de una transferencia: el
   coordinador/distribuidora opera su propia cartera, no decide a nombre de otro.
+  La detección **no es por IP/CIDR**, es por el host de la petición (`VerifyVpnAccess`
+  compara `Request::getHost()` contra `config('security.vpn_host')`, leído de la variable
+  de entorno `VPN_HOST`): infra publica estas rutas en un dominio/subdominio aparte,
+  resoluble únicamente desde dentro de la VPN. Con `VPN_HOST` vacío (dev/test) el
+  middleware no bloquea nada.
 
 ### Flujo recomendado para probar de punta a punta
 
