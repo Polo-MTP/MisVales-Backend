@@ -247,6 +247,14 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware(['role:Gerente de Sucursal,Gerente General', 'vpn'])
             ->name('api.v1.distribuidoras.contrato');
 
+        // Reasignación masiva de cartera: el coordinador mueve TODOS los clientes de una
+        // distribuidora suya a otra suya (típicamente cuando la de origen deja de operar).
+        // No es una decisión de autorización de un tercero, es el propio coordinador operando
+        // su cartera, por eso no lleva 'vpn'.
+        Route::post('{distribuidora}/reasignar-clientes', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'reasignarTodos'])
+            ->middleware('role:Coordinador')
+            ->name('api.v1.distribuidoras.clientes.reasignar');
+
         // Historial de movimientos de puntos (generados, penalizados, canjeados, ajustes): sin
         // esto no había forma de ver cómo se llegó al saldo actual, solo el número final.
         Route::get('{distribuidora}/puntos', [App\Http\Controllers\Api\V1\Distribuidora\PuntoCanjeController::class, 'index'])

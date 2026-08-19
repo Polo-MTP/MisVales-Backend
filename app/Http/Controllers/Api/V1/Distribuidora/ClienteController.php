@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Distribuidora;
 
 use App\Http\Controllers\Api\ApiController;
+use App\Http\Requests\Api\V1\Distribuidora\ReasignarClientesRequest;
 use App\Http\Requests\Api\V1\Distribuidora\StoreClienteRequest;
 use App\Http\Requests\Api\V1\Distribuidora\UpdateClienteRequest;
 use App\Http\Resources\Distribuidora\ClienteResource;
 use App\Http\Resources\Distribuidora\DistribuidoraResource;
 use App\Models\Cliente;
+use App\Models\Distribuidora;
 use App\Models\User;
 use App\Services\Distribuidora\ClienteService;
 use Illuminate\Http\JsonResponse;
@@ -106,6 +108,25 @@ final class ClienteController extends ApiController
         return $this->success(
             data: new ClienteResource($cliente),
             message: 'Estado del cliente actualizado exitosamente.'
+        );
+    }
+
+    /**
+     * Reasigna en bloque todos los clientes de una distribuidora a otra. Uso típico: la
+     * distribuidora de origen deja de operar y el coordinador reubica su cartera completa.
+     */
+    public function reasignarTodos(ReasignarClientesRequest $request, Distribuidora $distribuidora): JsonResponse
+    {
+        /** @var User $usuario */
+        $usuario = $request->user();
+
+        $destino = Distribuidora::query()->findOrFail($request->integer('distribuidora_destino_id'));
+
+        $total = $this->clienteService->reasignarTodos($distribuidora, $destino, $usuario);
+
+        return $this->success(
+            data: ['clientes_reasignados' => $total],
+            message: "{$total} cliente(s) reasignado(s) de {$distribuidora->numero_distribuidora} a {$destino->numero_distribuidora}."
         );
     }
 
