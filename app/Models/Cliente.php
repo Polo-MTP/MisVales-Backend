@@ -46,4 +46,12 @@ final class Cliente extends Model
     {
         return $this->hasMany(HistorialClienteDistr::class, 'cliente_id');
     }
+
+    /**
+     * Solicitudes de transferencia de este cliente entre distribuidoras.
+     */
+    public function solicitudesTransferencia(): HasMany
+    {
+        return $this->hasMany(SolicitudTransferenciaCliente::class);
+    }
 }

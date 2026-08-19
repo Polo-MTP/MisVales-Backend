@@ -87,6 +87,16 @@ final class ConfiguracionSeeder extends Seeder
                 'valor' => '2',
                 'tipo_dato' => 'decimal',
             ],
+            [
+                'clave' => 'relaciones_impagas_para_morosidad',
+                'valor' => '3',
+                'tipo_dato' => 'decimal',
+            ],
+            [
+                'clave' => 'margen_aumento_credito',
+                'valor' => '500',
+                'tipo_dato' => 'decimal',
+            ],
         ];
 
         foreach ($configsIniciales as $cfg) {

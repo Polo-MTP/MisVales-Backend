@@ -36,6 +36,7 @@ final class Distribuidora extends Model
         'comentarios_verificador',
         'fecha_aprobacion',
         'aprobado_por',
+        'contrato_url',
     ];
 
     protected $casts = [
@@ -153,6 +154,14 @@ final class Distribuidora extends Model
     }
 
     /**
+     * Solicitudes de aumento de línea de crédito de esta distribuidora.
+     */
+    public function solicitudesAumentoCredito(): HasMany
+    {
+        return $this->hasMany(SolicitudAumentoCredito::class);
+    }
+
+    /**
      * Crédito disponible: límite de crédito menos el monto de vales que aún cuentan
      * contra el crédito (mismo criterio de "pendiente" que usa RelacionCalculoService).
      */
@@ -169,7 +178,8 @@ final class Distribuidora extends Model
     /**
      * Verifica si la distribuidora puede solicitar un vale por el monto indicado:
      * debe estar activa/en verificación, tener crédito disponible suficiente y,
-     * si es su primer vale, no exceder el porcentaje máximo configurable ('regla_50_pct').
+     * si es su primer vale (o el primero desde un aumento de crédito reciente), no exceder
+     * el porcentaje máximo configurable ('regla_50_pct').
      */
     public function puedeSolicitarVale(float $montoSolicitado, bool $esPrimerVale = false): bool
     {
@@ -182,15 +192,47 @@ final class Distribuidora extends Model
             return false;
         }
 
-        // Regla del porcentaje máximo para el primer vale (configurable, clave 'regla_50_pct')
-        if ($esPrimerVale) {
-            $porcentaje = (float) (app(ConfiguracionService::class)->obtenerValorVigente('regla_50_pct') ?? 50);
+        $configuracionService = app(ConfiguracionService::class);
+        $porcentaje = (float) ($configuracionService->obtenerValorVigente('regla_50_pct') ?? 50);
 
-            if ($montoSolicitado > $this->limite_credito * ($porcentaje / 100)) {
-                return false;
-            }
+        // Regla del porcentaje máximo para el primer vale de la distribuidora.
+        if ($esPrimerVale) {
+            return $montoSolicitado <= $this->limite_credito * ($porcentaje / 100);
+        }
+
+        // Un aumento de crédito no se puede usar de un solo golpe: el primer vale después de
+        // un aumento aprobado y aún no "estrenado" respeta el mismo porcentaje de caución,
+        // mas un margen de tolerancia fijo (config 'margen_aumento_credito', default $500).
+        if ($this->aumentoCreditoSinConsumir() !== null) {
+            $margen = (float) ($configuracionService->obtenerValorVigente('margen_aumento_credito') ?? 500);
+
+            return $montoSolicitado <= ($this->credito_disponible * ($porcentaje / 100)) + $margen;
         }
 
         return true;
+    }
+
+    /**
+     * El aumento de crédito aprobado más reciente, si todavía no se le ha solicitado ningún
+     * vale desde que se otorgó (la caución de puedeSolicitarVale() solo aplica una vez, al
+     * primer vale que "estrena" ese aumento — igual que la regla del primer vale de siempre).
+     */
+    public function aumentoCreditoSinConsumir(): ?SolicitudAumentoCredito
+    {
+        /** @var SolicitudAumentoCredito|null $ultimo */
+        $ultimo = $this->solicitudesAumentoCredito()
+            ->where('estado', 'aprobada')
+            ->latest('fecha_decision')
+            ->first();
+
+        if (! $ultimo || ! $ultimo->fecha_decision) {
+            return null;
+        }
+
+        $yaSeUsoDespuesDelAumento = $this->vales()
+            ->where('created_at', '>=', $ultimo->fecha_decision)
+            ->exists();
+
+        return $yaSeUsoDespuesDelAumento ? null : $ultimo;
     }
 }

@@ -38,6 +38,8 @@ final class Vale extends Model
         'fecha_solicitud' => 'datetime',
         'fecha_validacion' => 'datetime',
         'fecha_autorizacion' => 'datetime',
+        'ine_verificada' => 'boolean',
+        'comprobante_domicilio_verificado' => 'boolean',
     ];
 
     /**

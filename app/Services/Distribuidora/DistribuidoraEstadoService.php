@@ -15,8 +15,10 @@ final class DistribuidoraEstadoService
 {
     /**
      * Cambia el estado de una distribuidora y genera la bitácora de auditoría histórica.
+     * $usuario es null cuando el cambio lo dispara el propio sistema (ej. MOROSO automático
+     * en RelacionEstadoService), no una acción humana explícita.
      */
-    public function cambiarEstado(Distribuidora $distribuidora, string $nuevoEstado, string $motivo, User $usuario): Distribuidora
+    public function cambiarEstado(Distribuidora $distribuidora, string $nuevoEstado, string $motivo, ?User $usuario): Distribuidora
     {
         $estadoAnterior = (string) $distribuidora->estado;
 
@@ -25,7 +27,7 @@ final class DistribuidoraEstadoService
             'estado_anterior' => $estadoAnterior,
             'estado_nuevo' => $nuevoEstado,
             'motivo' => $motivo,
-            'cambiado_por' => $usuario->id,
+            'cambiado_por' => $usuario?->id,
         ]);
 
         return DB::transaction(function () use ($distribuidora, $estadoAnterior, $nuevoEstado, $motivo, $usuario): Distribuidora {
@@ -46,7 +48,7 @@ final class DistribuidoraEstadoService
                 'estado_anterior' => $estadoAnterior,
                 'estado_nuevo' => $nuevoEstado,
                 'motivo' => $motivo,
-                'cambiado_por' => $usuario->id,
+                'cambiado_por' => $usuario?->id,
                 'fecha' => now(),
             ]);
 

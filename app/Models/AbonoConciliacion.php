@@ -31,9 +31,14 @@ final class AbonoConciliacion extends Model
 
     protected $table = 'abonos_conciliacion';
 
+    /**
+     * queja_* queda fuera de Fillable a propósito: solo las escribe
+     * ConciliacionBancariaService::levantarQueja(), nunca mass-assignment de un request.
+     */
     protected $casts = [
         'monto' => 'decimal:2',
         'fecha_pago' => 'date',
+        'queja_fecha' => 'datetime',
     ];
 
     /**
@@ -74,5 +79,13 @@ final class AbonoConciliacion extends Model
     public function subidoPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'subido_por');
+    }
+
+    /**
+     * Usuario (distribuidora) que levantó la queja sobre este abono.
+     */
+    public function quejaPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'queja_por');
     }
 }
