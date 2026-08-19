@@ -36,11 +36,14 @@ permitidos, body de ejemplo, respuesta esperada y un `curl` listo para copiar.
   que es `required`).
 - **Roles**: el middleware `role:...` (`app/Http/Middleware/CheckRole.php`) exige que el usuario
   autenticado tenga uno de los roles listados; si no, responde `403`.
-- **VPN**: 8 endpoints de autorización llevan el middleware `vpn` además del rol — en producción
+- **VPN**: 11 endpoints de autorización llevan el middleware `vpn` además del rol — en producción
   solo responden desde la red interna. Son los que deciden algo a nombre de un tercero
-  (aprobar/rechazar, cambiar estado, asignar crédito, perdonar). La excepción es
+  (aprobar/rechazar, cambiar estado, asignar crédito, perdonar, reasignar cartera de un
+  coordinador, decidir una transferencia de cliente o un aumento de crédito). La excepción es
   `PUT /vales/{vale}/autorizar`: aunque también es una autorización, la ejecuta la Cajera en
-  caja, no gerencia, así que **sí responde desde la red pública** (ver sección de Vales).
+  caja, no gerencia, así que **sí responde desde la red pública** (ver sección de Vales). Lo mismo
+  aplica a `reasignar-clientes` y a la confirmación (`aceptar`) de una transferencia: el
+  coordinador/distribuidora opera su propia cartera, no decide a nombre de otro.
 
 ### Flujo recomendado para probar de punta a punta
 
@@ -237,6 +240,39 @@ Roles: Coordinador, Gerente de Sucursal, Gerente General **+ VPN**. Body:
 Rol: Cajera. Body: `{ "solicitud_id": <id de una solicitud ya aprobada> }`. Aplica los cambios
 propuestos al cliente.
 
+### Transferencia de un cliente entre distribuidoras
+Tres pasos, cada uno con su propio actor — a diferencia de la reasignación masiva de abajo, esto
+mueve **un solo cliente** y puede cruzar la cartera de un coordinador distinto.
+
+1. `POST /distribuidora/clientes/{cliente}/solicitar-transferencia` — Rol: Distribuidora. La
+   distribuidora que quiere quedarse con el cliente pide la transferencia. Body: `{ "motivo": "..." }`.
+   `422` si el cliente ya es tuyo o si ya hay una solicitud en curso para ese cliente.
+2. `PUT /distribuidora/clientes/transferencias/{solicitud}/decidir` — Roles: Coordinador, Gerente
+   de Sucursal, Gerente General **+ VPN**. Autoriza el coordinador/gerente de la distribuidora
+   **origen** (no la que solicita). Body: `{ "decision": "autorizada"|"rechazada", "comentario": "..." }`.
+3. `PUT /distribuidora/clientes/transferencias/{solicitud}/aceptar` — Rol: Distribuidora. Solo la
+   distribuidora que solicitó puede confirmar; recién aquí se ejecuta el movimiento real en
+   `historial_cliente_distr`. Body: `{ "decision": "aceptada"|"rechazada" }`. Puede declinar aunque
+   ya esté autorizada (cambió de capacidad/opinión entre la solicitud y la autorización).
+
+`GET /distribuidora/clientes/transferencias` — Roles: Distribuidora, Coordinador, Gerente de
+Sucursal, Gerente General. Listado filtrado por rol (Distribuidora ve las suyas; Coordinador las
+de su cartera como origen; Gerente las de su sucursal). **Debe declararse antes de
+`clientes/{id}`**, mismo motivo que `ediciones`.
+
+### `POST /distribuidoras/{distribuidora}/reasignar-clientes`
+Rol: Coordinador. Mueve de un solo golpe **todos** los clientes activos de una distribuidora a
+otra, típicamente cuando la de origen deja de operar. Body: `{ "distribuidora_destino_id": <id> }`.
+Ambas distribuidoras deben pertenecer al mismo coordinador que hace la llamada; la destino debe
+estar ACTIVO o EN_VERIFICACION. Sin VPN — es el propio coordinador operando su cartera, no una
+autorización a nombre de un tercero.
+
+### `POST /distribuidoras/reasignar-coordinador`
+Roles: Gerente de Sucursal, Gerente General **+ VPN**. Mueve **toda la cartera** de un coordinador
+(todas sus distribuidoras) a otro coordinador de la misma sucursal — para cuando un coordinador
+deja la sucursal/empresa. Body: `{ "coordinador_origen_id": <id>, "coordinador_destino_id": <id> }`.
+Gerente de Sucursal solo puede operar dentro de su propia sucursal.
+
 ---
 
 ## 06. Configuraciones
@@ -359,6 +395,26 @@ Roles: Cajera, Distribuidora, Gerente de Sucursal, Gerente General. Historial de
 Rol: Cajera. Body: `cantidad` (int > 0), `motivo`. Falla con `422`/mensaje de negocio si
 `cantidad > puntos_acumulados`.
 
+### `POST /distribuidoras/{distribuidora}/contrato`
+Roles: Gerente de Sucursal, Gerente General **+ VPN**. `multipart/form-data`: `archivo` (PDF, máx
+10MB). Parte del mismo acto administrativo que aprobar/asignar crédito — sube o reemplaza el
+contrato firmado.
+
+### Solicitud de aumento de crédito
+Workflow negociado: la distribuidora pide un monto, el gerente decide cuánto otorgar (puede ser
+menos, nunca más que lo pedido).
+
+- `POST /distribuidoras/{distribuidora}/aumento-credito` — Roles: Distribuidora, Coordinador. Body:
+  `{ "monto_solicitado": 5000, "motivo": "..." }`. Solo distribuidoras `ACTIVO`; `422` si ya hay una
+  solicitud `pendiente` para esa distribuidora.
+- `PUT /distribuidoras/aumento-credito/{solicitud}/decidir` — Roles: Gerente de Sucursal, Gerente
+  General **+ VPN**. Body: `{ "decision": "aprobada"|"rechazada", "monto_otorgado": 3000, "comentario": "..." }`.
+  `monto_otorgado` requerido si se aprueba; `422` si es mayor al `monto_solicitado`. Al aprobar,
+  suma de inmediato al `limite_credito` de la distribuidora.
+- `GET /distribuidoras/aumento-credito` — Roles: Distribuidora, Coordinador, Gerente de Sucursal,
+  Gerente General. **Debe declararse antes de `{distribuidora}`**, mismo motivo que
+  `reasignar-coordinador`.
+
 ---
 
 ## 11. Vales
@@ -385,13 +441,18 @@ un vale activo/pendiente a la vez.
 Rol: Cajera. Sin VPN, responde desde red pública. Paso obligatorio antes de poder autorizar — no
 se puede saltar directo de `solicitado` a `autorizado`.
 ```json
-{ "clabe": "032180000118359719" }
+{ "clabe": "032180000118359719", "ine_verificada": true, "comprobante_domicilio_verificado": true }
 ```
 `clabe` es **opcional en el body**, pero **obligatoria de facto la primera vez** que se valida un
 vale de ese cliente: si el cliente todavía no tiene una guardada y no la mandas, la API responde
 `422` ("Este cliente no tiene CLABE interbancaria registrada..."). Debe ser exactamente 18 dígitos
 (`422` si no). Se guarda cifrada en el cliente (mismo criterio que el secreto TOTP) y no se vuelve
 a pedir en vales futuros del mismo cliente — el pago del vale se transfiere a esa CLABE.
+
+`ine_verificada` y `comprobante_domicilio_verificado` son **requeridos** (booleanos): la cajera
+confirma que el INE y el comprobante de domicilio del cliente coinciden con lo capturado. Si
+cualquiera de los dos llega en `false`, la API responde `422` ("...deben coincidir. Corrige los
+datos o pide autorización para editarlos...") en vez de validar el vale.
 
 ### `PUT /vales/{vale}/autorizar`
 Rol: Cajera (solo quien atiende al cliente en caja — ni Coordinador ni gerencia). Sin VPN, responde
@@ -427,6 +488,13 @@ curl -X POST "$BASE_URL/relaciones/generar" -H "Authorization: Bearer $TOKEN" \
 Roles: Gerente de Sucursal, Gerente General **+ VPN**. Body opcional: `motivo`. Si se alcanza el
 límite de perdones configurado, la relación se marca como `en_perdida` en vez de perdonarse.
 
+**Nota — MOROSO automático (sin endpoint propio):** cada vez que `marcarVencidas()` (job/comando
+de vencimiento) o `perdonar()` dejan una relación en `vencida`/`en_perdida`, el sistema cuenta
+cuántas relaciones de esa distribuidora están en esos dos estados. Al alcanzar el umbral
+configurado (clave `relaciones_impagas_para_morosidad`, default 3), la distribuidora pasa
+automáticamente a `estado=MOROSO` — sin usuario/VPN de por medio, `cambiado_por` queda `null` en
+el historial. No pisa una distribuidora ya `RECHAZADO`.
+
 ---
 
 ## 13. Conciliación Bancaria
@@ -458,6 +526,13 @@ Roles: Coordinador, Gerente de Sucursal, Gerente General **+ VPN**. Body:
 
 ### `POST /conciliaciones/{abono}/conciliar-manual`
 Rol: Cajera (debe ser quien solicitó la autorización). Body: `{ "solicitud_id": <id aprobada> }`.
+
+### `POST /conciliaciones/{abono}/queja`
+Rol: Distribuidora, sin VPN. Body: `{ "motivo": "..." }`. La distribuidora reporta que un abono no
+coincide con lo que ella pagó. Es **solo informativo** — no dispara ninguna corrección por sí solo,
+la `AbonoConciliacionResource` expone el bloque `queja{}` para que la cajera lo vea y, si procede,
+inicie ella el flujo normal de `solicitar-autorizacion` → `decidir` → `conciliar-manual`. `403` si
+el abono no pertenece a la relación de esa distribuidora.
 
 ---
 
