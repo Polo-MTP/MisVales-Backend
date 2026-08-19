@@ -20,6 +20,9 @@ final class ValeService
      * autoridad (Coordinador/Gerente) lo autorice — solo entonces cuenta contra el crédito
      * disponible y entra en el cálculo de cortes (RelacionCalculoService).
      *
+     * Un cliente solo puede tener un vale sin liquidar a la vez (cualquier estado que no
+     * sea 'pagado'); debe pagarse el vigente antes de poder solicitarle uno nuevo.
+     *
      * @param  array<string, mixed>  $data
      */
     public function solicitar(array $data, User $usuario): Vale
@@ -40,6 +43,18 @@ final class ValeService
 
         if (! $perteneceADistribuidora) {
             abort(403, 'Este cliente no está asignado a tu distribuidora.');
+        }
+
+        // Un cliente solo puede tener un vale activo/pendiente a la vez (cualquier estado
+        // que no sea 'pagado', y que no haya sido desactivado por la propia distribuidora).
+        $tieneValeSinLiquidar = Vale::query()
+            ->where('cliente_id', $cliente->id)
+            ->where('activo', true)
+            ->where('estado', '!=', 'pagado')
+            ->exists();
+
+        if ($tieneValeSinLiquidar) {
+            abort(422, 'Este cliente ya tiene un vale activo o pendiente. Debe liquidarse antes de poder solicitar otro.');
         }
 
         /** @var Producto $producto */
