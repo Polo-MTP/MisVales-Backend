@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Distribuidora\DistribuidoraCreditoRequest;
 use App\Http\Requests\Api\V1\Distribuidora\DistribuidoraEstadoRequest;
 use App\Http\Requests\Api\V1\Distribuidora\DistribuidoraUpdateRequest;
+use App\Http\Requests\Api\V1\Distribuidora\SubirContratoRequest;
 use App\Http\Resources\Distribuidora\DistribuidoraResource;
 use App\Models\Distribuidora;
 use App\Services\Distribuidora\DistribuidoraService;
@@ -117,5 +118,18 @@ final class DistribuidoraController extends Controller
     public function saldoDisponible(Distribuidora $distribuidora): JsonResponse
     {
         return response()->json($this->distribuidoraService->obtenerSaldoDisponible($distribuidora));
+    }
+
+    /**
+     * POST /api/v1/distribuidoras/{distribuidora}/contrato
+     */
+    public function subirContrato(SubirContratoRequest $request, Distribuidora $distribuidora): JsonResponse
+    {
+        $distribuidora = $this->distribuidoraService->subirContrato($distribuidora, $request->file('archivo'));
+
+        return response()->json([
+            'message' => 'Contrato subido correctamente',
+            'data' => new DistribuidoraResource($distribuidora),
+        ]);
     }
 }

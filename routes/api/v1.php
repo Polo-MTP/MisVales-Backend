@@ -242,6 +242,11 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware('role:Cajera,Distribuidora,Gerente de Sucursal,Gerente General')
             ->name('api.v1.distribuidoras.saldo');
 
+        // Contrato firmado — parte del mismo acto administrativo que aprobar/asignar crédito.
+        Route::post('{distribuidora}/contrato', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'subirContrato'])
+            ->middleware(['role:Gerente de Sucursal,Gerente General', 'vpn'])
+            ->name('api.v1.distribuidoras.contrato');
+
         // Historial de movimientos de puntos (generados, penalizados, canjeados, ajustes): sin
         // esto no había forma de ver cómo se llegó al saldo actual, solo el número final.
         Route::get('{distribuidora}/puntos', [App\Http\Controllers\Api\V1\Distribuidora\PuntoCanjeController::class, 'index'])

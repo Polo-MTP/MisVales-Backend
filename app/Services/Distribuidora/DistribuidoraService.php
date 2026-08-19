@@ -7,8 +7,10 @@ namespace App\Services\Distribuidora;
 use App\Models\Distribuidora;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 final class DistribuidoraService
@@ -110,5 +112,18 @@ final class DistribuidoraService
     public function obtenerSaldoDisponible(Distribuidora $distribuidora): float
     {
         return $distribuidora->credito_disponible; // accesor del modelo
+    }
+
+    /**
+     * Sube (o reemplaza) el contrato firmado de la distribuidora.
+     */
+    public function subirContrato(Distribuidora $distribuidora, UploadedFile $archivo): Distribuidora
+    {
+        $ruta = Storage::disk('public')->putFile('contratos', $archivo);
+
+        $distribuidora->contrato_url = Storage::disk('public')->url($ruta);
+        $distribuidora->save();
+
+        return $distribuidora->fresh();
     }
 }

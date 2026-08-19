@@ -59,6 +59,7 @@ final class DistribuidoraResource extends JsonResource
             ],
             'datos_extras' => new DistribuidorDatosExtrasResource($this->whenLoaded('datosExtras')),
             'comentarios_verificador' => $this->comentarios_verificador,
+            'contrato_url' => $this->contrato_url,
             'fecha_aprobacion' => $this->fecha_aprobacion?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
