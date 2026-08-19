@@ -267,11 +267,11 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware('role:Distribuidora')
             ->name('api.v1.vales.store');
 
-        // La cajera es quien autoriza/paga el vale al cliente en caja, no gerencia — y a
-        // diferencia de las demás decisiones de autorización, esta sí debe responder desde
+        // Solo la cajera autoriza/paga el vale al cliente en caja — ni Coordinador ni gerencia.
+        // A diferencia de las demás decisiones de autorización, esta sí debe responder desde
         // la red pública (la cajera no opera desde la VPN interna).
         Route::put('{vale}/autorizar', [ValeController::class, 'autorizar'])
-            ->middleware('role:Coordinador,Cajera')
+            ->middleware('role:Cajera')
             ->name('api.v1.vales.autorizar');
 
         // La distribuidora activa/desactiva sus propios vales sin autorización de nadie más.

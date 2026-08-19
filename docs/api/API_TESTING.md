@@ -48,7 +48,7 @@ permitidos, body de ejemplo, respuesta esperada y un `curl` listo para copiar.
 2. `POST /distribuidora/clientes` (rol Distribuidora) → crea un cliente.
 3. `POST /productos` (rol Gerente General) → crea un producto del catálogo.
 4. `POST /vales` (rol Distribuidora) → solicita un vale con ese cliente/producto.
-5. `PUT /vales/{vale}/autorizar` (rol Coordinador/Cajera) → autoriza/paga el vale.
+5. `PUT /vales/{vale}/autorizar` (rol Cajera) → autoriza/paga el vale.
 6. `POST /relaciones/generar` (rol Gerente General) → genera el corte de esa distribuidora.
 7. `POST /conciliaciones/importar` o el flujo manual (`solicitar-autorizacion` → `decidir` →
    `conciliar-manual`) → concilia el pago y liquida la relación.
@@ -381,9 +381,9 @@ tiene otro vale sin liquidar** (cualquier estado que no sea `pagado`) — un cli
 un vale activo/pendiente a la vez.
 
 ### `PUT /vales/{vale}/autorizar`
-Roles: Coordinador, Cajera (no gerencia — lo autoriza/paga quien atiende al cliente en caja). Sin
-VPN, responde desde red pública. Sin body. Pasa `estado` a `autorizado` — desde aquí cuenta contra
-el crédito disponible.
+Rol: Cajera (solo quien atiende al cliente en caja — ni Coordinador ni gerencia). Sin VPN, responde
+desde red pública. Sin body. Pasa `estado` a `autorizado` — desde aquí cuenta contra el crédito
+disponible.
 
 ### `PUT /vales/{vale}/desactivar`
 Rol: Distribuidora (dueña del vale). Solo mientras sigue en `solicitado`.

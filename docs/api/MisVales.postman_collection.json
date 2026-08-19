@@ -791,7 +791,7 @@
             "method": "PUT",
             "header": [{ "key": "Accept", "value": "application/json" }],
             "url": { "raw": "{{base_url}}/vales/{{vale_id}}/autorizar", "host": ["{{base_url}}"], "path": ["vales", "{{vale_id}}", "autorizar"] },
-            "description": "Roles: Coordinador, Cajera (lo autoriza/paga quien atiende en caja, no gerencia). Sin VPN, responde desde red pública."
+            "description": "Rol: Cajera (solo quien atiende en caja — ni Coordinador ni gerencia). Sin VPN, responde desde red pública."
           }
         },
         {
