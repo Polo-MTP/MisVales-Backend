@@ -72,7 +72,7 @@ it('valida un vale solicitado y registra quién y cuándo lo validó', function 
         'producto_id' => $producto->id,
     ], $distribuidora->usuario);
 
-    $vale = app(ValeService::class)->validar($vale, $cajera, '4152313312345678');
+    $vale = app(ValeService::class)->validar($vale, $cajera, '032180000118359719');
 
     expect($vale->estado)->toBe('validado')
         ->and($vale->validado_por)->toBe($cajera->id)
@@ -88,7 +88,7 @@ it('permite autorizar un vale ya validado', function (): void {
         'producto_id' => $producto->id,
     ], $distribuidora->usuario);
 
-    $vale = app(ValeService::class)->validar($vale, $cajera, '4152313312345678');
+    $vale = app(ValeService::class)->validar($vale, $cajera, '032180000118359719');
     $vale = app(ValeService::class)->autorizar($vale, $cajera);
 
     expect($vale->estado)->toBe('autorizado')
@@ -104,13 +104,13 @@ it('no permite validar un vale que no está en estado solicitado', function (): 
         'producto_id' => $producto->id,
     ], $distribuidora->usuario);
 
-    app(ValeService::class)->validar($vale, $cajera, '4152313312345678');
+    app(ValeService::class)->validar($vale, $cajera, '032180000118359719');
 
     expect(fn () => app(ValeService::class)->validar($vale->fresh(), $cajera))
         ->toThrow(HttpException::class, "Solo se pueden validar vales en estado 'solicitado' (actual: validado).");
 });
 
-it('exige número de tarjeta la primera vez que se valida un vale del cliente', function (): void {
+it('exige CLABE interbancaria la primera vez que se valida un vale del cliente', function (): void {
     [$distribuidora, $cliente, $cajera] = crearDistribuidoraConClienteYCajera();
     $producto = Producto::create(['monto' => 500, 'quincenas' => 4, 'descripcion' => 'Test', 'activo' => true, 'created_by' => $distribuidora->usuario_id]);
 
@@ -120,12 +120,12 @@ it('exige número de tarjeta la primera vez que se valida un vale del cliente', 
     ], $distribuidora->usuario);
 
     expect(fn () => app(ValeService::class)->validar($vale, $cajera))
-        ->toThrow(HttpException::class, 'Este cliente no tiene número de tarjeta registrado. Captúralo para poder validar y transferirle el pago.');
+        ->toThrow(HttpException::class, 'Este cliente no tiene CLABE interbancaria registrada. Captúrala para poder validar y transferirle el pago.');
 
-    expect($cliente->fresh()->numero_tarjeta)->toBeNull();
+    expect($cliente->fresh()->clabe)->toBeNull();
 });
 
-it('guarda el número de tarjeta cifrado en el cliente y no lo vuelve a pedir en un vale futuro', function (): void {
+it('guarda la CLABE cifrada en el cliente y no la vuelve a pedir en un vale futuro', function (): void {
     [$distribuidora, $cliente, $cajera] = crearDistribuidoraConClienteYCajera();
     $producto = Producto::create(['monto' => 500, 'quincenas' => 4, 'descripcion' => 'Test', 'activo' => true, 'created_by' => $distribuidora->usuario_id]);
 
@@ -134,13 +134,13 @@ it('guarda el número de tarjeta cifrado en el cliente y no lo vuelve a pedir en
         'producto_id' => $producto->id,
     ], $distribuidora->usuario);
 
-    app(ValeService::class)->validar($primerVale, $cajera, '4152313312345678');
+    app(ValeService::class)->validar($primerVale, $cajera, '032180000118359719');
 
-    expect($cliente->fresh()->numero_tarjeta)->toBe('4152313312345678');
+    expect($cliente->fresh()->clabe)->toBe('032180000118359719');
 
-    // Se guarda cifrado en crudo (no en texto plano) — como MfaMethod.secret.
-    $crudo = \Illuminate\Support\Facades\DB::table('clientes')->where('id', $cliente->id)->value('numero_tarjeta');
-    expect($crudo)->not->toBe('4152313312345678');
+    // Se guarda cifrada en crudo (no en texto plano) — como MfaMethod.secret.
+    $crudo = \Illuminate\Support\Facades\DB::table('clientes')->where('id', $cliente->id)->value('clabe');
+    expect($crudo)->not->toBe('032180000118359719');
 
     // Liquida el primer vale para poder solicitar uno nuevo, y valida sin mandar tarjeta otra vez.
     $primerVale->fresh()->update(['estado' => 'pagado']);

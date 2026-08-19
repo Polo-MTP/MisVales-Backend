@@ -21,10 +21,10 @@ final class ClienteResource extends JsonResource
         return [
             'id' => $this->id,
             'estado' => $this->estado,
-            // Nunca el número completo: es un dato bancario sensible (cifrado en BD). Solo se
+            // Nunca la CLABE completa: es un dato bancario sensible (cifrada en BD). Solo se
             // exponen los últimos 4 dígitos, para que el front pueda confirmar "ya la tenemos
-            // registrada" sin tener que volver a mostrar/transmitir la tarjeta completa.
-            'numero_tarjeta_ultimos4' => $this->numero_tarjeta ? mb_substr((string) $this->numero_tarjeta, -4) : null,
+            // registrada" sin tener que volver a mostrar/transmitir la CLABE completa.
+            'clabe_ultimos4' => $this->clabe ? mb_substr((string) $this->clabe, -4) : null,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
             'datos_personales' => [

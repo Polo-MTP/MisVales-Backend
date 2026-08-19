@@ -88,10 +88,10 @@ final class ValeService
      * obligatorio antes de poder autorizarlo/pagarlo, no se puede saltar directo a autorizar.
      *
      * El pago del vale se transfiere al cliente, así que la primera vez que se valida un vale
-     * suyo se le pide su número de tarjeta/cuenta; queda guardado (cifrado) en el cliente para
-     * los vales futuros, no hace falta volver a capturarlo cada vez.
+     * suyo se le pide su CLABE interbancaria; queda guardada (cifrada) en el cliente para los
+     * vales futuros, no hace falta volver a capturarla cada vez.
      */
-    public function validar(Vale $vale, User $usuario, ?string $numeroTarjeta = null): Vale
+    public function validar(Vale $vale, User $usuario, ?string $clabe = null): Vale
     {
         if ($vale->estado !== 'solicitado') {
             abort(422, "Solo se pueden validar vales en estado 'solicitado' (actual: {$vale->estado}).");
@@ -100,12 +100,12 @@ final class ValeService
         /** @var Cliente $cliente */
         $cliente = $vale->cliente;
 
-        if (! $cliente->numero_tarjeta) {
-            if (! $numeroTarjeta) {
-                abort(422, 'Este cliente no tiene número de tarjeta registrado. Captúralo para poder validar y transferirle el pago.');
+        if (! $cliente->clabe) {
+            if (! $clabe) {
+                abort(422, 'Este cliente no tiene CLABE interbancaria registrada. Captúrala para poder validar y transferirle el pago.');
             }
 
-            $cliente->numero_tarjeta = $numeroTarjeta;
+            $cliente->clabe = $clabe;
             $cliente->save();
         }
 

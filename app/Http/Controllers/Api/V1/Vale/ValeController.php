@@ -54,7 +54,7 @@ final class ValeController extends ApiController
 
     /**
      * Valida los datos del cliente en persona — paso previo obligatorio para poder autorizar.
-     * Si es el primer vale validado del cliente, exige su número de tarjeta/cuenta para poder
+     * Si es el primer vale validado del cliente, exige su CLABE interbancaria para poder
      * transferirle el pago.
      */
     public function validar(Vale $vale, ValidarValeRequest $request): JsonResponse
@@ -62,7 +62,7 @@ final class ValeController extends ApiController
         /** @var User $usuario */
         $usuario = $request->user();
 
-        $vale = $this->valeService->validar($vale, $usuario, $request->validated('numero_tarjeta'));
+        $vale = $this->valeService->validar($vale, $usuario, $request->validated('clabe'));
 
         return $this->success(
             data: new ValeResource($vale),

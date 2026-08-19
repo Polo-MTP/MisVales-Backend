@@ -792,11 +792,11 @@
             "header": [{ "key": "Accept", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"numero_tarjeta\": \"4152313312345678\"\n}",
+              "raw": "{\n  \"clabe\": \"032180000118359719\"\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": { "raw": "{{base_url}}/vales/{{vale_id}}/validar", "host": ["{{base_url}}"], "path": ["vales", "{{vale_id}}", "validar"] },
-            "description": "Rol: Cajera. Sin VPN, responde desde red pública. Paso obligatorio antes de autorizar. numero_tarjeta es opcional en el body, pero obligatorio de facto la primera vez que se valida un vale de ese cliente (si aún no tiene uno guardado) — se guarda cifrado y no se vuelve a pedir después."
+            "description": "Rol: Cajera. Sin VPN, responde desde red pública. Paso obligatorio antes de autorizar. clabe (18 dígitos) es opcional en el body, pero obligatoria de facto la primera vez que se valida un vale de ese cliente (si aún no tiene una guardada) — se guarda cifrada y no se vuelve a pedir después."
           }
         },
         {

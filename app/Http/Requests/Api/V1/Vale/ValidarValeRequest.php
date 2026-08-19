@@ -17,8 +17,8 @@ final class ValidarValeRequest extends FormRequest
     }
 
     /**
-     * numero_tarjeta es opcional aquí a propósito: solo es obligatorio la primera vez que se
-     * valida un vale del cliente (si aún no tiene uno registrado) — esa regla vive en
+     * clabe es opcional aquí a propósito: solo es obligatoria la primera vez que se valida un
+     * vale del cliente (si aún no tiene una registrada) — esa regla vive en
      * ValeService::validar(), no aquí, porque depende de datos ya guardados del cliente.
      *
      * @return array<string, mixed>
@@ -26,7 +26,18 @@ final class ValidarValeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'numero_tarjeta' => ['nullable', 'string', 'max:30'],
+            // La CLABE interbancaria mexicana siempre son 18 dígitos, formato fijo.
+            'clabe' => ['nullable', 'digits:18'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'clabe.digits' => 'La CLABE interbancaria debe tener exactamente 18 dígitos.',
         ];
     }
 }
