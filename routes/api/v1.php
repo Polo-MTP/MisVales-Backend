@@ -251,6 +251,22 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware(['role:Gerente de Sucursal,Gerente General', 'vpn'])
             ->name('api.v1.distribuidoras.reasignar_coordinador');
 
+        // Solicitud de aumento de crédito: la distribuidora (o su coordinador) pide, el
+        // gerente decide el monto otorgado. Debe ir ANTES de {distribuidora} por la misma
+        // razón que reasignar-coordinador: si no, el wildcard se comería "aumento-credito".
+        Route::get('aumento-credito', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudAumentoCreditoController::class, 'index'])
+            ->middleware('role:Distribuidora,Coordinador,Gerente de Sucursal,Gerente General')
+            ->name('api.v1.distribuidoras.aumento_credito.index');
+
+        Route::post('{distribuidora}/aumento-credito', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudAumentoCreditoController::class, 'store'])
+            ->middleware('role:Distribuidora,Coordinador')
+            ->name('api.v1.distribuidoras.aumento_credito.store');
+
+        // Decisión del gerente — decisión de autorización, va con VPN igual que el resto.
+        Route::put('aumento-credito/{solicitud}/decidir', [App\Http\Controllers\Api\V1\Distribuidora\SolicitudAumentoCreditoController::class, 'decidir'])
+            ->middleware(['role:Gerente de Sucursal,Gerente General', 'vpn'])
+            ->name('api.v1.distribuidoras.aumento_credito.decidir');
+
         // Detalle, actualización y eliminación (con autorización por política)
         Route::get('{distribuidora}', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'show'])
             ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General')

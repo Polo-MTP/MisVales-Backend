@@ -15,6 +15,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'limite_credito_anterior',
     'monto_solicitado',
     'motivo',
+    'estado',
+    'monto_otorgado',
+    'decidido_por',
+    'comentario_decision',
+    'fecha_decision',
 ])]
 final class SolicitudAumentoCredito extends Model
 {
