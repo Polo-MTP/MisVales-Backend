@@ -13,8 +13,18 @@ return new class extends Migration
         Schema::create('solicitudes_transferencia_cliente', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('cliente_id')->constrained('clientes')->cascadeOnDelete();
-            $table->foreignId('distribuidora_origen_id')->constrained('distribuidoras')->cascadeOnDelete();
-            $table->foreignId('distribuidora_destino_id')->constrained('distribuidoras')->cascadeOnDelete();
+
+            // Nombre de constraint autogenerado por Laravel ("solicitudes_transferencia_cliente_
+            // distribuidora_origen_id_foreign") pasa de 64 caracteres, el límite de MySQL para
+            // identificadores -- de ahí el nombre corto explícito en estas dos.
+            $table->foreignId('distribuidora_origen_id');
+            $table->foreign('distribuidora_origen_id', 'sol_trans_orig_fk')
+                ->references('id')->on('distribuidoras')->cascadeOnDelete();
+
+            $table->foreignId('distribuidora_destino_id');
+            $table->foreign('distribuidora_destino_id', 'sol_trans_dest_fk')
+                ->references('id')->on('distribuidoras')->cascadeOnDelete();
+
             $table->foreignId('solicitado_por')->constrained('users')->cascadeOnDelete();
             $table->string('motivo', 500)->nullable();
             // pendiente_autorizacion -> autorizada -> aceptada (o rechazada en cualquiera de los 2 primeros pasos)
