@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Distribuidora;
 
 use App\Models\Distribuidora;
+use App\Models\HistorialCoordinador;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\UploadedFile;
@@ -112,6 +113,66 @@ final class DistribuidoraService
     public function obtenerSaldoDisponible(Distribuidora $distribuidora): float
     {
         return $distribuidora->credito_disponible; // accesor del modelo
+    }
+
+    /**
+     * Mueve TODA la cartera de distribuidoras de un coordinador a otro de un solo golpe.
+     * Pensado para cuando un coordinador deja la empresa/sucursal: en vez de reasignar
+     * distribuidora por distribuidora, el Gerente lo hace de una vez. Cierra el periodo
+     * vigente en historial_coordinador de cada distribuidora y abre uno nuevo, igual que se
+     * hace en la asignación inicial (SolicitudProveedorService::aprobar).
+     */
+    public function reasignarCoordinador(User $coordinadorOrigen, User $coordinadorDestino, User $usuario): int
+    {
+        $rolUsuario = $usuario->role?->name;
+
+        if (! in_array($rolUsuario, ['Gerente de Sucursal', 'Gerente General'], true)) {
+            abort(403, 'Solo un Gerente puede reasignar la cartera de un coordinador.');
+        }
+
+        if ($coordinadorOrigen->role?->name !== 'Coordinador' || $coordinadorDestino->role?->name !== 'Coordinador') {
+            abort(422, 'Ambos usuarios deben tener el rol Coordinador.');
+        }
+
+        if ($coordinadorOrigen->id === $coordinadorDestino->id) {
+            abort(422, 'El coordinador destino debe ser diferente del coordinador de origen.');
+        }
+
+        if ($coordinadorDestino->sucursal_id !== $coordinadorOrigen->sucursal_id) {
+            abort(422, 'El coordinador destino debe pertenecer a la misma sucursal que el de origen.');
+        }
+
+        if ($rolUsuario === 'Gerente de Sucursal' && $coordinadorOrigen->sucursal_id !== $usuario->sucursal_id) {
+            abort(403, 'Solo puedes reasignar coordinadores de tu propia sucursal.');
+        }
+
+        return DB::transaction(function () use ($coordinadorOrigen, $coordinadorDestino, $usuario): int {
+            $distribuidoras = Distribuidora::query()
+                ->where('coordinador_id', $coordinadorOrigen->id)
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($distribuidoras as $distribuidora) {
+                $distribuidora->coordinador_id = $coordinadorDestino->id;
+                $distribuidora->save();
+
+                HistorialCoordinador::query()
+                    ->where('distribuidor_id', $distribuidora->usuario_id)
+                    ->where('coordinador_id', $coordinadorOrigen->id)
+                    ->whereNull('fecha_fin')
+                    ->update(['fecha_fin' => now()]);
+
+                HistorialCoordinador::query()->create([
+                    'distribuidor_id' => $distribuidora->usuario_id,
+                    'coordinador_id' => $coordinadorDestino->id,
+                    'fecha_inicio' => now(),
+                    'asignado_por' => $usuario->id,
+                    'motivo' => "Reasignación masiva de cartera (coordinador #{$coordinadorOrigen->id} dejó de operar).",
+                ]);
+            }
+
+            return $distribuidoras->count();
+        });
     }
 
     /**

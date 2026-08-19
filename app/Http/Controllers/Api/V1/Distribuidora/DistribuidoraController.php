@@ -8,9 +8,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Distribuidora\DistribuidoraCreditoRequest;
 use App\Http\Requests\Api\V1\Distribuidora\DistribuidoraEstadoRequest;
 use App\Http\Requests\Api\V1\Distribuidora\DistribuidoraUpdateRequest;
+use App\Http\Requests\Api\V1\Distribuidora\ReasignarCoordinadorRequest;
 use App\Http\Requests\Api\V1\Distribuidora\SubirContratoRequest;
 use App\Http\Resources\Distribuidora\DistribuidoraResource;
 use App\Models\Distribuidora;
+use App\Models\User;
 use App\Services\Distribuidora\DistribuidoraService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -118,6 +120,25 @@ final class DistribuidoraController extends Controller
     public function saldoDisponible(Distribuidora $distribuidora): JsonResponse
     {
         return response()->json($this->distribuidoraService->obtenerSaldoDisponible($distribuidora));
+    }
+
+    /**
+     * POST /api/v1/distribuidoras/reasignar-coordinador
+     */
+    public function reasignarCoordinador(ReasignarCoordinadorRequest $request): JsonResponse
+    {
+        $coordinadorOrigen = User::query()->findOrFail($request->integer('coordinador_origen_id'));
+        $coordinadorDestino = User::query()->findOrFail($request->integer('coordinador_destino_id'));
+
+        /** @var User $usuario */
+        $usuario = $request->user();
+
+        $total = $this->distribuidoraService->reasignarCoordinador($coordinadorOrigen, $coordinadorDestino, $usuario);
+
+        return response()->json([
+            'message' => "{$total} distribuidora(s) reasignada(s) de {$coordinadorOrigen->name} a {$coordinadorDestino->name}.",
+            'data' => ['distribuidoras_reasignadas' => $total],
+        ]);
     }
 
     /**

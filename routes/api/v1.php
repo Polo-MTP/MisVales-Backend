@@ -220,6 +220,13 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General,Cajera')
             ->name('api.v1.distribuidoras.index');
 
+        // Reasignación masiva de cartera de un coordinador a otro (p.ej. el coordinador deja
+        // la sucursal/empresa). Debe ir ANTES de {distribuidora} para no ser capturada por el
+        // wildcard. Es una decisión gerencial, no operación de rutina: va con VPN.
+        Route::post('reasignar-coordinador', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'reasignarCoordinador'])
+            ->middleware(['role:Gerente de Sucursal,Gerente General', 'vpn'])
+            ->name('api.v1.distribuidoras.reasignar_coordinador');
+
         // Detalle, actualización y eliminación (con autorización por política)
         Route::get('{distribuidora}', [App\Http\Controllers\Api\V1\Distribuidora\DistribuidoraController::class, 'show'])
             ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General')
