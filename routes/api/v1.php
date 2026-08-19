@@ -119,6 +119,12 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware('role:Distribuidora,Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.distribuidora.clientes.transferencias.index');
 
+        // Búsqueda por CURP exacta fuera de la cartera propia — para poder solicitar la
+        // transferencia de un cliente de otra distribuidora. Misma razón de orden que arriba.
+        Route::get('clientes/buscar-por-curp', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'buscarPorCurp'])
+            ->middleware('role:Distribuidora')
+            ->name('api.v1.distribuidora.clientes.buscar_por_curp');
+
         Route::get('clientes/{id}', [App\Http\Controllers\Api\V1\Distribuidora\ClienteController::class, 'show'])
             ->middleware('role:Distribuidora,Gerente General,Gerente de Sucursal,Cajera')
             ->name('api.v1.distribuidora.clientes.show');
@@ -378,8 +384,10 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
     // MÓDULO 8: CONCILIACIÓN BANCARIA (importación del Excel del banco)
     // ============================================================
     Route::prefix('conciliaciones')->group(function (): void {
+        // Distribuidora incluida a propósito: necesita ver sus propios abonos para poder
+        // levantar una queja sobre uno (el controller la restringe a solo los suyos).
         Route::get('/', [ConciliacionController::class, 'index'])
-            ->middleware('role:Cajera,Coordinador,Gerente de Sucursal,Gerente General')
+            ->middleware('role:Distribuidora,Cajera,Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.conciliaciones.index');
 
         Route::post('importar', [ConciliacionController::class, 'importar'])

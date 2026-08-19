@@ -39,6 +39,21 @@ final class ClienteService
     }
 
     /**
+     * Busca UN cliente por CURP exacta, sin importar de qué distribuidora sea — a diferencia de
+     * listarClientes(), que solo muestra la cartera propia. Se usa para solicitar la transferencia
+     * de un cliente que hoy pertenece a otra distribuidora: se exige coincidencia exacta (no
+     * búsqueda parcial por nombre) para no dejar "hojear" la cartera ajena, solo confirmar un
+     * cliente puntual del que ya se tiene la CURP de otra fuente (ej. el cliente te la dio).
+     */
+    public function buscarPorCurpExacta(string $curp): ?Cliente
+    {
+        return Cliente::query()
+            ->with(['datosPersonales.direccion', 'historialDistribuidoras.distribuidora'])
+            ->whereHas('datosPersonales', fn ($q) => $q->where('curp', $curp))
+            ->first();
+    }
+
+    /**
      * Registra un nuevo cliente para una distribuidora.
      *
      * @param  array<string, mixed>  $data

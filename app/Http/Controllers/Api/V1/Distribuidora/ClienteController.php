@@ -131,6 +131,30 @@ final class ClienteController extends ApiController
     }
 
     /**
+     * Busca un cliente por CURP exacta sin importar la distribuidora, para poder solicitar su
+     * transferencia. No es un listado navegable de otras carteras — exige coincidencia exacta.
+     */
+    public function buscarPorCurp(Request $request): JsonResponse
+    {
+        $curp = mb_strtoupper((string) $request->query('curp', ''));
+
+        if (mb_strlen($curp) !== 18) {
+            return $this->error('Captura la CURP completa (18 caracteres).', 422);
+        }
+
+        $cliente = $this->clienteService->buscarPorCurpExacta($curp);
+
+        if (! $cliente) {
+            return $this->error('No se encontró ningún cliente con esa CURP.', 404);
+        }
+
+        return $this->success(
+            data: new ClienteResource($cliente),
+            message: 'Cliente encontrado.'
+        );
+    }
+
+    /**
      * Devuelve (creando si hace falta) el perfil de distribuidora del usuario autenticado.
      */
     public function miPerfil(Request $request): JsonResponse

@@ -29,11 +29,21 @@ final class ConciliacionController extends ApiController
     ) {}
 
     /**
-     * Lista los abonos de conciliación bancaria, filtrables por estado y relación.
+     * Lista los abonos de conciliación bancaria, filtrables por estado y relación. La
+     * Distribuidora solo ve los suyos (para poder levantar queja sobre uno); el staff los ve
+     * todos.
      */
     public function index(Request $request): JsonResponse
     {
+        /** @var User $usuario */
+        $usuario = $request->user();
+
         $query = AbonoConciliacion::query()->with(['convenioBancario', 'autorizadoPor']);
+
+        if ($usuario->role?->name === 'Distribuidora') {
+            $distribuidoraId = $usuario->distribuidora?->id ?? 0;
+            $query->whereHas('relacion', fn ($q) => $q->where('distribuidora_id', $distribuidoraId));
+        }
 
         if ($request->filled('estado')) {
             $query->where('estado', $request->string('estado'));
