@@ -101,6 +101,29 @@ final class ConciliacionBancariaService
     }
 
     /**
+     * La distribuidora reporta que un abono no coincide con lo que ella realmente pagó. Es
+     * solo el punto de entrada informativo — la cajera sigue siendo quien de verdad dispara
+     * SolicitudConciliacionService::solicitar()/ConciliacionBancariaService::conciliarManual()
+     * para corregirlo; esto no reemplaza ese flujo, solo deja constancia de quién y por qué
+     * lo reportó, visible para la cajera en el listado de abonos.
+     */
+    public function levantarQueja(AbonoConciliacion $abono, User $distribuidoraUsuario, string $motivo): AbonoConciliacion
+    {
+        $distribuidoraId = $distribuidoraUsuario->distribuidora?->id;
+
+        if (! $distribuidoraId || $abono->relacion?->distribuidora_id !== $distribuidoraId) {
+            abort(403, 'Este abono no pertenece a tu distribuidora.');
+        }
+
+        $abono->queja_por = $distribuidoraUsuario->id;
+        $abono->queja_motivo = $motivo;
+        $abono->queja_fecha = now();
+        $abono->save();
+
+        return $abono->fresh(['relacion', 'quejaPor']);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function mapearFila(array $encabezado, array $fila): array

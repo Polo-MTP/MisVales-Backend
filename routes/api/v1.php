@@ -343,6 +343,12 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
             ->middleware('role:Cajera')
             ->name('api.v1.conciliaciones.solicitar_autorizacion');
 
+        // La distribuidora reporta que un abono no coincide con lo que ella pagó — solo
+        // informativo, no dispara la corrección por sí solo (eso lo sigue haciendo la cajera).
+        Route::post('{abono}/queja', [ConciliacionController::class, 'levantarQueja'])
+            ->middleware('role:Distribuidora')
+            ->name('api.v1.conciliaciones.queja');
+
         // Endpoint de decisión (aprobar/rechazar) — confirmado por infra como uno de los
         // que solo debe contestar por VPN. La restricción real va en el firewall del
         // droplet; 'vpn' es la segunda capa (ver VerifyVpnAccess), no-op hasta que

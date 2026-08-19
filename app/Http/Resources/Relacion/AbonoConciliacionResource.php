@@ -28,6 +28,11 @@ final class AbonoConciliacionResource extends JsonResource
             'convenio_bancario' => $this->convenioBancario?->banco,
             'autorizado_por' => $this->autorizadoPor?->name,
             'motivo_manual' => $this->motivo_manual,
+            'queja' => $this->queja_por ? [
+                'reportado_por' => $this->quejaPor?->name,
+                'motivo' => $this->queja_motivo,
+                'fecha' => $this->queja_fecha?->toIso8601String(),
+            ] : null,
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }

@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Api\V1\Relacion\DecidirSolicitudConciliacionRequest;
 use App\Http\Requests\Api\V1\Relacion\EjecutarConciliacionManualRequest;
 use App\Http\Requests\Api\V1\Relacion\ImportarConciliacionRequest;
+use App\Http\Requests\Api\V1\Relacion\LevantarQuejaAbonoRequest;
 use App\Http\Requests\Api\V1\Relacion\SolicitarConciliacionRequest;
 use App\Http\Resources\Relacion\AbonoConciliacionResource;
 use App\Http\Resources\Relacion\SolicitudConciliacionResource;
@@ -109,6 +110,23 @@ final class ConciliacionController extends ApiController
         } catch (DomainException $e) {
             return $this->error($e->getMessage());
         }
+    }
+
+    /**
+     * La distribuidora reporta que un abono no coincide con lo que ella pagó. Es solo un
+     * reporte informativo — no ejecuta ninguna corrección por sí solo, avisa a la cajera.
+     */
+    public function levantarQueja(LevantarQuejaAbonoRequest $request, AbonoConciliacion $abono): JsonResponse
+    {
+        /** @var User $usuario */
+        $usuario = $request->user();
+
+        $abono = $this->conciliacionService->levantarQueja($abono, $usuario, (string) $request->string('motivo'));
+
+        return $this->success(
+            data: new AbonoConciliacionResource($abono),
+            message: 'Queja registrada. La cajera de tu sucursal iniciará la conciliación manual.'
+        );
     }
 
     /**
