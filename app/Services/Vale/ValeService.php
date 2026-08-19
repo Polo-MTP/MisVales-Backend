@@ -86,15 +86,26 @@ final class ValeService
     /**
      * La cajera valida en persona los datos del cliente contra el vale solicitado — paso
      * obligatorio antes de poder autorizarlo/pagarlo, no se puede saltar directo a autorizar.
+     * Debe confirmar explícitamente que revisó la INE y el comprobante de domicilio del
+     * cliente (no se puede validar si alguno de los dos falta o no coincide).
      *
      * El pago del vale se transfiere al cliente, así que la primera vez que se valida un vale
      * suyo se le pide su CLABE interbancaria; queda guardada (cifrada) en el cliente para los
      * vales futuros, no hace falta volver a capturarla cada vez.
      */
-    public function validar(Vale $vale, User $usuario, ?string $clabe = null): Vale
-    {
+    public function validar(
+        Vale $vale,
+        User $usuario,
+        ?string $clabe = null,
+        ?bool $ineVerificada = null,
+        ?bool $comprobanteDomicilioVerificado = null,
+    ): Vale {
         if ($vale->estado !== 'solicitado') {
             abort(422, "Solo se pueden validar vales en estado 'solicitado' (actual: {$vale->estado}).");
+        }
+
+        if ($ineVerificada === false || $comprobanteDomicilioVerificado === false) {
+            abort(422, 'No se puede validar el vale: la INE y el comprobante de domicilio del cliente deben coincidir. Corrige los datos o pide autorización para editarlos antes de continuar.');
         }
 
         /** @var Cliente $cliente */
@@ -112,6 +123,8 @@ final class ValeService
         $vale->estado = 'validado';
         $vale->validado_por = $usuario->id;
         $vale->fecha_validacion = now();
+        $vale->ine_verificada = $ineVerificada;
+        $vale->comprobante_domicilio_verificado = $comprobanteDomicilioVerificado;
         $vale->save();
 
         return $vale->fresh(['distribuidora', 'cliente.datosPersonales', 'producto']);

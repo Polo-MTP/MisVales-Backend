@@ -125,6 +125,36 @@ it('exige CLABE interbancaria la primera vez que se valida un vale del cliente',
     expect($cliente->fresh()->clabe)->toBeNull();
 });
 
+it('no permite validar si la cajera marca que la INE o el comprobante no coinciden', function (): void {
+    [$distribuidora, $cliente, $cajera] = crearDistribuidoraConClienteYCajera();
+    $producto = Producto::create(['monto' => 500, 'quincenas' => 4, 'descripcion' => 'Test', 'activo' => true, 'created_by' => $distribuidora->usuario_id]);
+
+    $vale = app(ValeService::class)->solicitar([
+        'cliente_id' => $cliente->id,
+        'producto_id' => $producto->id,
+    ], $distribuidora->usuario);
+
+    expect(fn () => app(ValeService::class)->validar($vale, $cajera, '032180000118359719', false, true))
+        ->toThrow(HttpException::class, 'No se puede validar el vale: la INE y el comprobante de domicilio del cliente deben coincidir. Corrige los datos o pide autorización para editarlos antes de continuar.');
+
+    expect($vale->fresh()->estado)->toBe('solicitado');
+});
+
+it('registra que la cajera revisó INE y comprobante de domicilio al validar', function (): void {
+    [$distribuidora, $cliente, $cajera] = crearDistribuidoraConClienteYCajera();
+    $producto = Producto::create(['monto' => 500, 'quincenas' => 4, 'descripcion' => 'Test', 'activo' => true, 'created_by' => $distribuidora->usuario_id]);
+
+    $vale = app(ValeService::class)->solicitar([
+        'cliente_id' => $cliente->id,
+        'producto_id' => $producto->id,
+    ], $distribuidora->usuario);
+
+    $vale = app(ValeService::class)->validar($vale, $cajera, '032180000118359719', true, true);
+
+    expect($vale->ine_verificada)->toBeTrue()
+        ->and($vale->comprobante_domicilio_verificado)->toBeTrue();
+});
+
 it('guarda la CLABE cifrada en el cliente y no la vuelve a pedir en un vale futuro', function (): void {
     [$distribuidora, $cliente, $cajera] = crearDistribuidoraConClienteYCajera();
     $producto = Producto::create(['monto' => 500, 'quincenas' => 4, 'descripcion' => 'Test', 'activo' => true, 'created_by' => $distribuidora->usuario_id]);

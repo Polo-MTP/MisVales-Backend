@@ -43,6 +43,8 @@ final class ValeResource extends JsonResource
             'fecha_solicitud' => $this->fecha_solicitud?->toIso8601String(),
             'validado_por' => $this->validado_por,
             'fecha_validacion' => $this->fecha_validacion?->toIso8601String(),
+            'ine_verificada' => $this->ine_verificada,
+            'comprobante_domicilio_verificado' => $this->comprobante_domicilio_verificado,
             'fecha_autorizacion' => $this->fecha_autorizacion?->toIso8601String(),
             'numero_transferencia' => $this->numero_transferencia,
             'created_at' => $this->created_at?->toIso8601String(),

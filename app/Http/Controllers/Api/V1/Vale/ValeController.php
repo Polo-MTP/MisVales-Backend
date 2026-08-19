@@ -62,7 +62,13 @@ final class ValeController extends ApiController
         /** @var User $usuario */
         $usuario = $request->user();
 
-        $vale = $this->valeService->validar($vale, $usuario, $request->validated('clabe'));
+        $vale = $this->valeService->validar(
+            $vale,
+            $usuario,
+            $request->validated('clabe'),
+            $request->validated('ine_verificada'),
+            $request->validated('comprobante_domicilio_verificado'),
+        );
 
         return $this->success(
             data: new ValeResource($vale),
