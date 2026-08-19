@@ -786,12 +786,26 @@
           }
         },
         {
+          "name": "Validar datos del cliente",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"numero_tarjeta\": \"4152313312345678\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/vales/{{vale_id}}/validar", "host": ["{{base_url}}"], "path": ["vales", "{{vale_id}}", "validar"] },
+            "description": "Rol: Cajera. Sin VPN, responde desde red pública. Paso obligatorio antes de autorizar. numero_tarjeta es opcional en el body, pero obligatorio de facto la primera vez que se valida un vale de ese cliente (si aún no tiene uno guardado) — se guarda cifrado y no se vuelve a pedir después."
+          }
+        },
+        {
           "name": "Autorizar vale",
           "request": {
             "method": "PUT",
             "header": [{ "key": "Accept", "value": "application/json" }],
             "url": { "raw": "{{base_url}}/vales/{{vale_id}}/autorizar", "host": ["{{base_url}}"], "path": ["vales", "{{vale_id}}", "autorizar"] },
-            "description": "Rol: Cajera (solo quien atiende en caja — ni Coordinador ni gerencia). Sin VPN, responde desde red pública."
+            "description": "Rol: Cajera (solo quien atiende en caja — ni Coordinador ni gerencia). Sin VPN, responde desde red pública. Requiere que el vale ya esté 'validado'."
           }
         },
         {

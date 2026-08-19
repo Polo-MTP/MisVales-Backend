@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1\Vale;
 
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Api\V1\Vale\SolicitarValeRequest;
+use App\Http\Requests\Api\V1\Vale\ValidarValeRequest;
 use App\Http\Resources\Vale\ValeResource;
 use App\Models\User;
 use App\Models\Vale;
@@ -53,13 +54,15 @@ final class ValeController extends ApiController
 
     /**
      * Valida los datos del cliente en persona — paso previo obligatorio para poder autorizar.
+     * Si es el primer vale validado del cliente, exige su número de tarjeta/cuenta para poder
+     * transferirle el pago.
      */
-    public function validar(Vale $vale, Request $request): JsonResponse
+    public function validar(Vale $vale, ValidarValeRequest $request): JsonResponse
     {
         /** @var User $usuario */
         $usuario = $request->user();
 
-        $vale = $this->valeService->validar($vale, $usuario);
+        $vale = $this->valeService->validar($vale, $usuario, $request->validated('numero_tarjeta'));
 
         return $this->success(
             data: new ValeResource($vale),

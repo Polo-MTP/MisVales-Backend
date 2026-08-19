@@ -48,9 +48,10 @@ permitidos, body de ejemplo, respuesta esperada y un `curl` listo para copiar.
 2. `POST /distribuidora/clientes` (rol Distribuidora) → crea un cliente.
 3. `POST /productos` (rol Gerente General) → crea un producto del catálogo.
 4. `POST /vales` (rol Distribuidora) → solicita un vale con ese cliente/producto.
-5. `PUT /vales/{vale}/autorizar` (rol Cajera) → autoriza/paga el vale.
-6. `POST /relaciones/generar` (rol Gerente General) → genera el corte de esa distribuidora.
-7. `POST /conciliaciones/importar` o el flujo manual (`solicitar-autorizacion` → `decidir` →
+5. `PUT /vales/{vale}/validar` (rol Cajera) → valida los datos y captura el número de tarjeta.
+6. `PUT /vales/{vale}/autorizar` (rol Cajera) → autoriza/paga el vale.
+7. `POST /relaciones/generar` (rol Gerente General) → genera el corte de esa distribuidora.
+8. `POST /conciliaciones/importar` o el flujo manual (`solicitar-autorizacion` → `decidir` →
    `conciliar-manual`) → concilia el pago y liquida la relación.
 
 ---
@@ -380,10 +381,22 @@ distribuidora, si excede el crédito disponible / el límite del primer vale, o 
 tiene otro vale sin liquidar** (cualquier estado que no sea `pagado`) — un cliente solo puede tener
 un vale activo/pendiente a la vez.
 
+### `PUT /vales/{vale}/validar`
+Rol: Cajera. Sin VPN, responde desde red pública. Paso obligatorio antes de poder autorizar — no
+se puede saltar directo de `solicitado` a `autorizado`.
+```json
+{ "numero_tarjeta": "4152313312345678" }
+```
+`numero_tarjeta` es **opcional en el body**, pero **obligatorio de facto la primera vez** que se
+valida un vale de ese cliente: si el cliente todavía no tiene uno guardado y no lo mandas, la
+API responde `422` ("Este cliente no tiene número de tarjeta registrado..."). Se guarda cifrado
+en el cliente (mismo criterio que el secreto TOTP) y no se vuelve a pedir en vales futuros del
+mismo cliente — el pago del vale se transfiere a esa tarjeta/cuenta.
+
 ### `PUT /vales/{vale}/autorizar`
 Rol: Cajera (solo quien atiende al cliente en caja — ni Coordinador ni gerencia). Sin VPN, responde
-desde red pública. Sin body. Pasa `estado` a `autorizado` — desde aquí cuenta contra el crédito
-disponible.
+desde red pública. Sin body. Requiere que el vale ya esté `validado` (paso anterior) — pasa
+`estado` a `autorizado`, desde aquí cuenta contra el crédito disponible.
 
 ### `PUT /vales/{vale}/desactivar`
 Rol: Distribuidora (dueña del vale). Solo mientras sigue en `solicitado`.

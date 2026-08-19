@@ -20,8 +20,15 @@ final class Cliente extends Model
 
     protected $table = 'clientes';
 
+    /**
+     * numero_tarjeta queda fuera de Fillable a propósito: solo lo escribe
+     * ValeService::validar() la primera vez que la cajera valida un vale del cliente,
+     * nunca debe venir de mass-assignment de un request. Se guarda cifrado (mismo
+     * criterio que MfaMethod.secret) por ser un dato bancario sensible.
+     */
     protected $casts = [
         'estado' => 'boolean',
+        'numero_tarjeta' => 'encrypted',
     ];
 
     /**
