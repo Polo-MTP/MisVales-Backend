@@ -27,7 +27,7 @@ function crearDistribuidoraRelCajera(Sucursal $sucursal, string $numero): Distri
 {
     $categoria = CategoriaDistribuidora::create(['nombre' => 'PLATA-'.uniqid(), 'porcentaje_comision' => 6, 'activo' => true]);
     $role = Role::firstOrCreate(['name' => 'Distribuidora']);
-    $user = User::factory()->create(['role_id' => $role->id, 'sucursal_id' => $sucursal->id]);
+    $user = User::factory()->create(['role_id' => $role->id, 'sucursal_id' => $sucursal->id, 'is_active' => true]);
 
     return Distribuidora::create([
         'usuario_id' => $user->id, 'numero_distribuidora' => $numero, 'limite_credito' => 20000,
@@ -111,4 +111,51 @@ it('la cajera sí puede ver el detalle de una relación de su propia sucursal', 
     $this->getJson("/api/v1/relaciones/{$relacion->id}")
         ->assertStatus(200)
         ->assertJsonPath('data.referencia_pago', 'REF-A-001');
+});
+
+/**
+ * Antes, GET /relaciones y GET /relaciones/{id} estaban cerrados también para Distribuidora —
+ * no tenía forma de ver cuánto le tocaba pagar cada quincena ni la fecha límite. Ahora ve de
+ * solo lectura sus propios cortes.
+ */
+it('la distribuidora lista solo sus propias relaciones (lo que le toca pagar cada quincena)', function (): void {
+    $sucursal = crearSucursalRelCajera('SUC-A');
+    $distPropia = crearDistribuidoraRelCajera($sucursal, 'DIST-PROPIA');
+    $distAjena = crearDistribuidoraRelCajera($sucursal, 'DIST-AJENA');
+    crearRelacionCajera($distPropia, $sucursal, 'REF-PROPIA-001');
+    crearRelacionCajera($distAjena, $sucursal, 'REF-AJENA-001');
+
+    Sanctum::actingAs($distPropia->usuario);
+
+    $this->getJson('/api/v1/relaciones')
+        ->assertStatus(200)
+        ->assertJsonCount(1, 'data.data')
+        ->assertJsonPath('data.data.0.referencia_pago', 'REF-PROPIA-001');
+});
+
+it('la distribuidora no puede ver el detalle de una relación de otra distribuidora', function (): void {
+    $sucursal = crearSucursalRelCajera('SUC-A');
+    $distPropia = crearDistribuidoraRelCajera($sucursal, 'DIST-PROPIA');
+    $distAjena = crearDistribuidoraRelCajera($sucursal, 'DIST-AJENA');
+    $relacionAjena = crearRelacionCajera($distAjena, $sucursal, 'REF-AJENA-001');
+
+    Sanctum::actingAs($distPropia->usuario);
+
+    $this->getJson("/api/v1/relaciones/{$relacionAjena->id}")
+        ->assertStatus(403);
+});
+
+it('la distribuidora sí puede ver el detalle y los totales a pagar de su propia relación', function (): void {
+    $sucursal = crearSucursalRelCajera('SUC-A');
+    $dist = crearDistribuidoraRelCajera($sucursal, 'DIST-PROPIA');
+    $relacion = crearRelacionCajera($dist, $sucursal, 'REF-PROPIA-001');
+    $relacion->update(['total_a_pagar' => 3500, 'total_abonado' => 0]);
+
+    Sanctum::actingAs($dist->usuario);
+
+    $this->getJson("/api/v1/relaciones/{$relacion->id}")
+        ->assertStatus(200)
+        ->assertJsonPath('data.referencia_pago', 'REF-PROPIA-001')
+        ->assertJsonPath('data.fecha_limite_pago', '2026-02-16')
+        ->assertJsonPath('data.totales.a_pagar', '3500.00');
 });

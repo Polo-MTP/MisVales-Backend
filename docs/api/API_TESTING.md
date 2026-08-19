@@ -475,11 +475,14 @@ Rol: Distribuidora (dueña del vale).
 ## 12. Relaciones (Cortes / Estado de cuenta)
 
 ### `GET /relaciones`
-Roles: Cajera, Coordinador, Gerente de Sucursal, Gerente General. Query: `distribuidora_id`,
-`estado`, `referencia_pago` (búsqueda parcial), `per_page`.
+Roles: Distribuidora, Cajera, Coordinador, Gerente de Sucursal, Gerente General. Query:
+`distribuidora_id`, `estado`, `referencia_pago` (búsqueda parcial), `per_page`. Distribuidora ve
+**solo sus propios cortes** — es como sabe cuánto le toca pagar cada quincena (`totales.a_pagar`,
+`totales.saldo_pendiente`) y para cuándo (`fecha_limite_pago`); Cajera solo los de su sucursal.
 
 ### `GET /relaciones/{relacion}`
-Mismos roles. Incluye `detalles` (una cuota por vale del corte).
+Mismos roles/alcance que el listado (`403` si la relación no es tuya/de tu sucursal). Incluye
+`detalles` (una cuota por vale del corte).
 
 ### `POST /relaciones/generar`
 Rol: Gerente General. Body opcional: `distribuidora_id` (si se omite, genera el corte del día para

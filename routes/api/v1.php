@@ -360,12 +360,14 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
     // MÓDULO 7: RELACIÓN DE CÁLCULOS (cortes / estado de cuenta por distribuidora)
     // ============================================================
     Route::prefix('relaciones')->group(function (): void {
+        // Distribuidora incluida a propósito (igual que en conciliaciones): necesita ver sus
+        // propios cortes para saber cuánto le toca pagar cada quincena y para cuándo.
         Route::get('/', [RelacionController::class, 'index'])
-            ->middleware('role:Cajera,Coordinador,Gerente de Sucursal,Gerente General')
+            ->middleware('role:Distribuidora,Cajera,Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.relaciones.index');
 
         Route::get('{relacion}', [RelacionController::class, 'show'])
-            ->middleware('role:Cajera,Coordinador,Gerente de Sucursal,Gerente General')
+            ->middleware('role:Distribuidora,Cajera,Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.relaciones.show');
 
         // Disparo manual del corte (el disparo normal es automático vía comando programado). Administrador

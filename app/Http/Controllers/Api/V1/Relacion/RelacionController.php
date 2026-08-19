@@ -23,6 +23,8 @@ final class RelacionController extends ApiController
 
     /**
      * Lista los cortes (relaciones), filtrables por distribuidora, estado y referencia de pago.
+     * La Distribuidora solo ve los suyos (para saber cuánto le toca pagar cada quincena); el
+     * staff los ve según su alcance.
      */
     public function index(Request $request): JsonResponse
     {
@@ -35,6 +37,10 @@ final class RelacionController extends ApiController
         // (ver flujo de conciliación manual), pero solo dentro de su propia sucursal.
         if ($usuario->role?->name === 'Cajera') {
             $query->where('sucursal_id', $usuario->sucursal_id ?? 0);
+        }
+
+        if ($usuario->role?->name === 'Distribuidora') {
+            $query->where('distribuidora_id', $usuario->distribuidora?->id ?? 0);
         }
 
         if ($request->filled('distribuidora_id')) {
@@ -67,6 +73,10 @@ final class RelacionController extends ApiController
 
         if ($usuario->role?->name === 'Cajera' && $relacion->sucursal_id !== $usuario->sucursal_id) {
             abort(403, 'No puedes ver relaciones de otra sucursal.');
+        }
+
+        if ($usuario->role?->name === 'Distribuidora' && $relacion->distribuidora_id !== $usuario->distribuidora?->id) {
+            abort(403, 'No puedes ver relaciones de otra distribuidora.');
         }
 
         $relacion->load(['distribuidora', 'sucursal', 'categoriaSnapshot', 'detalles.vale', 'detalles.cliente.datosPersonales', 'detalles.producto']);

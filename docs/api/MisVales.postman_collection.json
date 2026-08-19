@@ -1000,7 +1000,7 @@
                 { "key": "referencia_pago", "value": "", "disabled": true }
               ]
             },
-            "description": "Roles: Cajera, Coordinador, Gerente de Sucursal, Gerente General."
+            "description": "Roles: Distribuidora, Cajera, Coordinador, Gerente de Sucursal, Gerente General. Distribuidora solo ve sus propios cortes; Cajera solo los de su sucursal."
           }
         },
         {
@@ -1008,7 +1008,8 @@
           "request": {
             "method": "GET",
             "header": [{ "key": "Accept", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/relaciones/{{relacion_id}}", "host": ["{{base_url}}"], "path": ["relaciones", "{{relacion_id}}"] }
+            "url": { "raw": "{{base_url}}/relaciones/{{relacion_id}}", "host": ["{{base_url}}"], "path": ["relaciones", "{{relacion_id}}"] },
+            "description": "Roles: Distribuidora, Cajera, Coordinador, Gerente de Sucursal, Gerente General. Distribuidora solo ve la suya (totales.a_pagar, saldo_pendiente, fecha_limite_pago); 403 si no le pertenece."
           }
         },
         {
