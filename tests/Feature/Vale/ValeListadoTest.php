@@ -7,6 +7,8 @@ use App\Models\Cliente;
 use App\Models\DatosPersonales;
 use App\Models\Direccion;
 use App\Models\Distribuidora;
+use App\Models\Relacion;
+use App\Models\RelacionDetalle;
 use App\Models\Role;
 use App\Models\Sucursal;
 use App\Models\User;
@@ -111,4 +113,57 @@ it('la cajera puede llegar por HTTP a GET /vales (antes solo Distribuidora/Coord
     $this->getJson('/api/v1/vales')
         ->assertStatus(200)
         ->assertJsonCount(1, 'data.data');
+});
+
+it('un vale sin corte todavía trae el pago quincenal estimado', function (): void {
+    $sucursal = crearSucursalListado('SUC-A');
+    $distribuidora = crearDistribuidoraValeListado($sucursal, 'DIST-A');
+    crearValeListado($distribuidora, 5000);
+
+    $cajera = crearUsuarioDeSucursal('Cajera', $sucursal);
+    Sanctum::actingAs($cajera);
+
+    $response = $this->getJson('/api/v1/vales');
+
+    $response->assertStatus(200);
+    $vale = $response->json('data.data.0');
+
+    expect($vale['cortes'])->toBe([])
+        ->and($vale['estimacion'])->not->toBeNull();
+
+    // categoria PLATA 6%, monto 5000, 4 quincenas, comisión/interés por defecto (10%/5%,
+    // sin config sembrada), sin seguro (sin SeguroTabla sembrada):
+    // capital=1250, comisión=125, interés=250, seguro=0, categoría=75 -> piso(1550)=1550
+    expect((float) $vale['estimacion']['pago_quincenal'])->toBe(1550.0)
+        ->and((float) $vale['estimacion']['total_estimado_plazo'])->toBe(6200.0);
+});
+
+it('un vale que ya entró a un corte NO trae estimación (ya tiene el desglose real en "cortes")', function (): void {
+    $sucursal = crearSucursalListado('SUC-A');
+    $distribuidora = crearDistribuidoraValeListado($sucursal, 'DIST-A');
+    $vale = crearValeListado($distribuidora, 5000);
+
+    $relacion = Relacion::create([
+        'distribuidora_id' => $distribuidora->id, 'sucursal_id' => $sucursal->id,
+        'referencia_pago' => 'REF-'.uniqid(), 'fecha_corte' => '2026-02-15', 'fecha_limite_pago' => '2026-02-16',
+        'limite_credito_snapshot' => 20000, 'estado' => 'pendiente',
+    ]);
+
+    RelacionDetalle::create([
+        'relacion_id' => $relacion->id, 'vale_id' => $vale->id, 'cliente_id' => $vale->cliente_id,
+        'cuota_numero' => 1, 'cuotas_totales' => 4, 'capital' => 1250, 'comision' => 125,
+        'interes' => 250, 'seguro' => 0, 'categoria' => 75, 'recargo' => 0, 'pago' => 0,
+        'total' => 1550, 'estado' => 'pendiente',
+    ]);
+
+    $cajera = crearUsuarioDeSucursal('Cajera', $sucursal);
+    Sanctum::actingAs($cajera);
+
+    $response = $this->getJson('/api/v1/vales');
+
+    $response->assertStatus(200);
+    $valeJson = $response->json('data.data.0');
+
+    expect($valeJson['cortes'])->toHaveCount(1)
+        ->and($valeJson['estimacion'])->toBeNull();
 });

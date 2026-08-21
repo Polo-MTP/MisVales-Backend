@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Resources\Vale;
 
 use App\Models\Vale;
+use App\Services\Relacion\RelacionCalculoService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -69,6 +70,35 @@ final class ValeResource extends JsonResource
                 'estado_cuota' => $detalle->estado,
                 'total' => $detalle->total,
             ])->values(),
+            // Mientras el vale no entre a ningún corte, 'cortes' viene vacío y no hay forma de
+            // saber cuánto va a tocar pagar por quincena -- ese desglose real recién se calcula
+            // al generarse el corte (RelacionCalculoService::calcularDetalleVale). Aquí se
+            // reutiliza la misma fórmula (simularPagoQuincenal) para dar un estimado mientras
+            // tanto, sin que el front tenga que ir a pedirlo aparte a /productos/{id}/simulacion.
+            'estimacion' => $this->relacionDetalles->isEmpty() ? $this->construirEstimacion() : null,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function construirEstimacion(): ?array
+    {
+        $quincenas = (int) ($this->quincenas ?? $this->producto?->quincenas ?? 0);
+
+        if ($quincenas < 1) {
+            return null;
+        }
+
+        $resultado = app(RelacionCalculoService::class)->simularPagoQuincenal(
+            (float) $this->monto,
+            $quincenas,
+            $this->distribuidora,
+        );
+
+        return [
+            ...$resultado,
+            'nota' => 'Estimado si paga puntual, con las reglas vigentes hoy. En cuanto este vale entre a un corte, "cortes" trae el desglose real.',
         ];
     }
 }
