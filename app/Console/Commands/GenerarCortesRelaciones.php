@@ -20,9 +20,16 @@ final class GenerarCortesRelaciones extends Command
     {
         $fecha = $this->option('fecha');
 
-        $generadas = $relacionCalculoService->generarCortesDelDia($fecha);
+        $resultado = $relacionCalculoService->generarCortesDelDia($fecha);
 
-        $this->info(count($generadas).' relación(es) generada(s).');
+        $this->info(count($resultado['generadas']).' relación(es) generada(s).');
+
+        if ($resultado['errores'] !== []) {
+            $this->error(count($resultado['errores']).' distribuidora(s) fallaron y se omitieron:');
+            foreach ($resultado['errores'] as $distribuidoraId => $mensaje) {
+                $this->error("  - distribuidora #{$distribuidoraId}: {$mensaje}");
+            }
+        }
 
         return self::SUCCESS;
     }

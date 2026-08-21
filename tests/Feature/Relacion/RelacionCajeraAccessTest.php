@@ -23,7 +23,7 @@ function crearSucursalRelCajera(string $codigo): Sucursal
     return Sucursal::create(['nombre' => 'Sucursal '.$codigo, 'codigo' => $codigo, 'es_matriz' => false, 'is_active' => true]);
 }
 
-function crearDistribuidoraRelCajera(Sucursal $sucursal, string $numero): Distribuidora
+function crearDistribuidoraRelCajera(Sucursal $sucursal, string $numero, ?int $coordinadorId = null): Distribuidora
 {
     $categoria = CategoriaDistribuidora::create(['nombre' => 'PLATA-'.uniqid(), 'porcentaje_comision' => 6, 'activo' => true]);
     $role = Role::firstOrCreate(['name' => 'Distribuidora']);
@@ -32,6 +32,7 @@ function crearDistribuidoraRelCajera(Sucursal $sucursal, string $numero): Distri
     return Distribuidora::create([
         'usuario_id' => $user->id, 'numero_distribuidora' => $numero, 'limite_credito' => 20000,
         'categoria_id' => $categoria->id, 'puntos_acumulados' => 0, 'estado' => 'ACTIVO', 'sucursal_id' => $sucursal->id,
+        'coordinador_id' => $coordinadorId,
     ]);
 }
 
@@ -51,6 +52,20 @@ function crearRelacionCajera(Distribuidora $distribuidora, Sucursal $sucursal, s
 function crearCajeraDeSucursal(Sucursal $sucursal): User
 {
     $role = Role::firstOrCreate(['name' => 'Cajera']);
+
+    return User::factory()->create(['role_id' => $role->id, 'sucursal_id' => $sucursal->id, 'is_active' => true]);
+}
+
+function crearGerenteDeSucursalRel(Sucursal $sucursal): User
+{
+    $role = Role::firstOrCreate(['name' => 'Gerente de Sucursal']);
+
+    return User::factory()->create(['role_id' => $role->id, 'sucursal_id' => $sucursal->id, 'is_active' => true]);
+}
+
+function crearCoordinadorRel(Sucursal $sucursal): User
+{
+    $role = Role::firstOrCreate(['name' => 'Coordinador']);
 
     return User::factory()->create(['role_id' => $role->id, 'sucursal_id' => $sucursal->id, 'is_active' => true]);
 }
@@ -158,4 +173,67 @@ it('la distribuidora sí puede ver el detalle y los totales a pagar de su propia
         ->assertJsonPath('data.referencia_pago', 'REF-PROPIA-001')
         ->assertJsonPath('data.fecha_limite_pago', '2026-02-16')
         ->assertJsonPath('data.totales.a_pagar', '3500.00');
+});
+
+/**
+ * Antes, index()/show() solo restringían a Cajera (por sucursal) y Distribuidora (por sí
+ * misma) — Coordinador y Gerente de Sucursal no tenían ningún filtro y veían los cortes de
+ * TODAS las sucursales/distribuidoras, aunque la ruta ya solo dejaba entrar a esos roles.
+ */
+it('el Gerente de Sucursal lista solo las relaciones de su propia sucursal', function (): void {
+    $sucursalA = crearSucursalRelCajera('SUC-A');
+    $sucursalB = crearSucursalRelCajera('SUC-B');
+    $distA = crearDistribuidoraRelCajera($sucursalA, 'DIST-A');
+    $distB = crearDistribuidoraRelCajera($sucursalB, 'DIST-B');
+    crearRelacionCajera($distA, $sucursalA, 'REF-A-001');
+    crearRelacionCajera($distB, $sucursalB, 'REF-B-001');
+
+    Sanctum::actingAs(crearGerenteDeSucursalRel($sucursalA));
+
+    $this->getJson('/api/v1/relaciones')
+        ->assertStatus(200)
+        ->assertJsonCount(1, 'data.data')
+        ->assertJsonPath('data.data.0.referencia_pago', 'REF-A-001');
+});
+
+it('el Gerente de Sucursal no puede ver el detalle de una relación de otra sucursal', function (): void {
+    $sucursalA = crearSucursalRelCajera('SUC-A');
+    $sucursalB = crearSucursalRelCajera('SUC-B');
+    $distB = crearDistribuidoraRelCajera($sucursalB, 'DIST-B');
+    $relacionB = crearRelacionCajera($distB, $sucursalB, 'REF-B-001');
+
+    Sanctum::actingAs(crearGerenteDeSucursalRel($sucursalA));
+
+    $this->getJson("/api/v1/relaciones/{$relacionB->id}")
+        ->assertStatus(403);
+});
+
+it('el Coordinador lista solo las relaciones de las distribuidoras que coordina', function (): void {
+    $sucursal = crearSucursalRelCajera('SUC-A');
+    $coordinadorPropio = crearCoordinadorRel($sucursal);
+    $coordinadorAjeno = crearCoordinadorRel($sucursal);
+    $distPropia = crearDistribuidoraRelCajera($sucursal, 'DIST-PROPIA', $coordinadorPropio->id);
+    $distAjena = crearDistribuidoraRelCajera($sucursal, 'DIST-AJENA', $coordinadorAjeno->id);
+    crearRelacionCajera($distPropia, $sucursal, 'REF-PROPIA-001');
+    crearRelacionCajera($distAjena, $sucursal, 'REF-AJENA-001');
+
+    Sanctum::actingAs($coordinadorPropio);
+
+    $this->getJson('/api/v1/relaciones')
+        ->assertStatus(200)
+        ->assertJsonCount(1, 'data.data')
+        ->assertJsonPath('data.data.0.referencia_pago', 'REF-PROPIA-001');
+});
+
+it('el Coordinador no puede ver el detalle de una relación de una distribuidora que no coordina', function (): void {
+    $sucursal = crearSucursalRelCajera('SUC-A');
+    $coordinadorPropio = crearCoordinadorRel($sucursal);
+    $coordinadorAjeno = crearCoordinadorRel($sucursal);
+    $distAjena = crearDistribuidoraRelCajera($sucursal, 'DIST-AJENA', $coordinadorAjeno->id);
+    $relacionAjena = crearRelacionCajera($distAjena, $sucursal, 'REF-AJENA-001');
+
+    Sanctum::actingAs($coordinadorPropio);
+
+    $this->getJson("/api/v1/relaciones/{$relacionAjena->id}")
+        ->assertStatus(403);
 });

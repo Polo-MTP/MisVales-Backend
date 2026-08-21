@@ -14,6 +14,8 @@ use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use DomainException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Calcula la relación (corte / estado de cuenta) de una distribuidora, siguiendo la fórmula
@@ -34,36 +36,52 @@ final class RelacionCalculoService
      * hoy su día de corte configurado (o el de la fecha indicada). Las distribuidoras sin
      * vales pendientes se omiten silenciosamente.
      *
-     * @return array<int, Relacion> Relaciones generadas, indexadas por distribuidora_id.
+     * Cada distribuidora se procesa aislada: si una truena (ej. ya existe relación para esa
+     * fecha), las demás siguen generándose normal — antes, una sola excepción dentro del
+     * chunk() detenía TODO el resto del lote sin avisar cuántas sí se alcanzaron a generar.
+     *
+     * @return array{generadas: array<int, Relacion>, errores: array<int, string>} Relaciones
+     *                                                                             generadas indexadas por distribuidora_id, y mensajes de error por distribuidora
+     *                                                                             que falló (indexados igual).
      */
     public function generarCortesDelDia(?string $fecha = null): array
     {
         $fechaCorte = $fecha ? Carbon::parse($fecha) : now();
         $generadas = [];
+        $errores = [];
 
         Distribuidora::query()
             ->where('estado', 'ACTIVO')
             ->with('sucursal', 'categoria')
-            ->chunk(50, function ($distribuidoras) use ($fechaCorte, &$generadas): void {
+            ->chunk(50, function ($distribuidoras) use ($fechaCorte, &$generadas, &$errores): void {
                 foreach ($distribuidoras as $distribuidora) {
-                    $fechasConfig = $this->configuracionService->obtenerFechasVigentes(
-                        $distribuidora->sucursal_id,
-                        $fechaCorte->toDateString()
-                    );
+                    try {
+                        $fechasConfig = $this->configuracionService->obtenerFechasVigentes(
+                            $distribuidora->sucursal_id,
+                            $fechaCorte->toDateString()
+                        );
 
-                    if ((int) $fechasConfig->dia_corte !== (int) $fechaCorte->day) {
-                        continue;
-                    }
+                        if ((int) $fechasConfig->dia_corte !== (int) $fechaCorte->day) {
+                            continue;
+                        }
 
-                    $relacion = $this->generarParaDistribuidora($distribuidora, $fechaCorte->toDateString());
+                        $relacion = $this->generarParaDistribuidora($distribuidora, $fechaCorte->toDateString());
 
-                    if ($relacion) {
-                        $generadas[$distribuidora->id] = $relacion;
+                        if ($relacion) {
+                            $generadas[$distribuidora->id] = $relacion;
+                        }
+                    } catch (Throwable $e) {
+                        Log::error('generarCortesDelDia: fallo al generar el corte de una distribuidora, se continúa con las demás', [
+                            'distribuidora_id' => $distribuidora->id,
+                            'fecha_corte' => $fechaCorte->toDateString(),
+                            'error' => $e->getMessage(),
+                        ]);
+                        $errores[$distribuidora->id] = $e->getMessage();
                     }
                 }
             });
 
-        return $generadas;
+        return ['generadas' => $generadas, 'errores' => $errores];
     }
 
     /**

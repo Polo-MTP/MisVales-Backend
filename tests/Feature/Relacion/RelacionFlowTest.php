@@ -164,6 +164,25 @@ it('aplica recargo cuando la cuota anterior del mismo vale no quedó pagada', fu
         ->and($segundaRelacion->detalles->first()->cuota_numero)->toBe(2);
 });
 
+it('no aplica recargo si la cuota anterior del mismo vale ya se liquidó puntual', function (): void {
+    $distribuidora = crearDistribuidora();
+    crearVale($distribuidora, 15000, 8);
+
+    $service = app(RelacionCalculoService::class);
+    $primeraRelacion = $service->generarParaDistribuidora($distribuidora, '2026-02-15');
+
+    $archivo = crearExcelBanco([
+        [1, 'Pago puntual', $primeraRelacion->referencia_pago, 2712, 'F900', '15/2/2026', '10:00', 'Transferencia'],
+    ]);
+    app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, User::factory()->create());
+
+    expect($primeraRelacion->fresh()->detalles->first()->estado)->toBe('pagado');
+
+    $segundaRelacion = $service->generarParaDistribuidora($distribuidora, '2026-03-15');
+
+    expect((float) $segundaRelacion->detalles->first()->recargo)->toBe(0.0);
+});
+
 it('concilia un abono bancario, liquida la relación y genera puntos por pago anticipado', function (): void {
     $distribuidora = crearDistribuidora();
     crearVale($distribuidora, 15000, 8, '2026-02-01');
@@ -254,6 +273,32 @@ it('marca como vencidas las relaciones cuya fecha límite de pago ya pasó', fun
 
     expect($total)->toBe(1)
         ->and($relacion->fresh()->estado)->toBe('vencida');
+});
+
+it('perdonar condona el recargo y el interés, y reduce el total a pagar (no toca capital/comisión/seguro/categoría)', function (): void {
+    $distribuidora = crearDistribuidora();
+    crearVale($distribuidora, 15000, 8);
+
+    $service = app(RelacionCalculoService::class);
+    $service->generarParaDistribuidora($distribuidora, '2026-02-15');
+    $segundaRelacion = $service->generarParaDistribuidora($distribuidora, '2026-03-15');
+
+    // Vale sin liquidar la 1a cuota -> la 2a cuota trae recargo, sin descuento de categoría ni piso.
+    expect((float) $segundaRelacion->total_recargos)->toBe(300.0)
+        ->and((float) $segundaRelacion->total_interes)->toBe(750.0)
+        ->and((float) $segundaRelacion->total_a_pagar)->toBe(3125.0);
+
+    $gerente = User::factory()->create();
+    $perdonada = app(RelacionEstadoService::class)->perdonar($segundaRelacion, $gerente, 'atraso justificado');
+
+    expect($perdonada->estado)->toBe('perdonada')
+        ->and((float) $perdonada->total_recargos)->toBe(0.0)
+        ->and((float) $perdonada->total_interes)->toBe(0.0)
+        // 3125 - 300 (recargo) - 750 (interés) = 2075; capital+comisión+seguro se quedan igual.
+        ->and((float) $perdonada->total_a_pagar)->toBe(2075.0)
+        ->and((float) $perdonada->detalles->first()->recargo)->toBe(0.0)
+        ->and((float) $perdonada->detalles->first()->interes)->toBe(0.0)
+        ->and((float) $perdonada->detalles->first()->total)->toBe(2075.0);
 });
 
 it('perdona la primera y segunda relación vencida, y marca la tercera como pérdida', function (): void {

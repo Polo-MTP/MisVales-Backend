@@ -202,15 +202,24 @@ final class ConciliacionBancariaService
     }
 
     /**
-     * Un vale queda 'pagado' hasta que se liquida su última cuota (cuota_numero === cuotas_totales);
-     * si nació como 'pre-vale' (primer vale de un cliente nuevo), se convierte en 'vale-digital'
-     * en ese mismo momento.
+     * Al liquidarse el corte, cada cuota (RelacionDetalle) de ese corte queda 'pagado' — sin
+     * esto, RelacionCalculoService::calcularDetalleVale() nunca encuentra una cuota anterior en
+     * 'pagado' (se queda en 'pendiente' para siempre) y le cobra el recargo por atraso a TODO
+     * corte a partir del segundo, así se haya pagado puntual.
+     *
+     * Un vale además queda 'pagado' hasta que se liquida su última cuota (cuota_numero ===
+     * cuotas_totales); si nació como 'pre-vale' (primer vale de un cliente nuevo), se convierte
+     * en 'vale-digital' en ese mismo momento.
      */
     private function marcarValesPagados(Relacion $relacion): void
     {
         $relacion->loadMissing('detalles.vale');
 
         foreach ($relacion->detalles as $detalle) {
+            if ($detalle->estado !== 'pagado') {
+                $detalle->update(['estado' => 'pagado']);
+            }
+
             if ($detalle->cuota_numero !== $detalle->cuotas_totales) {
                 continue;
             }

@@ -11,6 +11,7 @@ use App\Models\Relacion;
 use App\Models\User;
 use App\Services\Relacion\RelacionCalculoService;
 use App\Services\Relacion\RelacionEstadoService;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -34,9 +35,16 @@ final class RelacionController extends ApiController
         $query = Relacion::query()->with(['distribuidora', 'sucursal', 'categoriaSnapshot']);
 
         // La cajera necesita poder buscar la relación de un pago sin adivinar el ID a mano
-        // (ver flujo de conciliación manual), pero solo dentro de su propia sucursal.
-        if ($usuario->role?->name === 'Cajera') {
+        // (ver flujo de conciliación manual), pero solo dentro de su propia sucursal. El
+        // Gerente de Sucursal se limita igual (mismo patrón que DistribuidoraService::listar()).
+        if (in_array($usuario->role?->name, ['Cajera', 'Gerente de Sucursal'], true)) {
             $query->where('sucursal_id', $usuario->sucursal_id ?? 0);
+        }
+
+        // El Coordinador solo ve las relaciones de las distribuidoras que él coordina, no
+        // de todas las sucursales (mismo patrón que DistribuidoraService::listar()).
+        if ($usuario->role?->name === 'Coordinador') {
+            $query->whereHas('distribuidora', fn ($q) => $q->where('coordinador_id', $usuario->id));
         }
 
         if ($usuario->role?->name === 'Distribuidora') {
@@ -71,8 +79,12 @@ final class RelacionController extends ApiController
         /** @var User $usuario */
         $usuario = $request->user();
 
-        if ($usuario->role?->name === 'Cajera' && $relacion->sucursal_id !== $usuario->sucursal_id) {
+        if (in_array($usuario->role?->name, ['Cajera', 'Gerente de Sucursal'], true) && $relacion->sucursal_id !== $usuario->sucursal_id) {
             abort(403, 'No puedes ver relaciones de otra sucursal.');
+        }
+
+        if ($usuario->role?->name === 'Coordinador' && $relacion->distribuidora?->coordinador_id !== $usuario->id) {
+            abort(403, 'No puedes ver relaciones de distribuidoras que no coordinas.');
         }
 
         if ($usuario->role?->name === 'Distribuidora' && $relacion->distribuidora_id !== $usuario->distribuidora?->id) {
@@ -113,13 +125,23 @@ final class RelacionController extends ApiController
                 );
             }
 
-            $generadas = $this->relacionCalculoService->generarCortesDelDia($request->input('fecha_corte'));
+            $resultado = $this->relacionCalculoService->generarCortesDelDia($request->input('fecha_corte'));
+            $generadas = $resultado['generadas'];
+            $errores = $resultado['errores'];
+
+            $mensaje = count($generadas).' relación(es) generada(s) para el corte del día.';
+            if ($errores !== []) {
+                $mensaje .= ' '.count($errores).' distribuidora(s) fallaron y se omitieron (ver "errores").';
+            }
 
             return $this->created(
-                data: RelacionResource::collection(array_values($generadas)),
-                message: count($generadas).' relación(es) generada(s) para el corte del día.'
+                data: [
+                    'relaciones' => RelacionResource::collection(array_values($generadas)),
+                    'errores' => $errores,
+                ],
+                message: $mensaje
             );
-        } catch (\DomainException $e) {
+        } catch (DomainException $e) {
             return $this->error($e->getMessage());
         }
     }
@@ -144,7 +166,7 @@ final class RelacionController extends ApiController
                 data: new RelacionResource($relacion),
                 message: $relacion->estado === 'perdonada' ? 'Relación perdonada exitosamente.' : 'Límite de perdones alcanzado: la relación se marcó como pérdida.'
             );
-        } catch (\DomainException $e) {
+        } catch (DomainException $e) {
             return $this->error($e->getMessage());
         }
     }
