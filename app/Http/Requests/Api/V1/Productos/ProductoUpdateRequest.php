@@ -1,19 +1,23 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Requests\Api\V1\Productos;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class ProductoUpdateRequest extends FormRequest
+final class ProductoUpdateRequest extends FormRequest
 {
     /**
-     * Solo el Gerente General puede editar productos del catálogo.
+     * Gerente General y Gerente de Sucursal pueden editar productos del catálogo. La VPN la
+     * exige la ruta (ver routes/api/v1.php), no este authorize() — es una capa de red, no de rol.
      */
     public function authorize(): bool
     {
         $user = $this->user();
-        return $user && $user->role->name === 'Gerente General';
+
+        return $user && in_array($user->role->name, ['Gerente General', 'Gerente de Sucursal'], true);
     }
 
     /**
@@ -22,6 +26,7 @@ class ProductoUpdateRequest extends FormRequest
     public function rules(): array
     {
         $id = $this->route('producto');
+
         return [
             'monto' => [
                 'required',

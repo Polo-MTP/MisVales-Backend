@@ -1,19 +1,22 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Requests\Api\V1\Productos;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class ProductoStoreRequest extends FormRequest
+final class ProductoStoreRequest extends FormRequest
 {
     /**
-     * Solo el Gerente General puede crear productos del catálogo.
+     * Gerente General y Gerente de Sucursal pueden crear productos del catálogo.
      */
     public function authorize(): bool
     {
         $user = $this->user();
-        return $user && $user->role->name === 'Gerente General';
+
+        return $user && in_array($user->role->name, ['Gerente General', 'Gerente de Sucursal'], true);
     }
 
     /**
