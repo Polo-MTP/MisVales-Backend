@@ -182,6 +182,10 @@ final class ValeService
         return $vale->fresh(['distribuidora', 'cliente.datosPersonales.direccion', 'producto']);
     }
 
+    /**
+     * Reactiva un vale que la propia distribuidora había desactivado -- misma regla que
+     * desactivar(): solo aplica mientras siga en 'solicitado'.
+     */
     public function activar(Vale $vale, User $usuario): Vale
     {
         $this->verificarPropiedad($vale, $usuario);

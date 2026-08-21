@@ -39,11 +39,17 @@ final class SucursalController extends ApiController
         return $this->created(new SucursalResource($sucursal));
     }
 
+    /**
+     * Devuelve el detalle de una sucursal.
+     */
     public function show(Sucursal $sucursal): JsonResponse
     {
         return $this->success(new SucursalResource($sucursal));
     }
 
+    /**
+     * Actualiza los datos de una sucursal existente.
+     */
     public function update(SucursalUpdateRequest $request, Sucursal $sucursal): JsonResponse
     {
         $sucursal->update($request->validated());
