@@ -182,8 +182,11 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
             ->middleware('role:Gerente General,Gerente de Sucursal')
             ->name('api.v1.configuraciones.index');
 
+        // Cambia parámetros de negocio (comisión, %quincena, multa) que aplican a TODOS los
+        // vales que se generen de ahí en adelante — mayor radio de impacto que una decisión
+        // puntual, mismo dueño (Gerente General) que ya exige VPN en el resto de la API.
         Route::post('', [App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'store'])
-            ->middleware('role:Gerente General')
+            ->middleware(['role:Gerente General', 'vpn'])
             ->name('api.v1.configuraciones.store');
 
         Route::get('historial/{clave}', [App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'historial'])
@@ -195,7 +198,7 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
             ->name('api.v1.configuraciones.fechas.index');
 
         Route::post('fechas', [App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'fechasStore'])
-            ->middleware('role:Gerente General')
+            ->middleware(['role:Gerente General', 'vpn'])
             ->name('api.v1.configuraciones.fechas.store');
 
         Route::get('fechas/historial', [App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'fechasHistorial'])
@@ -209,15 +212,15 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
             ->name('api.v1.configuraciones.seguros.index');
 
         Route::post('seguros', [SeguroTablaController::class, 'store'])
-            ->middleware('role:Gerente General')
+            ->middleware(['role:Gerente General', 'vpn'])
             ->name('api.v1.configuraciones.seguros.store');
 
         Route::put('seguros/{seguro}', [SeguroTablaController::class, 'update'])
-            ->middleware('role:Gerente General')
+            ->middleware(['role:Gerente General', 'vpn'])
             ->name('api.v1.configuraciones.seguros.update');
 
         Route::delete('seguros/{seguro}', [SeguroTablaController::class, 'destroy'])
-            ->middleware('role:Gerente General')
+            ->middleware(['role:Gerente General', 'vpn'])
             ->name('api.v1.configuraciones.seguros.destroy');
     });
 
@@ -258,15 +261,15 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
             ->name('api.v1.categorias_distribuidoras.index');
 
         Route::post('/', [CategoriaDistribuidoraController::class, 'store'])
-            ->middleware('role:Gerente General')
+            ->middleware(['role:Gerente General', 'vpn'])
             ->name('api.v1.categorias_distribuidoras.store');
 
         Route::put('{categoria}', [CategoriaDistribuidoraController::class, 'update'])
-            ->middleware('role:Gerente General')
+            ->middleware(['role:Gerente General', 'vpn'])
             ->name('api.v1.categorias_distribuidoras.update');
 
         Route::delete('{categoria}', [CategoriaDistribuidoraController::class, 'destroy'])
-            ->middleware('role:Gerente General')
+            ->middleware(['role:Gerente General', 'vpn'])
             ->name('api.v1.categorias_distribuidoras.destroy');
     });
 

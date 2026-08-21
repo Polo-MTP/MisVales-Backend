@@ -104,3 +104,28 @@ it('las dos rutas de decisión confirmadas por infra tienen el middleware vpn ad
         ->and($decidirEdicion)->not->toBeNull()
         ->and($decidirEdicion->middleware())->toContain('vpn');
 });
+
+/**
+ * Cambiar los parámetros de la fórmula (comisión, %quincena, multa, categoría, seguro, fechas
+ * de corte) afecta a TODOS los vales que se generen de ahí en adelante — mayor radio de
+ * impacto que una decisión puntual sobre un solo caso, así que también exige VPN.
+ */
+it('los endpoints que modifican parámetros de negocio (comisión/categoría/seguro/fechas) tienen el middleware vpn adjunto', function (): void {
+    $nombres = [
+        'api.v1.configuraciones.store',
+        'api.v1.configuraciones.fechas.store',
+        'api.v1.configuraciones.seguros.store',
+        'api.v1.configuraciones.seguros.update',
+        'api.v1.configuraciones.seguros.destroy',
+        'api.v1.categorias_distribuidoras.store',
+        'api.v1.categorias_distribuidoras.update',
+        'api.v1.categorias_distribuidoras.destroy',
+    ];
+
+    foreach ($nombres as $nombre) {
+        $route = Route::getRoutes()->getByName($nombre);
+
+        expect($route)->not->toBeNull("La ruta '{$nombre}' no existe.");
+        expect($route->middleware())->toContain('vpn');
+    }
+});
