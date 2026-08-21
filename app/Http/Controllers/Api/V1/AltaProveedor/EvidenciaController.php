@@ -28,8 +28,13 @@ final class EvidenciaController extends ApiController
         /** @var User $usuario */
         $usuario = $request->user();
 
-        $disk = (string) config('filesystems.default', 's3');
-        $ruta = Storage::disk($disk)->putFile('evidencias', $request->file('archivo'), 'public');
+        // Siempre el disco 'public', sin importar FILESYSTEM_DISK: esta evidencia necesita URL
+        // pública de verdad, y 'local' (el default de la app) no tiene 'url' configurada — con
+        // config('filesystems.default') aquí, en cualquier entorno donde FILESYSTEM_DISK=local
+        // (dev, test, y producción hasta hoy) la subida "funcionaba" pero la URL guardada
+        // quedaba rota. Si algún día se quiere mandar esto a Spaces, cambiar el driver del
+        // disco 'public' en config/filesystems.php, no acoplar esta ruta al default global.
+        $ruta = Storage::disk('public')->putFile('evidencias', $request->file('archivo'));
 
         /** @var Evidencia $evidencia */
         $evidencia = Evidencia::query()->create([
@@ -37,7 +42,7 @@ final class EvidenciaController extends ApiController
             'entidad_tipo' => 'SolicitudProveedor',
             'entidad_id' => $solicitud->id,
             'tipo_documento' => $request->string('tipo_documento'),
-            'url_archivo' => Storage::disk($disk)->url($ruta),
+            'url_archivo' => Storage::disk('public')->url($ruta),
             'subido_por' => $usuario->id,
             'fecha_subida' => now(),
         ]);
