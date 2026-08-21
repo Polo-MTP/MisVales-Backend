@@ -43,23 +43,21 @@ it('el Gerente General puede editar un producto sin necesidad de VPN', function 
     expect((float) $producto->fresh()->monto)->toBe(5500.0);
 });
 
-it('el Gerente de Sucursal NO puede crear ni editar productos', function (): void {
+it('el Gerente de Sucursal es de solo lectura: no puede crear, editar ni desactivar productos', function (): void {
     $producto = Producto::create(['monto' => 5000, 'quincenas' => 8, 'activo' => true, 'created_by' => User::factory()->create()->id]);
     Sanctum::actingAs(crearUsuarioProducto('Gerente de Sucursal'));
 
     $this->postJson('/api/v1/productos', ['monto' => 6000, 'quincenas' => 8])->assertStatus(403);
     $this->putJson('/api/v1/productos/'.$producto->id, ['monto' => 6000, 'quincenas' => 8])->assertStatus(403);
+    $this->deleteJson('/api/v1/productos/'.$producto->id)->assertStatus(403);
 });
 
-it('el Gerente de Sucursal sí puede ver el detalle y desactivar un producto', function (): void {
+it('el Gerente de Sucursal sí puede ver el listado y el detalle', function (): void {
     $producto = Producto::create(['monto' => 5000, 'quincenas' => 8, 'activo' => true, 'created_by' => User::factory()->create()->id]);
     Sanctum::actingAs(crearUsuarioProducto('Gerente de Sucursal'));
 
+    $this->getJson('/api/v1/productos')->assertStatus(200);
     $this->getJson('/api/v1/productos/'.$producto->id)->assertStatus(200);
-
-    $response = $this->deleteJson('/api/v1/productos/'.$producto->id);
-    $response->assertStatus(200);
-    expect($producto->fresh()->activo)->toBeFalse();
 });
 
 it('la Cajera sigue sin poder crear, editar ni desactivar productos', function (): void {
