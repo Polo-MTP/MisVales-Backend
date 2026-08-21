@@ -63,7 +63,10 @@ final class DistribuidoraService
     {
         $distribuidora->update($data);
 
-        return $distribuidora->fresh();
+        // DistribuidoraResource usa whenLoaded() para 'categoria'/'datos_extras' y accede
+        // directo a 'sucursal'/'coordinador'/'usuario.datosPersonales' -- sin este load(), la
+        // respuesta de este endpoint queda incompleta/inconsistente frente a la de show().
+        return $distribuidora->fresh(['usuario.datosPersonales.direccion', 'datosExtras', 'categoria', 'sucursal', 'coordinador', 'verificador']);
     }
 
     /**

@@ -189,7 +189,7 @@ final class ValeService
      */
     public function listar(User $usuario, array $filters = []): LengthAwarePaginator
     {
-        $query = Vale::query()->with(['distribuidora', 'cliente.datosPersonales.direccion', 'producto']);
+        $query = Vale::query()->with(['distribuidora', 'cliente.datosPersonales.direccion', 'producto', 'relacionDetalles.relacion']);
 
         $role = $usuario->role?->name;
 
