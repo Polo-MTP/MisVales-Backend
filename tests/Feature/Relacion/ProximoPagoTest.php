@@ -105,3 +105,24 @@ it('el staff puede consultar el próximo pago de una distribuidora específica',
 
     $response->assertStatus(200)->assertJsonPath('data.fecha_corte', '2026-02-15');
 });
+
+it('sin vales autorizados/parciales/vencidos no regresa referencia -- una solicitud aún se puede cancelar', function (): void {
+    $this->travelTo('2026-02-10');
+    $distribuidora = crearDistribuidoraProximoPago();
+    // Vale en 'solicitado', no 'autorizado': todavía no hay nada firme detrás de un posible corte.
+    $direccion = Direccion::create(['calle' => 'Test', 'colonia' => 'Test', 'numero_ext' => '1', 'codigo_postal' => '00000', 'estado' => 'Coahuila', 'ciudad' => 'Torreón']);
+    $datos = DatosPersonales::create(['nombre' => 'Cliente', 'apellido_paterno' => 'Prueba', 'curp' => 'CUPD'.uniqid(), 'direccion_id' => $direccion->id]);
+    $cliente = Cliente::create(['datos_id' => $datos->id, 'estado' => true]);
+    Vale::create([
+        'distribuidora_id' => $distribuidora->id, 'cliente_id' => $cliente->id, 'monto' => 5000, 'quincenas' => 4,
+        'tipo' => 'vale-digital', 'estado' => 'solicitado',
+    ]);
+    Sanctum::actingAs($distribuidora->usuario);
+
+    $response = $this->getJson('/api/v1/relaciones/proximo-pago');
+
+    $response->assertStatus(200)
+        ->assertJsonPath('data.referencia_pago', null)
+        ->assertJsonPath('data.monto_estimado', 0)
+        ->assertJsonPath('data.vales', []);
+});
