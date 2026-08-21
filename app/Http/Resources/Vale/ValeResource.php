@@ -59,6 +59,16 @@ final class ValeResource extends JsonResource
             'fecha_autorizacion' => $this->fecha_autorizacion?->toIso8601String(),
             'numero_transferencia' => $this->numero_transferencia,
             'created_at' => $this->created_at?->toIso8601String(),
+            // Cortes (relaciones) donde ya se facturó alguna cuota de este vale -- antes no había
+            // forma de rastrear, desde el vale, en qué corte(s) quedó incluido.
+            'cortes' => $this->relacionDetalles->map(fn ($detalle) => [
+                'relacion_id' => $detalle->relacion_id,
+                'referencia_pago' => $detalle->relacion?->referencia_pago,
+                'fecha_corte' => $detalle->relacion?->fecha_corte?->toDateString(),
+                'cuota' => "{$detalle->cuota_numero}/{$detalle->cuotas_totales}",
+                'estado_cuota' => $detalle->estado,
+                'total' => $detalle->total,
+            ])->values(),
         ];
     }
 }
