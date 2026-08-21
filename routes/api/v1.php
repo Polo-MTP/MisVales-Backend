@@ -233,9 +233,10 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
             ->name('api.v1.distribuidoras.estado.historial');
     });
     // ============================================================
-    // MÓDULO 5: CATÁLOGO DE PRODUCTOS (Gerente General y Gerente de Sucursal escriben,
-    // sin VPN — no es una decisión de autorización de un tercero como el resto de rutas
-    // con 'vpn'. Administrador queda fuera, solo ve logs.
+    // MÓDULO 5: CATÁLOGO DE PRODUCTOS (crear/editar solo Gerente General, sin VPN — no es
+    // una decisión de autorización de un tercero como el resto de rutas con 'vpn'. Gerente
+    // de Sucursal puede ver y desactivar, pero no crear ni editar. Administrador queda
+    // fuera, solo ve logs.
     // ============================================================
     Route::prefix('productos')
         ->group(function () {
@@ -245,10 +246,10 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
                 ->middleware('role:Gerente General,Gerente de Sucursal')
                 ->name('api.v1.productos.show');
             Route::post('/', [ProductoController::class, 'store'])
-                ->middleware('role:Gerente General,Gerente de Sucursal')
+                ->middleware('role:Gerente General')
                 ->name('api.v1.productos.store');
             Route::put('{producto}', [ProductoController::class, 'update'])
-                ->middleware('role:Gerente General,Gerente de Sucursal')
+                ->middleware('role:Gerente General')
                 ->name('api.v1.productos.update');
             Route::delete('{producto}', [ProductoController::class, 'destroy'])
                 ->middleware('role:Gerente General,Gerente de Sucursal')

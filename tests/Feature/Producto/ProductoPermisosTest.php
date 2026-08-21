@@ -17,8 +17,8 @@ function crearUsuarioProducto(string $rol): User
     return User::factory()->create(['role_id' => $role->id, 'is_active' => true]);
 }
 
-it('el Gerente de Sucursal puede crear un producto sin necesidad de VPN', function (): void {
-    Sanctum::actingAs(crearUsuarioProducto('Gerente de Sucursal'));
+it('el Gerente General puede crear un producto sin necesidad de VPN', function (): void {
+    Sanctum::actingAs(crearUsuarioProducto('Gerente General'));
 
     $response = $this->postJson('/api/v1/productos', [
         'monto' => 5000,
@@ -30,9 +30,9 @@ it('el Gerente de Sucursal puede crear un producto sin necesidad de VPN', functi
     expect(Producto::where('monto', 5000)->exists())->toBeTrue();
 });
 
-it('el Gerente de Sucursal puede editar un producto sin necesidad de VPN', function (): void {
+it('el Gerente General puede editar un producto sin necesidad de VPN', function (): void {
     $producto = Producto::create(['monto' => 5000, 'quincenas' => 8, 'activo' => true, 'created_by' => User::factory()->create()->id]);
-    Sanctum::actingAs(crearUsuarioProducto('Gerente de Sucursal'));
+    Sanctum::actingAs(crearUsuarioProducto('Gerente General'));
 
     $response = $this->putJson('/api/v1/productos/'.$producto->id, [
         'monto' => 5500,
@@ -43,12 +43,21 @@ it('el Gerente de Sucursal puede editar un producto sin necesidad de VPN', funct
     expect((float) $producto->fresh()->monto)->toBe(5500.0);
 });
 
-it('el Gerente de Sucursal puede desactivar un producto', function (): void {
+it('el Gerente de Sucursal NO puede crear ni editar productos', function (): void {
     $producto = Producto::create(['monto' => 5000, 'quincenas' => 8, 'activo' => true, 'created_by' => User::factory()->create()->id]);
     Sanctum::actingAs(crearUsuarioProducto('Gerente de Sucursal'));
 
-    $response = $this->deleteJson('/api/v1/productos/'.$producto->id);
+    $this->postJson('/api/v1/productos', ['monto' => 6000, 'quincenas' => 8])->assertStatus(403);
+    $this->putJson('/api/v1/productos/'.$producto->id, ['monto' => 6000, 'quincenas' => 8])->assertStatus(403);
+});
 
+it('el Gerente de Sucursal sí puede ver el detalle y desactivar un producto', function (): void {
+    $producto = Producto::create(['monto' => 5000, 'quincenas' => 8, 'activo' => true, 'created_by' => User::factory()->create()->id]);
+    Sanctum::actingAs(crearUsuarioProducto('Gerente de Sucursal'));
+
+    $this->getJson('/api/v1/productos/'.$producto->id)->assertStatus(200);
+
+    $response = $this->deleteJson('/api/v1/productos/'.$producto->id);
     $response->assertStatus(200);
     expect($producto->fresh()->activo)->toBeFalse();
 });

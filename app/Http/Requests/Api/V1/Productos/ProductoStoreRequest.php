@@ -10,13 +10,13 @@ use Illuminate\Validation\Rule;
 final class ProductoStoreRequest extends FormRequest
 {
     /**
-     * Gerente General y Gerente de Sucursal pueden crear productos del catálogo.
+     * Solo el Gerente General puede crear productos del catálogo.
      */
     public function authorize(): bool
     {
         $user = $this->user();
 
-        return $user && in_array($user->role->name, ['Gerente General', 'Gerente de Sucursal'], true);
+        return $user && $user->role->name === 'Gerente General';
     }
 
     /**
