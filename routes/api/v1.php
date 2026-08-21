@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\Producto\ProductoController;
 use App\Http\Controllers\Api\V1\Relacion\ConciliacionController;
 use App\Http\Controllers\Api\V1\Relacion\RelacionController;
 use App\Http\Controllers\Api\V1\Reporte\ReporteController;
+use App\Http\Controllers\Api\V1\UploadController;
 use App\Http\Controllers\Api\V1\UsuarioController;
 use App\Http\Controllers\Api\V1\Vale\ValeController;
 use Illuminate\Support\Facades\Route;
@@ -47,6 +48,7 @@ Route::middleware('throttle:auth')->group(function (): void {
 Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(function (): void {
     Route::post('logout', [AuthController::class, 'logout'])->name('api.v1.logout');
     Route::get('me', [AuthController::class, 'me'])->name('api.v1.me');
+    Route::get('upload-url', [UploadController::class, 'getPresignedUrl'])->name('api.v1.upload_url');
 
     // Email verification
     Route::post('email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])

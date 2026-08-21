@@ -28,7 +28,8 @@ final class EvidenciaController extends ApiController
         /** @var User $usuario */
         $usuario = $request->user();
 
-        $ruta = Storage::disk('public')->putFile('evidencias', $request->file('archivo'));
+        $disk = (string) config('filesystems.default', 's3');
+        $ruta = Storage::disk($disk)->putFile('evidencias', $request->file('archivo'), 'public');
 
         /** @var Evidencia $evidencia */
         $evidencia = Evidencia::query()->create([
@@ -36,7 +37,7 @@ final class EvidenciaController extends ApiController
             'entidad_tipo' => 'SolicitudProveedor',
             'entidad_id' => $solicitud->id,
             'tipo_documento' => $request->string('tipo_documento'),
-            'url_archivo' => Storage::disk('public')->url($ruta),
+            'url_archivo' => Storage::disk($disk)->url($ruta),
             'subido_por' => $usuario->id,
             'fecha_subida' => now(),
         ]);
