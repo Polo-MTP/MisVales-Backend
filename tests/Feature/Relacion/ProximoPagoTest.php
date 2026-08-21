@@ -51,7 +51,8 @@ it('calcula la próxima fecha de corte de este mes si el día de corte todavía 
 
     $response->assertStatus(200)
         ->assertJsonPath('data.fecha_corte', '2026-02-15')
-        ->assertJsonPath('data.fecha_limite_pago', '2026-02-16');
+        ->assertJsonPath('data.fecha_limite_pago', '2026-02-16')
+        ->assertJsonPath('data.referencia_pago', sprintf('%09d%09d', $distribuidora->id, 20260215));
 });
 
 it('salta al corte del siguiente mes si el día de corte de este mes ya pasó', function (): void {

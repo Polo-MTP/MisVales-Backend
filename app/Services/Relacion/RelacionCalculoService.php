@@ -205,7 +205,7 @@ final class RelacionCalculoService
      * estimado de su siguiente cuota. Es un estimado "si paga puntual" — no incluye recargo,
      * eso depende de un comportamiento futuro que todavía no pasa.
      *
-     * @return array{fecha_corte: string, fecha_limite_pago: string, monto_estimado: float, vales: array<int, array{vale_id: int, monto: float, pago_estimado: float}>}
+     * @return array{fecha_corte: string, fecha_limite_pago: string, referencia_pago: string, monto_estimado: float, vales: array<int, array{vale_id: int, monto: float, pago_estimado: float}>}
      */
     public function proximoPago(Distribuidora $distribuidora, ?string $desde = null): array
     {
@@ -253,6 +253,11 @@ final class RelacionCalculoService
         return [
             'fecha_corte' => $proximaFechaCorte->toDateString(),
             'fecha_limite_pago' => $fechaLimitePago->toDateString(),
+            // La referencia es una fórmula pura (distribuidora_id + fecha_corte, ver
+            // construirReferenciaPago()), no depende de que el corte ya exista como registro --
+            // se puede calcular y mostrar desde antes para que la distribuidora prepare su
+            // transferencia con la referencia correcta sin tener que esperar al corte real.
+            'referencia_pago' => $this->construirReferenciaPago($distribuidora, $proximaFechaCorte),
             'monto_estimado' => round($montoEstimado, 2),
             'vales' => $vales,
         ];
