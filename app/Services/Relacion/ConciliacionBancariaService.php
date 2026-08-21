@@ -131,7 +131,7 @@ final class ConciliacionBancariaService
         $fila = array_combine($encabezado, array_slice($fila, 0, count($encabezado)));
 
         return [
-            'referencia' => trim((string) ($fila['referencia'] ?? '')),
+            'referencia' => $this->normalizarReferencia($fila['referencia'] ?? ''),
             'monto' => (float) preg_replace('/[^0-9.\-]/', '', (string) ($fila['pago'] ?? 0)),
             'folio_pago' => isset($fila['folio de pago']) ? trim((string) $fila['folio de pago']) : null,
             'fecha_pago' => $this->parsearFecha($fila['fecha de pago'] ?? null),
@@ -383,6 +383,27 @@ final class ConciliacionBancariaService
         } catch (Throwable) {
             return null;
         }
+    }
+
+    /**
+     * La referencia real (RelacionCalculoService::construirReferenciaPago) siempre tiene 18
+     * dígitos: 9 del id de la distribuidora + 9 de la fecha de corte, ambos rellenados con
+     * ceros a la izquierda. Si el banco exporta esa columna como número en vez de texto (muy
+     * común en Excel), esos ceros se pierden al leer la celda -- "000000001020260920" llega
+     * como 1020260920 -- y sin esto la comparación exacta contra Relacion::referencia_pago
+     * nunca hace match, cayendo siempre en "sin_coincidencia" aunque la referencia sea
+     * correcta. Se vuelve a rellenar antes de comparar; si no es puramente numérica (o ya
+     * mide 18), se deja tal cual.
+     */
+    private function normalizarReferencia(mixed $valor): string
+    {
+        $referencia = trim((string) $valor);
+
+        if ($referencia !== '' && ctype_digit($referencia) && mb_strlen($referencia) < 18) {
+            return str_pad($referencia, 18, '0', STR_PAD_LEFT);
+        }
+
+        return $referencia;
     }
 
     /**
