@@ -100,6 +100,36 @@ final class RelacionController extends ApiController
     }
 
     /**
+     * Cuándo será el próximo corte de la distribuidora y cuánto se estima que le va a tocar
+     * pagar, ANTES de que ese corte exista — sin esto no había forma de saberlo hasta que el
+     * corte ya se había generado. Si quien pregunta es una Distribuidora, es la suya; el
+     * staff puede pasar ?distribuidora_id= para consultar la de alguien más.
+     */
+    public function proximoPago(Request $request): JsonResponse
+    {
+        /** @var User $usuario */
+        $usuario = $request->user();
+
+        $distribuidora = $usuario->role?->name === 'Distribuidora'
+            ? $usuario->distribuidora
+            : ($request->filled('distribuidora_id') ? Distribuidora::query()->find($request->integer('distribuidora_id')) : null);
+
+        if (! $distribuidora) {
+            abort(404, 'No se encontró la distribuidora a consultar.');
+        }
+
+        $resultado = $this->relacionCalculoService->proximoPago($distribuidora);
+
+        return $this->success(
+            data: [
+                ...$resultado,
+                'nota' => 'Estimado si paga puntual, con las reglas vigentes hoy. No incluye recargo por atraso.',
+            ],
+            message: 'Próximo pago estimado obtenido exitosamente.'
+        );
+    }
+
+    /**
      * Genera el corte de una distribuidora específica, o el corte del día para todas
      * las distribuidoras que correspondan, si no se indica distribuidora_id.
      */

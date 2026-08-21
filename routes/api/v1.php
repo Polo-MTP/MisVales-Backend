@@ -437,6 +437,12 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
             ->middleware('role:Distribuidora,Cajera,Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.relaciones.index');
 
+        // Debe ir ANTES de {relacion}: si no, el wildcard capturaría "proximo-pago" como si
+        // fuera un id. Cuándo será el próximo corte y cuánto se estima, antes de que exista.
+        Route::get('proximo-pago', [RelacionController::class, 'proximoPago'])
+            ->middleware('role:Distribuidora,Cajera,Coordinador,Gerente de Sucursal,Gerente General')
+            ->name('api.v1.relaciones.proximo_pago');
+
         Route::get('{relacion}', [RelacionController::class, 'show'])
             ->middleware('role:Distribuidora,Cajera,Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.relaciones.show');

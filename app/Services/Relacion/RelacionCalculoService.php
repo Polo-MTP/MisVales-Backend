@@ -198,6 +198,66 @@ final class RelacionCalculoService
         ];
     }
 
+    /**
+     * Cuándo será el próximo corte de esta distribuidora y cuánto se estima que le va a
+     * tocar pagar — SIN generar ni persistir nada. Suma, para cada vale activo/pendiente
+     * (mismo criterio que generarParaDistribuidora: autorizado/parcial/vencido), el pago
+     * estimado de su siguiente cuota. Es un estimado "si paga puntual" — no incluye recargo,
+     * eso depende de un comportamiento futuro que todavía no pasa.
+     *
+     * @return array{fecha_corte: string, fecha_limite_pago: string, monto_estimado: float, vales: array<int, array{vale_id: int, monto: float, pago_estimado: float}>}
+     */
+    public function proximoPago(Distribuidora $distribuidora, ?string $desde = null): array
+    {
+        $hoy = $desde ? Carbon::parse($desde)->startOfDay() : now()->startOfDay();
+
+        $fechasConfig = $this->configuracionService->obtenerFechasVigentes($distribuidora->sucursal_id, $hoy->toDateString());
+        $diaCorte = (int) $fechasConfig->dia_corte;
+
+        $fechaCorteEsteMes = $hoy->copy()->day(min($diaCorte, $hoy->daysInMonth));
+
+        if ($fechaCorteEsteMes->lt($hoy)) {
+            $siguienteMes = $hoy->copy()->addMonthNoOverflow();
+            $proximaFechaCorte = $siguienteMes->copy()->day(min($diaCorte, $siguienteMes->daysInMonth));
+        } else {
+            $proximaFechaCorte = $fechaCorteEsteMes;
+        }
+
+        [$fechaLimitePago] = $this->calcularFechas($distribuidora->sucursal_id, $proximaFechaCorte);
+
+        $comisionBasePct = (float) ($this->configuracionService->obtenerValorVigente('comision_base_pct') ?? 10);
+        $interesPctQuincena = (float) ($this->configuracionService->obtenerValorVigente('interes_pct_quincena') ?? 5);
+        $porcentajeCategoria = (float) ($distribuidora->categoria?->porcentaje_comision ?? 0);
+
+        $vales = [];
+        $montoEstimado = 0.0;
+
+        $valesPendientes = Vale::query()
+            ->where('distribuidora_id', $distribuidora->id)
+            ->where('activo', true)
+            ->whereIn('estado', ['autorizado', 'parcial', 'vencido'])
+            ->get();
+
+        foreach ($valesPendientes as $vale) {
+            $quincenas = max(1, (int) ($vale->quincenas ?? $vale->producto?->quincenas ?? 1));
+            $base = $this->calcularMontosBase((float) $vale->monto, $quincenas, $comisionBasePct, $interesPctQuincena, $porcentajeCategoria);
+
+            $vales[] = [
+                'vale_id' => $vale->id,
+                'monto' => (float) $vale->monto,
+                'pago_estimado' => $base['pago_quincenal'],
+            ];
+            $montoEstimado += $base['pago_quincenal'];
+        }
+
+        return [
+            'fecha_corte' => $proximaFechaCorte->toDateString(),
+            'fecha_limite_pago' => $fechaLimitePago->toDateString(),
+            'monto_estimado' => round($montoEstimado, 2),
+            'vales' => $vales,
+        ];
+    }
+
     private function calcularDetalleVale(
         Relacion $relacion,
         Vale $vale,
