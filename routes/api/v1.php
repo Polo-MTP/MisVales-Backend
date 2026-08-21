@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\V1\AltaProveedor\SolicitudProveedorController;
 use App\Http\Controllers\Api\V1\AuditController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\Configuracion\SeguroTablaController;
 use App\Http\Controllers\Api\V1\Distribuidora\CategoriaDistribuidoraController;
 use App\Http\Controllers\Api\V1\MfaController;
 use App\Http\Controllers\Api\V1\Producto\ProductoController;
@@ -41,7 +42,6 @@ Route::middleware('throttle:auth')->group(function (): void {
     Route::get('mfa/setup', [MfaController::class, 'showSetup'])->middleware('signed')->name('api.v1.mfa.setup');
     Route::post('mfa/setup/confirm', [MfaController::class, 'confirmSetup'])->name('api.v1.mfa.setup.confirm');
 });
-
 
 // Protected routes for active authenticated users (120/min)
 Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(function (): void {
@@ -199,6 +199,24 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
         Route::get('fechas/historial', [App\Http\Controllers\Api\V1\Configuracion\ConfiguracionController::class, 'fechasHistorial'])
             ->middleware('role:Gerente General')
             ->name('api.v1.configuraciones.fechas.historial');
+
+        // Tabla de rangos de seguro por monto de vale ("varía según la cantidad") — la usa
+        // RelacionCalculoService en vivo, sin esto solo se podía cambiar directo en BD.
+        Route::get('seguros', [SeguroTablaController::class, 'index'])
+            ->middleware('role:Gerente General,Gerente de Sucursal')
+            ->name('api.v1.configuraciones.seguros.index');
+
+        Route::post('seguros', [SeguroTablaController::class, 'store'])
+            ->middleware('role:Gerente General')
+            ->name('api.v1.configuraciones.seguros.store');
+
+        Route::put('seguros/{seguro}', [SeguroTablaController::class, 'update'])
+            ->middleware('role:Gerente General')
+            ->name('api.v1.configuraciones.seguros.update');
+
+        Route::delete('seguros/{seguro}', [SeguroTablaController::class, 'destroy'])
+            ->middleware('role:Gerente General')
+            ->name('api.v1.configuraciones.seguros.destroy');
     });
 
     // MÓDULO 4: AUDITORÍA DE CAMBIOS DE ESTADO DE DISTRIBUIDORAS
@@ -230,10 +248,25 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
                 ->name('api.v1.productos.destroy');
         });
 
-    // Catálogo de categorías de distribuidora (usado por el selector de PUT distribuidoras/{id}/credito)
-    Route::get('categorias-distribuidoras', [CategoriaDistribuidoraController::class, 'index'])
-        ->middleware('role:Gerente de Sucursal,Gerente General')
-        ->name('api.v1.categorias_distribuidoras.index');
+    // Catálogo de categorías de distribuidora (usado por el selector de PUT distribuidoras/{id}/credito
+    // y por RelacionCalculoService al calcular el descuento de categoría en cada corte).
+    Route::prefix('categorias-distribuidoras')->group(function (): void {
+        Route::get('/', [CategoriaDistribuidoraController::class, 'index'])
+            ->middleware('role:Gerente de Sucursal,Gerente General')
+            ->name('api.v1.categorias_distribuidoras.index');
+
+        Route::post('/', [CategoriaDistribuidoraController::class, 'store'])
+            ->middleware('role:Gerente General')
+            ->name('api.v1.categorias_distribuidoras.store');
+
+        Route::put('{categoria}', [CategoriaDistribuidoraController::class, 'update'])
+            ->middleware('role:Gerente General')
+            ->name('api.v1.categorias_distribuidoras.update');
+
+        Route::delete('{categoria}', [CategoriaDistribuidoraController::class, 'destroy'])
+            ->middleware('role:Gerente General')
+            ->name('api.v1.categorias_distribuidoras.destroy');
+    });
 
     // ============================================================
     // MÓDULO 6: GESTIÓN AVANZADA DE DISTRIBUIDORAS

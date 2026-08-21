@@ -36,6 +36,7 @@ final class RelacionResource extends JsonResource
                 'comision' => $this->total_comision,
                 'interes' => $this->total_interes,
                 'seguro' => $this->total_seguro,
+                'categoria' => $this->total_categoria,
                 'recargos' => $this->total_recargos,
                 'a_pagar' => $this->total_a_pagar,
                 'abonado' => $this->total_abonado,

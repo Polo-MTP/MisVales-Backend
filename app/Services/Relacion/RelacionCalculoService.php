@@ -128,7 +128,7 @@ final class RelacionCalculoService
             ]);
 
             $totales = [
-                'capital' => 0.0, 'comision' => 0.0, 'interes' => 0.0, 'seguro' => 0.0, 'recargo' => 0.0, 'total' => 0.0,
+                'capital' => 0.0, 'comision' => 0.0, 'interes' => 0.0, 'seguro' => 0.0, 'categoria' => 0.0, 'recargo' => 0.0, 'total' => 0.0,
             ];
 
             foreach ($valesPendientes as $vale) {
@@ -138,6 +138,7 @@ final class RelacionCalculoService
                 $totales['comision'] += (float) $detalle->comision;
                 $totales['interes'] += (float) $detalle->interes;
                 $totales['seguro'] += (float) $detalle->seguro;
+                $totales['categoria'] += (float) $detalle->categoria;
                 $totales['recargo'] += (float) $detalle->recargo;
                 $totales['total'] += (float) $detalle->total;
             }
@@ -147,6 +148,7 @@ final class RelacionCalculoService
                 'total_comision' => $totales['comision'],
                 'total_interes' => $totales['interes'],
                 'total_seguro' => $totales['seguro'],
+                'total_categoria' => $totales['categoria'],
                 'total_recargos' => $totales['recargo'],
                 'total_a_pagar' => $totales['total'],
             ]);
@@ -180,7 +182,20 @@ final class RelacionCalculoService
         // Interés simple sobre el total del plazo, prorrateado entre quincenas (ver "Analisis de calculo de relacion").
         $interes = round(($monto * $interesPctQuincena / 100 * $quincenas) / $quincenas, 2);
         $seguro = round($this->calcularSeguro($monto) / $quincenas, 2);
-        $total = round($capital + $comision + $interes + $seguro + $recargo, 2);
+
+        // Ganancia de la distribuidora por su categoría (Cobre/Plata/Oro), snapshot al generar el corte.
+        // Solo se le reconoce cuando paga a tiempo — con recargo pierde el descuento de esta quincena
+        // ("se le quita la comisión por regla") y paga el monto completo sin categoría de por medio.
+        $porcentajeCategoria = (float) ($relacion->porcentaje_comision_snapshot ?? 0);
+        $categoria = round(($monto * $porcentajeCategoria / 100) / $quincenas, 2);
+
+        if ($recargo > 0.0) {
+            $categoria = 0.0;
+            $total = round($capital + $comision + $interes + $seguro + $recargo, 2);
+        } else {
+            // ROUNDDOWN al piso (no round()) tal como el documento fuente calcula el "Pago Distribuidora".
+            $total = floor($capital + $comision + $interes + $seguro - $categoria);
+        }
 
         return RelacionDetalle::query()->create([
             'relacion_id' => $relacion->id,
@@ -193,6 +208,7 @@ final class RelacionCalculoService
             'comision' => $comision,
             'interes' => $interes,
             'seguro' => $seguro,
+            'categoria' => $categoria,
             'recargo' => $recargo,
             'pago' => 0,
             'total' => $total,

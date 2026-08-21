@@ -117,11 +117,14 @@ it('calcula la relación replicando exactamente el ejemplo del documento fuente'
     $relacion = app(RelacionCalculoService::class)->generarParaDistribuidora($distribuidora, '2026-02-15');
 
     expect($relacion)->not->toBeNull()
-        ->and((float) $relacion->total_a_pagar)->toBe(2825.0)
         ->and((float) $relacion->total_capital)->toBe(1875.0)
         ->and((float) $relacion->total_comision)->toBe(187.5)
         ->and((float) $relacion->total_interes)->toBe(750.0)
         ->and((float) $relacion->total_seguro)->toBe(12.5)
+        // Categoría PLATA (6%): 15,000 x 0.06 / 8 quincenas = 112.5 (ganancia de la distribuidora, se resta del pago)
+        ->and((float) $relacion->total_categoria)->toBe(112.5)
+        // Pago Distribuidora = 1875 + 187.5 + 750 + 12.5 - 112.5 = 2712 - 112.5 = 2712.5, ROUNDDOWN al piso = 2712
+        ->and((float) $relacion->total_a_pagar)->toBe(2712.0)
         ->and($relacion->fecha_limite_pago->toDateString())->toBe('2026-02-16')
         ->and($relacion->fecha_pago_anticipado_desde->toDateString())->toBe('2026-02-13')
         ->and($relacion->fecha_pago_anticipado_hasta->toDateString())->toBe('2026-02-15')
@@ -169,7 +172,7 @@ it('concilia un abono bancario, liquida la relación y genera puntos por pago an
     $cajera = User::factory()->create();
 
     $archivo = crearExcelBanco([
-        [1, 'Pago de distribuidora', $relacion->referencia_pago, 2825, 'F001', '13/2/2026', '14:00', 'Transferencia'],
+        [1, 'Pago de distribuidora', $relacion->referencia_pago, 2712, 'F001', '13/2/2026', '14:00', 'Transferencia'],
     ]);
 
     $resumen = app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, $cajera);
@@ -179,7 +182,7 @@ it('concilia un abono bancario, liquida la relación y genera puntos por pago an
 
     $relacion->refresh();
     expect($relacion->estado)->toBe('liquidada')
-        ->and((float) $relacion->total_abonado)->toBe(2825.0)
+        ->and((float) $relacion->total_abonado)->toBe(2712.0)
         ->and($relacion->puntos_generados)->toBeGreaterThanOrEqual(0);
 });
 
@@ -215,7 +218,7 @@ it('tolera el typo real del banco "Tranferencia" y lo normaliza a transferencia'
     $cajera = User::factory()->create();
 
     $archivo = crearExcelBanco([
-        [1, 'Pago', $relacion->referencia_pago, 2825, 'F003', '13/2/2026', '14:00', 'Tranferencia'],
+        [1, 'Pago', $relacion->referencia_pago, 2712, 'F003', '13/2/2026', '14:00', 'Tranferencia'],
     ]);
 
     app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, $cajera);
@@ -233,7 +236,7 @@ it('penaliza el 20% de los puntos acumulados cuando el pago llega fuera de tiemp
 
     // fecha límite era 2026-02-16; este pago llega el 2026-02-20, fuera de tiempo.
     $archivo = crearExcelBanco([
-        [1, 'Pago tardío', $relacion->referencia_pago, 2825, 'F004', '20/2/2026', '10:00', 'Transferencia'],
+        [1, 'Pago tardío', $relacion->referencia_pago, 2712, 'F004', '20/2/2026', '10:00', 'Transferencia'],
     ]);
 
     app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, $cajera);
