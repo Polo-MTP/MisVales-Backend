@@ -514,12 +514,17 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
     });
 
     // ============================================================
-    // MÓDULO 11: NOTIFICACIONES — feed de movimientos del aplicativo. Gerente de Sucursal ve
-    // solo los de su sucursal; Gerente General y Administrador ven todos, sin filtrar.
+    // MÓDULO 11: NOTIFICACIONES. Gerente de Sucursal ve todas las de su sucursal (supervisión);
+    // Gerente General y Administrador ven todas, sin filtrar. Distribuidora/Verificador/
+    // Coordinador/Cajera solo ven las suyas (destinatario_id) -- antes no tenían acceso aquí.
     // ============================================================
     Route::get('notificaciones', [App\Http\Controllers\Api\V1\NotificacionController::class, 'index'])
-        ->middleware('role:Gerente de Sucursal,Gerente General,Administrador')
+        ->middleware('role:Distribuidora,Cajera,Coordinador,Verificador,Gerente de Sucursal,Gerente General,Administrador')
         ->name('api.v1.notificaciones.index');
+
+    Route::put('notificaciones/{notificacion}/leida', [App\Http\Controllers\Api\V1\NotificacionController::class, 'marcarLeida'])
+        ->middleware('role:Distribuidora,Cajera,Coordinador,Verificador,Gerente de Sucursal,Gerente General,Administrador')
+        ->name('api.v1.notificaciones.marcar_leida');
 
 });
 

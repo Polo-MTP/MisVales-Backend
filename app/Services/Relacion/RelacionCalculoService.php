@@ -10,6 +10,7 @@ use App\Models\RelacionDetalle;
 use App\Models\SeguroTabla;
 use App\Models\Vale;
 use App\Services\Configuracion\ConfiguracionService;
+use App\Services\Notificacion\NotificacionService;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use DomainException;
@@ -29,6 +30,7 @@ final class RelacionCalculoService
 {
     public function __construct(
         private readonly ConfiguracionService $configuracionService,
+        private readonly NotificacionService $notificacionService,
     ) {}
 
     /**
@@ -171,7 +173,17 @@ final class RelacionCalculoService
                 'total_a_pagar' => $totales['total'],
             ]);
 
-            return $relacion->fresh(['detalles.vale', 'detalles.cliente', 'detalles.producto', 'categoriaSnapshot']);
+            $relacion = $relacion->fresh(['detalles.vale', 'detalles.cliente', 'detalles.producto', 'categoriaSnapshot']);
+
+            if ($distribuidora->usuario) {
+                $this->notificacionService->crear(
+                    $distribuidora->usuario,
+                    'corte_listo',
+                    'Relación '.$relacion->referencia_pago
+                );
+            }
+
+            return $relacion;
         });
     }
 

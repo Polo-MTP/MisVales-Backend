@@ -10,6 +10,7 @@ use App\Models\Relacion;
 use App\Models\User;
 use App\Models\Vale;
 use App\Services\Configuracion\ConfiguracionService;
+use App\Services\Notificacion\NotificacionService;
 use Carbon\Carbon;
 use DomainException;
 use Illuminate\Http\UploadedFile;
@@ -32,6 +33,7 @@ final class ConciliacionBancariaService
 
     public function __construct(
         private readonly ConfiguracionService $configuracionService,
+        private readonly NotificacionService $notificacionService,
     ) {}
 
     /**
@@ -285,6 +287,14 @@ final class ConciliacionBancariaService
 
         $relacion->distribuidora?->increment('puntos_acumulados', $puntos);
         $relacion->update(['puntos_generados' => $puntos]);
+
+        if ($relacion->distribuidora?->usuario) {
+            $this->notificacionService->crear(
+                $relacion->distribuidora->usuario,
+                'puntos_generados',
+                'Relación '.$relacion->referencia_pago.' (+'.$puntos.' pts)'
+            );
+        }
     }
 
     /**
@@ -309,6 +319,14 @@ final class ConciliacionBancariaService
         ]);
 
         $relacion->distribuidora?->decrement('puntos_acumulados', $penalizacion);
+
+        if ($relacion->distribuidora?->usuario) {
+            $this->notificacionService->crear(
+                $relacion->distribuidora->usuario,
+                'puntos_penalizados',
+                'Relación '.$relacion->referencia_pago.' (-'.$penalizacion.' pts)'
+            );
+        }
     }
 
     /**
@@ -400,7 +418,7 @@ final class ConciliacionBancariaService
         $referencia = trim((string) $valor);
 
         if ($referencia !== '' && ctype_digit($referencia) && mb_strlen($referencia) < 18) {
-            return str_pad($referencia, 18, '0', STR_PAD_LEFT);
+            return mb_str_pad($referencia, 18, '0', STR_PAD_LEFT);
         }
 
         return $referencia;

@@ -7,12 +7,17 @@ namespace App\Services\Distribuidora;
 use App\Models\Distribuidora;
 use App\Models\HistorialEstadoDistribuidora;
 use App\Models\User;
+use App\Services\Notificacion\NotificacionService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 final class DistribuidoraEstadoService
 {
+    public function __construct(
+        private readonly NotificacionService $notificacionService,
+    ) {}
+
     /**
      * Cambia el estado de una distribuidora y genera la bitácora de auditoría histórica.
      * $usuario es null cuando el cambio lo dispara el propio sistema (ej. MOROSO automático
@@ -55,6 +60,16 @@ final class DistribuidoraEstadoService
             Log::debug('DistribuidoraEstadoService: Cambio de estado registrado exitosamente', [
                 'distribuidora_id' => $distribuidora->id,
             ]);
+
+            if ($nuevoEstado === 'MOROSO') {
+                $this->notificacionService->notificarRolEnSucursal(
+                    'Cajera',
+                    $distribuidora->sucursal_id,
+                    'distribuidora_morosa',
+                    'Distribuidora '.$distribuidora->numero_distribuidora,
+                    $usuario
+                );
+            }
 
             return $distribuidora->fresh(['usuario', 'historialEstados.cambiadoPor']);
         });

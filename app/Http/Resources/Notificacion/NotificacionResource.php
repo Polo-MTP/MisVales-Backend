@@ -30,6 +30,9 @@ final class NotificacionResource extends JsonResource
                 'id' => $this->usuario->id,
                 'name' => $this->usuario->name,
             ] : null,
+            'destinatario_id' => $this->destinatario_id,
+            'leido_at' => $this->leido_at?->toIso8601String(),
+            'leida' => $this->leido_at !== null,
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }

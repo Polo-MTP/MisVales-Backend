@@ -14,12 +14,17 @@ use App\Models\LogNuevoProveedor;
 use App\Models\Role;
 use App\Models\SolicitudProveedor;
 use App\Models\User;
+use App\Services\Notificacion\NotificacionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 
 final class SolicitudProveedorService
 {
+    public function __construct(
+        private readonly NotificacionService $notificacionService,
+    ) {}
+
     /**
      * Captura la solicitud inicial de un nuevo proveedor realizada por un Coordinador.
      * Asigna automáticamente la sucursal del coordinador a la solicitud.
@@ -217,6 +222,27 @@ final class SolicitudProveedorService
                 'solicitud_id' => $solicitud->id,
                 'estado' => $solicitud->estado,
             ]);
+
+            if ($solicitud->coordinador) {
+                $this->notificacionService->crear(
+                    $solicitud->coordinador,
+                    $solicitud->cumple ? 'solicitud_verificada' : 'solicitud_rechazada_verificador',
+                    'Solicitud '.$solicitud->razon_social,
+                    $verificador
+                );
+            }
+
+            // Solo si "cumple": ya está lista para que Gerencia decida. Si el verificador la
+            // rechazó no hay nada que Gerencia deba autorizar todavía.
+            if ($solicitud->cumple) {
+                $this->notificacionService->notificarRolEnSucursal(
+                    'Gerente de Sucursal',
+                    $solicitud->sucursal_id,
+                    'solicitud_lista_para_autorizar',
+                    'Solicitud '.$solicitud->razon_social,
+                    $verificador
+                );
+            }
 
             return $solicitud->load(['datosPersonales.direccion', 'sucursal', 'coordinador', 'verificador', 'evidencias', 'logs']);
         });

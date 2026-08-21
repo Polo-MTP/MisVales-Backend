@@ -7,6 +7,7 @@ namespace App\Services\Distribuidora;
 use App\Models\Distribuidora;
 use App\Models\HistorialCoordinador;
 use App\Models\User;
+use App\Services\Notificacion\NotificacionService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,8 @@ use Illuminate\Support\Str;
 final class DistribuidoraService
 {
     public function __construct(
-        private readonly DistribuidoraEstadoService $estadoService
+        private readonly DistribuidoraEstadoService $estadoService,
+        private readonly NotificacionService $notificacionService,
     ) {}
 
     /**
@@ -85,6 +87,8 @@ final class DistribuidoraService
     public function asignarCredito(Distribuidora $distribuidora, float $limiteCredito, int $categoriaId): Distribuidora
     {
         return DB::transaction(function () use ($distribuidora, $limiteCredito, $categoriaId): Distribuidora {
+            $limiteAnterior = (float) $distribuidora->limite_credito;
+
             $distribuidora->limite_credito = $limiteCredito;
             $distribuidora->categoria_id = $categoriaId;
             $distribuidora->save();
@@ -104,6 +108,14 @@ final class DistribuidoraService
             // Cambiar estado a ACTIVO si estaba en PENDIENTE_APROBACION o EN_CAPTURA
             if (in_array($distribuidora->estado, ['EN_CAPTURA', 'PENDIENTE_APROBACION'])) {
                 $this->cambiarEstado($distribuidora, 'ACTIVO', 'Asignación de crédito y aprobación automática');
+            }
+
+            if ($distribuidora->usuario) {
+                $this->notificacionService->crear(
+                    $distribuidora->usuario,
+                    $limiteAnterior <= 0 ? 'credito_asignado' : 'credito_incrementado',
+                    'Nuevo límite: $'.number_format($limiteCredito, 2)
+                );
             }
 
             return $distribuidora->fresh();
