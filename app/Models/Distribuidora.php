@@ -229,8 +229,14 @@ final class Distribuidora extends Model
             return null;
         }
 
+        // Estrictamente posterior (no >=): 'created_at'/'fecha_decision' solo guardan hasta el
+        // segundo (sin microsegundos). Con >=, un vale creado ANTES del aumento pero dentro del
+        // mismo segundo que fecha_decision se leía como "ya se usó el aumento" y se saltaba por
+        // completo el tope del 50% en el vale que en realidad debía llevarlo. Ante la duda entre
+        // los dos segundos iguales, es más seguro seguir cobrando la caución un tantito de más
+        // que dejarla pasar del todo.
         $yaSeUsoDespuesDelAumento = $this->vales()
-            ->where('created_at', '>=', $ultimo->fecha_decision)
+            ->where('created_at', '>', $ultimo->fecha_decision)
             ->exists();
 
         return $yaSeUsoDespuesDelAumento ? null : $ultimo;
