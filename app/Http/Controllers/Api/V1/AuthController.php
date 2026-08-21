@@ -43,9 +43,13 @@ final class AuthController extends ApiController
             $request->userAgent()
         );
 
+        // Nunca loguear $result completo: trae el plainTextToken de Sanctum (o el
+        // setup_url firmado del MFA) en texto plano -- cualquiera con lectura del log
+        // podría secuestrar la sesión sin necesitar la contraseña.
         Log::debug('AuthController: Proceso de login terminado', [
             'email' => $request->email,
-            'result' => $result,
+            'success' => $result['success'],
+            'code' => $result['code'] ?? null,
         ]);
 
         if (! $result['success']) {

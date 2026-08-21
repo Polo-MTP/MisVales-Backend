@@ -8,10 +8,25 @@ use App\Http\Controllers\Api\ApiController;
 use App\Services\Storage\SpacesStorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Throwable;
 
 final class UploadController extends ApiController
 {
+    /**
+     * Tipos de archivo que de verdad se usan en el aplicativo (fotos de evidencias/INE,
+     * comprobantes, contratos escaneados). Cualquier otro (ej. text/html, image/svg+xml,
+     * application/javascript) queda fuera: el objeto se sube con ACL pública, así que
+     * aceptar cualquier content_type permitiría alojar contenido arbitrario bajo el
+     * dominio de confianza del bucket.
+     */
+    private const CONTENT_TYPES_PERMITIDOS = [
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'application/pdf',
+    ];
+
     public function __construct(
         private readonly SpacesStorageService $spacesService
     ) {}
@@ -23,8 +38,10 @@ final class UploadController extends ApiController
     {
         $request->validate([
             'file_name' => 'required|string|max:255',
-            'content_type' => 'required|string|max:100',
-            'folder' => 'nullable|string|max:50',
+            'content_type' => ['required', 'string', Rule::in(self::CONTENT_TYPES_PERMITIDOS)],
+            // Solo minúsculas/números/guiones -- nada de '/' o '..': el folder se concatena
+            // directo en la Key de S3.
+            'folder' => ['nullable', 'string', 'max:50', 'regex:/^[a-z0-9\-]+$/'],
         ]);
 
         try {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 
 uses(RefreshDatabase::class);
 
@@ -13,6 +14,31 @@ beforeEach(function (): void {
 });
 
 describe('Login', function (): void {
+    it('nunca loguea el token de sesión emitido en un login exitoso', function (): void {
+        $user = User::factory()->create([
+            'password' => bcrypt('Password123!'),
+            'role_id' => null,
+        ]);
+
+        $contextosLogueados = [];
+        Log::listen(function ($log) use (&$contextosLogueados): void {
+            $contextosLogueados[] = $log->context;
+        });
+
+        $response = $this->postJson('/api/v1/login', [
+            'email' => $user->email,
+            'password' => 'Password123!',
+            'recaptcha' => 'bypass-recaptcha',
+        ]);
+
+        $token = $response->json('data.token');
+        expect($token)->not->toBeNull();
+
+        foreach ($contextosLogueados as $contexto) {
+            expect(json_encode($contexto))->not->toContain($token);
+        }
+    });
+
     it('logs in with valid credentials for a role with no MFA requirement', function (): void {
         $user = User::factory()->create([
             'password' => bcrypt('Password123!'),
