@@ -234,7 +234,7 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
     });
     // ============================================================
     // MÓDULO 5: CATÁLOGO DE PRODUCTOS (Gerente General y Gerente de Sucursal escriben;
-    // editar requiere además VPN — es lo que cambia el monto/plazo que se le ofrece al
+    // crear/editar requieren además VPN — cambian el monto/plazo que se le ofrece al
     // cliente, mismo criterio que el resto de acciones de mayor impacto. Administrador
     // queda fuera, solo ve logs.
     // ============================================================
@@ -246,7 +246,7 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
                 ->middleware('role:Gerente General,Gerente de Sucursal')
                 ->name('api.v1.productos.show');
             Route::post('/', [ProductoController::class, 'store'])
-                ->middleware('role:Gerente General,Gerente de Sucursal')
+                ->middleware(['role:Gerente General,Gerente de Sucursal', 'vpn'])
                 ->name('api.v1.productos.store');
             Route::put('{producto}', [ProductoController::class, 'update'])
                 ->middleware(['role:Gerente General,Gerente de Sucursal', 'vpn'])

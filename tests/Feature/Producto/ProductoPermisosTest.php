@@ -17,10 +17,11 @@ function crearUsuarioProducto(string $rol): User
     return User::factory()->create(['role_id' => $role->id, 'is_active' => true]);
 }
 
-it('el Gerente de Sucursal puede crear un producto', function (): void {
+it('el Gerente de Sucursal puede crear un producto desde el host de la VPN', function (): void {
+    config(['security.vpn_host' => 'vpn.misvales.test']);
     Sanctum::actingAs(crearUsuarioProducto('Gerente de Sucursal'));
 
-    $response = $this->postJson('/api/v1/productos', [
+    $response = $this->postJson('http://vpn.misvales.test/api/v1/productos', [
         'monto' => 5000,
         'quincenas' => 8,
         'descripcion' => 'Producto de prueba',
@@ -28,6 +29,19 @@ it('el Gerente de Sucursal puede crear un producto', function (): void {
 
     $response->assertStatus(201);
     expect(Producto::where('monto', 5000)->exists())->toBeTrue();
+});
+
+it('el Gerente de Sucursal NO puede crear un producto desde la red pública', function (): void {
+    config(['security.vpn_host' => 'vpn.misvales.test']);
+    Sanctum::actingAs(crearUsuarioProducto('Gerente de Sucursal'));
+
+    $response = $this->postJson('http://api.misvales.test/api/v1/productos', [
+        'monto' => 5000,
+        'quincenas' => 8,
+    ]);
+
+    $response->assertStatus(403);
+    expect(Producto::where('monto', 5000)->exists())->toBeFalse();
 });
 
 it('el Gerente de Sucursal puede editar un producto desde el host de la VPN', function (): void {
