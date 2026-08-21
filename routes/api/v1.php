@@ -45,7 +45,7 @@ Route::middleware('throttle:auth')->group(function (): void {
 });
 
 // Protected routes for active authenticated users (120/min)
-Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(function (): void {
+Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])->group(function (): void {
     Route::post('logout', [AuthController::class, 'logout'])->name('api.v1.logout');
     Route::get('me', [AuthController::class, 'me'])->name('api.v1.me');
     Route::get('upload-url', [UploadController::class, 'getPresignedUrl'])->name('api.v1.upload_url');
@@ -482,7 +482,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
 });
 
 // Admin-only protected routes — el Administrador solo ve logs de todo lo que se hace en el aplicativo.
-Route::middleware(['auth:sanctum', 'active', 'role:Administrador', 'throttle:authenticated'])->group(function (): void {
+Route::middleware(['auth:sanctum', 'idle', 'active', 'role:Administrador', 'throttle:authenticated'])->group(function (): void {
     Route::get('admin/historical-data', [AuditController::class, 'getHistoricalData'])
         ->name('api.v1.admin.historical_data');
 

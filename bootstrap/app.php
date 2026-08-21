@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Middleware\CheckRole;
 use App\Http\Middleware\EnsureEmailVerified;
+use App\Http\Middleware\EnsureTokenNotIdle;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\LogApiRequests;
@@ -36,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'log.api' => LogApiRequests::class,
             'verified' => EnsureEmailVerified::class,
             'active' => EnsureUserIsActive::class,
+            'idle' => EnsureTokenNotIdle::class,
             'role' => CheckRole::class,
             'security.headers' => SecurityHeaders::class,
             'vpn' => VerifyVpnAccess::class,

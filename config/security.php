@@ -20,6 +20,22 @@ return [
 
     'vpn_host' => trim((string) env('VPN_HOST', '')),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Idle timeout (cierre de sesión por inactividad)
+    |--------------------------------------------------------------------------
+    |
+    | Minutos sin actividad antes de revocar el token (ver
+    | App\Http\Middleware\EnsureTokenNotIdle). Independiente de la expiración
+    | absoluta del token (config/sanctum.php 'expiration'). 15 min por defecto:
+    | maneja dinero/crédito, así que se toma el extremo estricto del rango que
+    | OWASP recomienda para apps de riesgo estándar (15-30 min) en vez del
+    | rango de bajo riesgo.
+    |
+    */
+
+    'idle_timeout_minutes' => (int) env('IDLE_TIMEOUT_MINUTES', 15),
+
     // TRUSTED_PROXIES (para el balanceador) NO vive aquí a propósito: se configura
     // directo en bootstrap/app.php con env(), porque ese archivo corre antes de que el
     // contenedor tenga registrado el binding 'config' — llamar config() ahí tumba el
