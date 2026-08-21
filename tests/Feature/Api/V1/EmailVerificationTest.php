@@ -29,7 +29,7 @@ describe('Email Verification', function (): void {
         $response->assertStatus(200)
             ->assertJson([
                 'success' => true,
-                'message' => 'Email verificado exitosamente.',
+                'message' => 'Email verified successfully',
             ]);
 
         $this->assertNotNull($user->fresh()->email_verified_at);
@@ -54,7 +54,7 @@ describe('Email Verification', function (): void {
         $response->assertStatus(200)
             ->assertJson([
                 'success' => true,
-                'message' => 'Email ya verificado.',
+                'message' => 'Email already verified',
             ]);
     });
 
@@ -97,7 +97,7 @@ describe('Resend Verification Email', function (): void {
         $response->assertStatus(200)
             ->assertJson([
                 'success' => true,
-                'message' => 'Correo de verificación reenviado exitosamente.',
+                'message' => 'Verification email sent successfully',
             ]);
     });
 
@@ -115,7 +115,7 @@ describe('Resend Verification Email', function (): void {
         $response->assertStatus(400)
             ->assertJson([
                 'success' => false,
-                'message' => 'Email ya verificado.',
+                'message' => 'Email already verified',
             ]);
     });
 
