@@ -28,11 +28,34 @@ use Illuminate\Validation\Rules\Password;
 final class AppServiceProvider extends ServiceProvider
 {
     /**
-     * Sin bindings propios de la aplicación por ahora.
+     * Registra servicios personalizados en el contenedor.
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(\Resend\Contracts\Client::class, static function ($app): \Resend\Client {
+            $apiKey = config('resend.api_key') ?? config('services.resend.key');
+
+            if (! is_string($apiKey) || $apiKey === '') {
+                throw \Resend\Laravel\Exceptions\ApiKeyIsMissing::create();
+            }
+
+            $key = \Resend\ValueObjects\ApiKey::from($apiKey);
+            $baseUri = \Resend\ValueObjects\Transporter\BaseUri::from(getenv('RESEND_BASE_URL') ?: 'api.resend.com');
+            $headers = \Resend\ValueObjects\Transporter\Headers::withAuthorization($key);
+
+            $guzzleOptions = [];
+            if ($app->environment('local', 'testing')) {
+                $guzzleOptions['verify'] = false;
+            }
+
+            $client = new \GuzzleHttp\Client($guzzleOptions);
+            $transporter = new \Resend\Transporters\HttpTransporter($client, $baseUri, $headers);
+
+            return new \Resend\Client($transporter);
+        });
+
+        $this->app->alias(\Resend\Contracts\Client::class, 'resend');
+        $this->app->alias(\Resend\Contracts\Client::class, \Resend\Client::class);
     }
 
     /**
