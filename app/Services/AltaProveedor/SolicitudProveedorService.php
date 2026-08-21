@@ -266,8 +266,13 @@ final class SolicitudProveedorService
                     'datos_id' => $solicitud->datos_id,
                     'sucursal_id' => $solicitud->sucursal_id,
                     'is_active' => true,
-                    'email_verified_at' => now(),
                 ]);
+
+                // 'email_verified_at' no está en $fillable de User a propósito -- mandarlo
+                // dentro del create() de arriba se ignora en silencio y la cuenta queda sin
+                // verificar. Se asigna aparte.
+                $distribuidoraUser->email_verified_at = now();
+                $distribuidoraUser->save();
 
                 $limiteCredito = (float) $data['limite_credito_asignado'];
                 /** @var Distribuidora $distribuidora */

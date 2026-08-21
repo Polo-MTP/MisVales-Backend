@@ -74,7 +74,10 @@ it('acepta un password fuerte, crea la cuenta y deja un solo rastro de auditorí
     ])->assertStatus(200);
 
     $nuevoUsuario = User::where('email', 'nuevo.proveedor@correo.com')->first();
-    expect($nuevoUsuario)->not->toBeNull();
+    expect($nuevoUsuario)->not->toBeNull()
+        // email_verified_at no está en $fillable de User -- mandarlo dentro de un create()
+        // se ignora en silencio. Regresión: la cuenta debe quedar realmente verificada.
+        ->and($nuevoUsuario->email_verified_at)->not->toBeNull();
 
     expect(AuditLog::where('action', 'User.registrado')->where('resource', 'User#'.$nuevoUsuario->id)->count())->toBe(1);
 
