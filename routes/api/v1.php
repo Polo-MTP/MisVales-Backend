@@ -245,6 +245,10 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
             Route::get('{producto}', [ProductoController::class, 'show'])
                 ->middleware('role:Gerente General,Gerente de Sucursal')
                 ->name('api.v1.productos.show');
+            // Previsualización del pago quincenal estimado — sin restricción de rol, es
+            // justo lo que la Distribuidora necesita ver antes de pedir el vale.
+            Route::get('{producto}/simulacion', [ProductoController::class, 'simular'])
+                ->name('api.v1.productos.simulacion');
             Route::post('/', [ProductoController::class, 'store'])
                 ->middleware('role:Gerente General')
                 ->name('api.v1.productos.store');

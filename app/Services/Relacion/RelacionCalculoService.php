@@ -175,6 +175,29 @@ final class RelacionCalculoService
         });
     }
 
+    /**
+     * Previsualiza el pago quincenal estimado para un monto/plazo dados, ANTES de que exista
+     * un vale o se genere ningún corte — mismas reglas vigentes ahora mismo que usaría un
+     * corte real. Es un estimado "si paga puntual": no incluye recargo (depende de un
+     * comportamiento futuro que todavía no pasa) y usa la configuración vigente EN ESTE
+     * MOMENTO, que puede cambiar antes de que el corte real se genere.
+     *
+     * @return array{capital: float, comision: float, interes: float, seguro: float, categoria: float, pago_quincenal: float, total_estimado_plazo: float}
+     */
+    public function simularPagoQuincenal(float $monto, int $quincenas, ?Distribuidora $distribuidora = null): array
+    {
+        $comisionBasePct = (float) ($this->configuracionService->obtenerValorVigente('comision_base_pct') ?? 10);
+        $interesPctQuincena = (float) ($this->configuracionService->obtenerValorVigente('interes_pct_quincena') ?? 5);
+        $porcentajeCategoria = (float) ($distribuidora?->categoria?->porcentaje_comision ?? 0);
+
+        $base = $this->calcularMontosBase($monto, max(1, $quincenas), $comisionBasePct, $interesPctQuincena, $porcentajeCategoria);
+
+        return [
+            ...$base,
+            'total_estimado_plazo' => round($base['pago_quincenal'] * max(1, $quincenas), 2),
+        ];
+    }
+
     private function calcularDetalleVale(
         Relacion $relacion,
         Vale $vale,
@@ -195,24 +218,18 @@ final class RelacionCalculoService
         // Recargo: si la cuota anterior de este mismo vale no quedó liquidada, se suma la multa configurada.
         $recargo = ($cuotaAnterior && $cuotaAnterior->estado !== 'pagado') ? $multaNoPago : 0.0;
 
-        $capital = round($monto / $quincenas, 2);
-        $comision = round(($monto * $comisionBasePct / 100) / $quincenas, 2);
-        // Interés simple sobre el total del plazo, prorrateado entre quincenas (ver "Analisis de calculo de relacion").
-        $interes = round(($monto * $interesPctQuincena / 100 * $quincenas) / $quincenas, 2);
-        $seguro = round($this->calcularSeguro($monto) / $quincenas, 2);
-
         // Ganancia de la distribuidora por su categoría (Cobre/Plata/Oro), snapshot al generar el corte.
-        // Solo se le reconoce cuando paga a tiempo — con recargo pierde el descuento de esta quincena
-        // ("se le quita la comisión por regla") y paga el monto completo sin categoría de por medio.
         $porcentajeCategoria = (float) ($relacion->porcentaje_comision_snapshot ?? 0);
-        $categoria = round(($monto * $porcentajeCategoria / 100) / $quincenas, 2);
+        $base = $this->calcularMontosBase($monto, $quincenas, $comisionBasePct, $interesPctQuincena, $porcentajeCategoria);
 
         if ($recargo > 0.0) {
+            // Con recargo pierde el descuento de esta quincena ("se le quita la comisión por
+            // regla") y paga el monto completo sin categoría de por medio.
             $categoria = 0.0;
-            $total = round($capital + $comision + $interes + $seguro + $recargo, 2);
+            $total = round($base['capital'] + $base['comision'] + $base['interes'] + $base['seguro'] + $recargo, 2);
         } else {
-            // ROUNDDOWN al piso (no round()) tal como el documento fuente calcula el "Pago Distribuidora".
-            $total = floor($capital + $comision + $interes + $seguro - $categoria);
+            $categoria = $base['categoria'];
+            $total = $base['pago_quincenal'];
         }
 
         return RelacionDetalle::query()->create([
@@ -222,16 +239,48 @@ final class RelacionCalculoService
             'producto_id' => $vale->producto_id,
             'cuota_numero' => $cuotaNumero,
             'cuotas_totales' => $quincenas,
-            'capital' => $capital,
-            'comision' => $comision,
-            'interes' => $interes,
-            'seguro' => $seguro,
+            'capital' => $base['capital'],
+            'comision' => $base['comision'],
+            'interes' => $base['interes'],
+            'seguro' => $base['seguro'],
             'categoria' => $categoria,
             'recargo' => $recargo,
             'pago' => 0,
             'total' => $total,
             'estado' => 'pendiente',
         ]);
+    }
+
+    /**
+     * Cálculo puro (sin recargo, sin tocar la base de datos) del pago quincenal "limpio":
+     * capital + comisión + interés + seguro, menos el descuento de categoría, redondeado al
+     * piso. Es la misma fórmula que calcularDetalleVale() aplica cuando no hay recargo — la
+     * comparten el cálculo real del corte y simularPagoQuincenal().
+     *
+     * @return array{capital: float, comision: float, interes: float, seguro: float, categoria: float, pago_quincenal: float}
+     */
+    private function calcularMontosBase(float $monto, int $quincenas, float $comisionBasePct, float $interesPctQuincena, float $porcentajeCategoria): array
+    {
+        $quincenas = max(1, $quincenas);
+
+        $capital = round($monto / $quincenas, 2);
+        $comision = round(($monto * $comisionBasePct / 100) / $quincenas, 2);
+        // Interés simple sobre el total del plazo, prorrateado entre quincenas (ver "Analisis de calculo de relacion").
+        $interes = round($monto * $interesPctQuincena / 100, 2);
+        $seguro = round($this->calcularSeguro($monto) / $quincenas, 2);
+        $categoria = round(($monto * $porcentajeCategoria / 100) / $quincenas, 2);
+
+        // ROUNDDOWN al piso (no round()) tal como el documento fuente calcula el "Pago Distribuidora".
+        $pagoQuincenal = floor($capital + $comision + $interes + $seguro - $categoria);
+
+        return [
+            'capital' => $capital,
+            'comision' => $comision,
+            'interes' => $interes,
+            'seguro' => $seguro,
+            'categoria' => $categoria,
+            'pago_quincenal' => $pagoQuincenal,
+        ];
     }
 
     /**

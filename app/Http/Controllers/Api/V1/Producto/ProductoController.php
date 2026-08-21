@@ -8,14 +8,19 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Productos\ProductoStoreRequest;
 use App\Http\Requests\Api\V1\Productos\ProductoUpdateRequest;
 use App\Http\Resources\Productos\ProductoResource;
+use App\Models\Distribuidora;
 use App\Models\Producto;
 use App\Services\Producto\ProductoService;
+use App\Services\Relacion\RelacionCalculoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 final class ProductoController extends Controller
 {
-    public function __construct(protected ProductoService $productoService) {}
+    public function __construct(
+        protected ProductoService $productoService,
+        protected RelacionCalculoService $relacionCalculoService,
+    ) {}
 
     /**
      * ?activos=false permite ver también los productos desactivados (para poder reactivarlos).
@@ -68,5 +73,34 @@ final class ProductoController extends Controller
         $this->productoService->desactivar($producto);
 
         return response()->json(['message' => 'Producto desactivado']);
+    }
+
+    /**
+     * Previsualiza cuánto le tocaría pagar por quincena a una distribuidora si le dan este
+     * producto, usando las reglas vigentes ahora mismo — sin necesidad de solicitar un vale
+     * ni de que se genere ningún corte. Si quien pregunta es una Distribuidora, usa su propia
+     * categoría; el staff puede pasar ?distribuidora_id= para simular la de alguien más.
+     */
+    public function simular(Request $request, Producto $producto): JsonResponse
+    {
+        $usuario = $request->user();
+
+        $distribuidora = $usuario?->role?->name === 'Distribuidora'
+            ? $usuario->distribuidora
+            : ($request->filled('distribuidora_id') ? Distribuidora::query()->find($request->integer('distribuidora_id')) : null);
+
+        $resultado = $this->relacionCalculoService->simularPagoQuincenal(
+            (float) $producto->monto,
+            (int) ($producto->quincenas ?? 1),
+            $distribuidora,
+        );
+
+        return response()->json([
+            'producto_id' => $producto->id,
+            'monto' => (float) $producto->monto,
+            'quincenas' => (int) ($producto->quincenas ?? 1),
+            ...$resultado,
+            'nota' => 'Estimado si paga puntual cada quincena, con las reglas vigentes hoy. El corte real puede variar si hay atraso (se pierde el descuento de categoría y se suma la multa) o si cambian los parámetros antes de generarse.',
+        ]);
     }
 }
