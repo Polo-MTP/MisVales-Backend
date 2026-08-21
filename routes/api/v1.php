@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\Producto\ProductoController;
 use App\Http\Controllers\Api\V1\Relacion\ConciliacionController;
 use App\Http\Controllers\Api\V1\Relacion\RelacionController;
 use App\Http\Controllers\Api\V1\Reporte\ReporteController;
+use App\Http\Controllers\Api\V1\Sucursal\SucursalController;
 use App\Http\Controllers\Api\V1\UploadController;
 use App\Http\Controllers\Api\V1\UsuarioController;
 use App\Http\Controllers\Api\V1\Vale\ValeController;
@@ -62,6 +63,31 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
     Route::get('usuarios', [UsuarioController::class, 'index'])
         ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General')
         ->name('api.v1.usuarios.index');
+
+    // Feed de "lo que yo he autorizado" -- sin restricción de rol, siempre es sobre uno mismo.
+    Route::get('usuarios/mis-autorizaciones', [UsuarioController::class, 'misAutorizaciones'])
+        ->name('api.v1.usuarios.mis_autorizaciones');
+
+    // Solo da de alta Gerente de Sucursal -- el rol queda fijo en el controller, no lo manda
+    // quien hace la petición.
+    Route::post('usuarios/gerente-sucursal', [UsuarioController::class, 'crearGerenteSucursal'])
+        ->middleware('role:Gerente General')
+        ->name('api.v1.usuarios.crear_gerente_sucursal');
+
+    // MÓDULO: SUCURSALES. Alta/edición solo Gerente General; listar/ver es de cualquier
+    // usuario autenticado (lo necesitan varios selectores: crear Gerente de Sucursal, etc.).
+    Route::prefix('sucursales')->group(function (): void {
+        Route::get('/', [SucursalController::class, 'index'])
+            ->name('api.v1.sucursales.index');
+        Route::get('{sucursal}', [SucursalController::class, 'show'])
+            ->name('api.v1.sucursales.show');
+        Route::post('/', [SucursalController::class, 'store'])
+            ->middleware('role:Gerente General')
+            ->name('api.v1.sucursales.store');
+        Route::put('{sucursal}', [SucursalController::class, 'update'])
+            ->middleware('role:Gerente General')
+            ->name('api.v1.sucursales.update');
+    });
 
     // MÓDULO 1: ALTA DE PROVEEDORES (NUEVO DISTRIBUIDOR)
     Route::prefix('alta-proveedor')->group(function (): void {
