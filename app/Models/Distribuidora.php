@@ -176,20 +176,27 @@ final class Distribuidora extends Model
     }
 
     /**
-     * Verifica si la distribuidora puede solicitar un vale por el monto indicado:
-     * debe estar activa/en verificación, tener crédito disponible suficiente y,
-     * si es su primer vale (o el primero desde un aumento de crédito reciente), no exceder
-     * el porcentaje máximo configurable ('regla_50_pct').
+     * Verifica si la distribuidora puede solicitar un vale por el monto indicado.
+     * Ver montoMaximoDisponible() para el detalle de las reglas.
      */
     public function puedeSolicitarVale(float $montoSolicitado, bool $esPrimerVale = false): bool
     {
+        return $montoSolicitado <= $this->montoMaximoDisponible($esPrimerVale);
+    }
+
+    /**
+     * Monto máximo que la distribuidora puede pedir ahora mismo en un vale nuevo: debe estar
+     * activa/en verificación, respetar el crédito disponible y, si es su primer vale (o el
+     * primero desde un aumento de crédito reciente), no exceder el porcentaje máximo
+     * configurable ('regla_50_pct'). Sirve tanto para validar una solicitud puntual
+     * (puedeSolicitarVale) como para filtrar de antemano qué productos del catálogo puede
+     * ver/elegir (ProductoService::listar()).
+     */
+    public function montoMaximoDisponible(bool $esPrimerVale = false): float
+    {
         // Solo pueden solicitar si están activas o en verificación
         if (! in_array($this->estado, ['ACTIVO', 'EN_VERIFICACION'])) {
-            return false;
-        }
-
-        if ($montoSolicitado > $this->credito_disponible) {
-            return false;
+            return 0.0;
         }
 
         $configuracionService = app(ConfiguracionService::class);
@@ -197,7 +204,7 @@ final class Distribuidora extends Model
 
         // Regla del porcentaje máximo para el primer vale de la distribuidora.
         if ($esPrimerVale) {
-            return $montoSolicitado <= $this->limite_credito * ($porcentaje / 100);
+            return min($this->credito_disponible, $this->limite_credito * ($porcentaje / 100));
         }
 
         // Un aumento de crédito no se puede usar de un solo golpe: el primer vale después de
@@ -206,10 +213,10 @@ final class Distribuidora extends Model
         if ($this->aumentoCreditoSinConsumir() !== null) {
             $margen = (float) ($configuracionService->obtenerValorVigente('margen_aumento_credito') ?? 500);
 
-            return $montoSolicitado <= ($this->credito_disponible * ($porcentaje / 100)) + $margen;
+            return min($this->credito_disponible, ($this->credito_disponible * ($porcentaje / 100)) + $margen);
         }
 
-        return true;
+        return $this->credito_disponible;
     }
 
     /**
