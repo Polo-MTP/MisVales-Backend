@@ -33,6 +33,9 @@ final class ValeResource extends JsonResource
                 'id' => $this->cliente->id,
                 'nombre' => trim(($this->cliente->datosPersonales?->nombre ?? '').' '.($this->cliente->datosPersonales?->apellido_paterno ?? '').' '.($this->cliente->datosPersonales?->apellido_materno ?? '')),
                 'curp' => $this->cliente->datosPersonales?->curp,
+                // Igual que ClienteResource: nunca la CLABE completa, solo los últimos 4 dígitos
+                // para que la cajera sepa si ya hay una registrada antes de pedir una nueva.
+                'clabe_ultimos4' => $this->cliente->clabe ? mb_substr((string) $this->cliente->clabe, -4) : null,
                 'direccion' => $this->cliente->datosPersonales?->direccion ? trim(
                     $this->cliente->datosPersonales->direccion->calle
                         .' '.$this->cliente->datosPersonales->direccion->numero_ext
