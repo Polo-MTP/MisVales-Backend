@@ -16,9 +16,8 @@ final class UploadController extends ApiController
     /**
      * Tipos de archivo que de verdad se usan en el aplicativo (fotos de evidencias/INE,
      * comprobantes, contratos escaneados). Cualquier otro (ej. text/html, image/svg+xml,
-     * application/javascript) queda fuera: el objeto se sube con ACL pública, así que
-     * aceptar cualquier content_type permitiría alojar contenido arbitrario bajo el
-     * dominio de confianza del bucket.
+     * application/javascript) queda fuera para no poder alojar contenido arbitrario bajo
+     * el dominio de confianza del bucket.
      */
     private const CONTENT_TYPES_PERMITIDOS = [
         'image/jpeg',
@@ -52,6 +51,29 @@ final class UploadController extends ApiController
             );
 
             return $this->success($data, 'URL prefirmada generada con éxito');
+        } catch (Throwable $e) {
+            return $this->error($e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Genera una URL prefirmada temporal para LEER un archivo privado del Space (el 'path'
+     * o el 'public_url' que se guardó al subirlo). Cualquier usuario autenticado puede
+     * pedirla para cualquier archivo -- la protección real es que la Key de S3 no es
+     * adivinable (nombre único con parte aleatoria); no hay verificación de "este usuario
+     * puede ver este documento en particular" a este nivel, eso lo sigue filtrando cada
+     * endpoint de negocio (Evidencia, contrato, etc.) al decidir qué url_archivo expone.
+     */
+    public function getPresignedReadUrl(Request $request): JsonResponse
+    {
+        $request->validate([
+            'path' => 'required|string|max:500',
+        ]);
+
+        try {
+            $readUrl = $this->spacesService->generatePresignedReadUrl($request->input('path'));
+
+            return $this->success(['read_url' => $readUrl], 'URL de lectura generada con éxito');
         } catch (Throwable $e) {
             return $this->error($e->getMessage(), 500);
         }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Storage\SpacesStorageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 
@@ -47,4 +48,53 @@ it('rechaza un folder con path traversal o slashes', function (): void {
 it('acepta un folder con solo minúsculas, números y guiones', function (): void {
     $this->getJson('/api/v1/upload-url?file_name=archivo.jpg&content_type=image/jpeg&folder=evidencias-2026')
         ->assertJsonMissingValidationErrors(['folder']);
+});
+
+function configurarSpacesFake(): void
+{
+    config()->set('filesystems.disks.s3.key', 'test-key');
+    config()->set('filesystems.disks.s3.secret', 'test-secret');
+    config()->set('filesystems.disks.s3.bucket', 'test-bucket');
+    config()->set('filesystems.disks.s3.region', 'us-east-1');
+    config()->set('filesystems.disks.s3.endpoint', 'https://fake.digitaloceanspaces.com');
+    config()->set('filesystems.disks.s3.use_path_style_endpoint', true);
+}
+
+it('los archivos se suben con ACL privada por defecto, no pública', function (): void {
+    $parametro = (new ReflectionMethod(SpacesStorageService::class, 'generatePresignedUploadUrl'))
+        ->getParameters()[4];
+
+    expect($parametro->getName())->toBe('acl')
+        ->and($parametro->getDefaultValue())->toBe('private');
+});
+
+it('exige el parámetro path para generar una URL de lectura', function (): void {
+    $this->getJson('/api/v1/read-url')
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['path']);
+});
+
+it('genera una URL de lectura firmada para un path directo (Key de S3)', function (): void {
+    configurarSpacesFake();
+
+    $response = $this->getJson('/api/v1/read-url?path='.urlencode('evidencias/123_abcdef_foto.jpg'));
+
+    $response->assertStatus(200);
+    $readUrl = $response->json('data.read_url');
+    expect($readUrl)->toContain('evidencias/123_abcdef_foto.jpg')
+        ->and($readUrl)->toContain('X-Amz-Signature');
+});
+
+it('genera una URL de lectura firmada aunque le manden el public_url completo que se guardó al subir', function (): void {
+    configurarSpacesFake();
+
+    $publicUrl = 'https://fake.digitaloceanspaces.com/test-bucket/evidencias/123_abcdef_foto.jpg';
+
+    $response = $this->getJson('/api/v1/read-url?path='.urlencode($publicUrl));
+
+    $response->assertStatus(200);
+    $readUrl = $response->json('data.read_url');
+    // No debe quedar el endpoint/bucket duplicado dentro de la Key firmada.
+    expect($readUrl)->toContain('/test-bucket/evidencias/123_abcdef_foto.jpg')
+        ->and(mb_substr_count($readUrl, 'test-bucket'))->toBe(1);
 });
