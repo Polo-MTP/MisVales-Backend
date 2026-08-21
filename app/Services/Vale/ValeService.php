@@ -134,6 +134,12 @@ final class ValeService
      * Autoriza (paga) un vale ya validado: a partir de aquí cuenta contra el crédito
      * disponible de la distribuidora y queda elegible para el corte (RelacionCalculoService).
      * No se puede autorizar/pagar sin haber validado los datos del cliente primero.
+     *
+     * El crédito se revisa aquí, no en solicitar(): un vale 'solicitado' todavía no cuenta
+     * contra el crédito disponible, así que nada impide solicitar de más mientras no se
+     * autorice. lockForUpdate() sobre la distribuidora evita que dos autorizaciones
+     * concurrentes (de vales distintos) lean el mismo crédito disponible "antes" y ambas
+     * pasen, dejando a la distribuidora por encima de su límite.
      */
     public function autorizar(Vale $vale, User $usuario): Vale
     {
@@ -141,11 +147,20 @@ final class ValeService
             abort(422, "Solo se pueden autorizar vales ya validados (actual: {$vale->estado}). Valida los datos del cliente primero.");
         }
 
-        $vale->estado = 'autorizado';
-        $vale->fecha_autorizacion = now();
-        $vale->save();
+        return DB::transaction(function () use ($vale): Vale {
+            /** @var Distribuidora $distribuidora */
+            $distribuidora = Distribuidora::query()->whereKey($vale->distribuidora_id)->lockForUpdate()->firstOrFail();
 
-        return $vale->fresh(['distribuidora', 'cliente.datosPersonales.direccion', 'producto']);
+            if ((float) $vale->monto > $distribuidora->credito_disponible) {
+                abort(422, 'La distribuidora ya no tiene crédito disponible suficiente para autorizar este vale.');
+            }
+
+            $vale->estado = 'autorizado';
+            $vale->fecha_autorizacion = now();
+            $vale->save();
+
+            return $vale->fresh(['distribuidora', 'cliente.datosPersonales.direccion', 'producto']);
+        });
     }
 
     /**

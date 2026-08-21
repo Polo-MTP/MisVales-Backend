@@ -111,9 +111,16 @@ final class DistribuidoraService
             }
 
             if ($distribuidora->usuario) {
+                $accion = match (true) {
+                    $limiteAnterior <= 0 => 'credito_asignado',
+                    $limiteCredito > $limiteAnterior => 'credito_incrementado',
+                    $limiteCredito < $limiteAnterior => 'credito_reducido',
+                    default => 'credito_actualizado',
+                };
+
                 $this->notificacionService->crear(
                     $distribuidora->usuario,
-                    $limiteAnterior <= 0 ? 'credito_asignado' : 'credito_incrementado',
+                    $accion,
                     'Nuevo límite: $'.number_format($limiteCredito, 2)
                 );
             }

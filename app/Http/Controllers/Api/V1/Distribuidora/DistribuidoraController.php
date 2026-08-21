@@ -40,6 +40,8 @@ final class DistribuidoraController extends Controller
      */
     public function show(Distribuidora $distribuidora): JsonResponse
     {
+        $this->authorize('view', $distribuidora);
+
         $distribuidora->load(['usuario.datosPersonales.direccion', 'datosExtras', 'categoria', 'sucursal', 'coordinador', 'verificador']);
 
         return response()->json(new DistribuidoraResource($distribuidora));
@@ -50,6 +52,8 @@ final class DistribuidoraController extends Controller
      */
     public function update(DistribuidoraUpdateRequest $request, Distribuidora $distribuidora): JsonResponse
     {
+        $this->authorize('update', $distribuidora);
+
         $data = $request->validated();
         if (isset($data['datos_personales']) && $distribuidora->usuario?->datosPersonales) {
             $distribuidora->usuario->datosPersonales->update($data['datos_personales']);
@@ -70,6 +74,8 @@ final class DistribuidoraController extends Controller
      */
     public function destroy(Distribuidora $distribuidora): JsonResponse
     {
+        $this->authorize('delete', $distribuidora);
+
         $distribuidora->update(['estado' => 'INACTIVO']);
 
         return response()->json(['message' => 'Distribuidora desactivada']);

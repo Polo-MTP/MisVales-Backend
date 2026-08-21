@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\AbonoConciliacion;
 use App\Models\CategoriaDistribuidora;
 use App\Models\Cliente;
 use App\Models\Configuracion;
@@ -9,7 +10,6 @@ use App\Models\DatosPersonales;
 use App\Models\Direccion;
 use App\Models\Distribuidora;
 use App\Models\PuntoMovimiento;
-use App\Models\Relacion;
 use App\Models\Role;
 use App\Models\SeguroTabla;
 use App\Models\Sucursal;
@@ -226,6 +226,35 @@ it('concilia aunque el banco exporte la referencia como número y pierda los cer
     expect($relacion->fresh()->estado)->toBe('liquidada');
 });
 
+it('reimportar el mismo excel del banco no duplica el abono (mismo folio de pago)', function (): void {
+    $distribuidora = crearDistribuidora();
+    crearVale($distribuidora, 15000, 8, '2026-02-01');
+
+    $relacion = app(RelacionCalculoService::class)->generarParaDistribuidora($distribuidora, '2026-02-15');
+    $cajera = User::factory()->create();
+
+    $archivo = crearExcelBanco([
+        [1, 'Pago de distribuidora', $relacion->referencia_pago, 2712, 'F001', '13/2/2026', '14:00', 'Transferencia'],
+    ]);
+
+    $primerResumen = app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, $cajera);
+    expect($primerResumen['conciliadas'])->toBe(1)
+        ->and($primerResumen['duplicados'])->toBe(0);
+
+    // El banco vuelve a exportar el mismo rango de fechas (o la cajera sube el mismo archivo
+    // por error): mismo folio de pago "F001" -- no debe volver a aplicarse el abono.
+    $archivoRepetido = crearExcelBanco([
+        [1, 'Pago de distribuidora', $relacion->referencia_pago, 2712, 'F001', '13/2/2026', '14:00', 'Transferencia'],
+    ]);
+    $segundoResumen = app(ConciliacionBancariaService::class)->importarArchivo($archivoRepetido, null, $cajera);
+
+    expect($segundoResumen['procesadas'])->toBe(0)
+        ->and($segundoResumen['duplicados'])->toBe(1);
+
+    expect((float) $relacion->fresh()->total_abonado)->toBe(2712.0);
+    expect(AbonoConciliacion::query()->where('folio_pago', 'F001')->count())->toBe(1);
+});
+
 it('no evalúa como fórmula una referencia del banco que por casualidad empiece con "="', function (): void {
     $cajera = User::factory()->create();
 
@@ -235,7 +264,7 @@ it('no evalúa como fórmula una referencia del banco que por casualidad empiece
 
     app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, $cajera);
 
-    expect(\App\Models\AbonoConciliacion::first()->referencia_leida)->toBe('=1+1');
+    expect(AbonoConciliacion::first()->referencia_leida)->toBe('=1+1');
 });
 
 it('deja el abono sin coincidencia cuando la referencia no existe', function (): void {
@@ -263,7 +292,7 @@ it('tolera el typo real del banco "Tranferencia" y lo normaliza a transferencia'
 
     app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, $cajera);
 
-    expect(\App\Models\AbonoConciliacion::first()->tipo_pago)->toBe('transferencia');
+    expect(AbonoConciliacion::first()->tipo_pago)->toBe('transferencia');
 });
 
 it('penaliza el 20% de los puntos acumulados cuando el pago llega fuera de tiempo', function (): void {
@@ -340,5 +369,5 @@ it('perdona la primera y segunda relación vencida, y marca la tercera como pér
     expect($r1->estado)->toBe('perdonada')
         ->and($r2->estado)->toBe('perdonada')
         ->and($r3->estado)->toBe('en_perdida')
-        ->and(\App\Models\RelacionPerdon::where('distribuidora_id', $distribuidora->id)->count())->toBe(2);
+        ->and(App\Models\RelacionPerdon::where('distribuidora_id', $distribuidora->id)->count())->toBe(2);
 });

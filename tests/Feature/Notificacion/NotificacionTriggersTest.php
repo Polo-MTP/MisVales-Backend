@@ -187,6 +187,10 @@ it('asignar crédito por primera vez notifica credito_asignado y una segunda asi
     $service->asignarCredito($distribuidora->fresh(), 30000, $categoria->id);
 
     expect(Notificacion::where('destinatario_id', $distribuidora->usuario_id)->where('accion', 'credito_incrementado')->exists())->toBeTrue();
+
+    $service->asignarCredito($distribuidora->fresh(), 15000, $categoria->id);
+
+    expect(Notificacion::where('destinatario_id', $distribuidora->usuario_id)->where('accion', 'credito_reducido')->exists())->toBeTrue();
 });
 
 it('una distribuidora que cae en MOROSO notifica a todas las cajeras de su sucursal, no a las de otra', function (): void {

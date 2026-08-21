@@ -37,7 +37,7 @@ final class ConciliacionBancariaService
     ) {}
 
     /**
-     * @return array{procesadas: int, conciliadas: int, sin_coincidencia: int, errores: array<int, string>}
+     * @return array{procesadas: int, conciliadas: int, sin_coincidencia: int, duplicados: int, errores: array<int, string>}
      */
     public function importarArchivo(UploadedFile $archivo, ?int $convenioBancarioId, User $usuario): array
     {
@@ -55,7 +55,7 @@ final class ConciliacionBancariaService
             array_shift($filas) ?? []
         );
 
-        $resumen = ['procesadas' => 0, 'conciliadas' => 0, 'sin_coincidencia' => 0, 'errores' => []];
+        $resumen = ['procesadas' => 0, 'conciliadas' => 0, 'sin_coincidencia' => 0, 'duplicados' => 0, 'errores' => []];
 
         foreach ($filas as $numeroFila => $fila) {
             if ($this->filaVacia($fila)) {
@@ -65,6 +65,12 @@ final class ConciliacionBancariaService
             try {
                 $datos = $this->mapearFila($encabezado, $fila);
                 $abono = $this->procesarFila($datos, $convenioBancarioId, $usuario, (string) $rutaGuardada);
+
+                if (! $abono->wasRecentlyCreated) {
+                    $resumen['duplicados']++;
+
+                    continue;
+                }
 
                 $resumen['procesadas']++;
                 $resumen[$abono->estado === 'conciliado' ? 'conciliadas' : 'sin_coincidencia']++;
@@ -150,6 +156,18 @@ final class ConciliacionBancariaService
     {
         if ($datos['referencia'] === '' || $datos['monto'] <= 0) {
             throw new InvalidArgumentException('Referencia o monto inválido.');
+        }
+
+        // El folio de pago es el identificador único que da el banco a esa transferencia --
+        // si ya existe un abono con el mismo folio, es el mismo pago (Excel resubido, o el
+        // banco exporta "últimos N días" y una fila se solapa con la importación anterior):
+        // no volver a aplicarlo, o se duplicaría el monto en total_abonado.
+        if ($datos['folio_pago']) {
+            $existente = AbonoConciliacion::query()->where('folio_pago', $datos['folio_pago'])->first();
+
+            if ($existente) {
+                return $existente;
+            }
         }
 
         $relacion = Relacion::query()->where('referencia_pago', $datos['referencia'])->first();

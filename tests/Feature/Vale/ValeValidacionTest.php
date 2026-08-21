@@ -169,7 +169,7 @@ it('guarda la CLABE cifrada en el cliente y no la vuelve a pedir en un vale futu
     expect($cliente->fresh()->clabe)->toBe('032180000118359719');
 
     // Se guarda cifrada en crudo (no en texto plano) — como MfaMethod.secret.
-    $crudo = \Illuminate\Support\Facades\DB::table('clientes')->where('id', $cliente->id)->value('clabe');
+    $crudo = Illuminate\Support\Facades\DB::table('clientes')->where('id', $cliente->id)->value('clabe');
     expect($crudo)->not->toBe('032180000118359719');
 
     // Liquida el primer vale para poder solicitar uno nuevo, y valida sin mandar tarjeta otra vez.
@@ -183,4 +183,35 @@ it('guarda la CLABE cifrada en el cliente y no la vuelve a pedir en un vale futu
     $segundoVale = app(ValeService::class)->validar($segundoVale, $cajera);
 
     expect($segundoVale->estado)->toBe('validado');
+});
+
+it('no permite autorizar un vale si ya no hay crédito disponible suficiente (el crédito se revisa al autorizar, no solo al solicitar)', function (): void {
+    [$distribuidora, $clienteUno, $cajera] = crearDistribuidoraConClienteYCajera(1000);
+
+    $direccion = Direccion::create(['calle' => 'Test', 'colonia' => 'Test', 'numero_ext' => '2', 'codigo_postal' => '00000', 'estado' => 'Coahuila', 'ciudad' => 'Torreón']);
+    $datos = DatosPersonales::create(['nombre' => 'Cliente', 'apellido_paterno' => 'Dos', 'curp' => 'CUPD'.uniqid(), 'direccion_id' => $direccion->id]);
+    $clienteDos = Cliente::create(['datos_id' => $datos->id, 'estado' => true]);
+    HistorialClienteDistr::create(['distribuidor_id' => $distribuidora->id, 'cliente_id' => $clienteDos->id, 'fecha_inicio' => now(), 'fecha_fin' => null]);
+
+    // El primero es el "primer vale" de la distribuidora: la regla del 50% limita su monto a
+    // la mitad del límite total (1000 * 50% = 500), sin importar el crédito disponible.
+    $productoUno = Producto::create(['monto' => 500, 'quincenas' => 4, 'descripcion' => 'Test', 'activo' => true, 'created_by' => $distribuidora->usuario_id]);
+    $productoDos = Producto::create(['monto' => 600, 'quincenas' => 4, 'descripcion' => 'Test', 'activo' => true, 'created_by' => $distribuidora->usuario_id]);
+
+    // Ambos vales pasan solicitar() sin problema: 'solicitado' todavía no cuenta contra el
+    // crédito disponible.
+    $valeUno = app(ValeService::class)->solicitar(['cliente_id' => $clienteUno->id, 'producto_id' => $productoUno->id], $distribuidora->usuario);
+    $valeDos = app(ValeService::class)->solicitar(['cliente_id' => $clienteDos->id, 'producto_id' => $productoDos->id], $distribuidora->usuario);
+
+    $valeUno = app(ValeService::class)->validar($valeUno, $cajera, '032180000118359719');
+    $valeDos = app(ValeService::class)->validar($valeDos, $cajera, '032180000118359720');
+
+    // El primero sí cabe (500 <= 1000) y al autorizarse empieza a contar contra el crédito.
+    app(ValeService::class)->autorizar($valeUno, $cajera);
+
+    // El segundo ya no cabe: crédito disponible ahora es 1000 - 500 = 500, y el vale es de 600.
+    expect(fn () => app(ValeService::class)->autorizar($valeDos, $cajera))
+        ->toThrow(HttpException::class, 'La distribuidora ya no tiene crédito disponible suficiente para autorizar este vale.');
+
+    expect($valeDos->fresh()->estado)->toBe('validado');
 });

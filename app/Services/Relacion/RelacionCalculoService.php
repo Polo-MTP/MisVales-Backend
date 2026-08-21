@@ -132,6 +132,22 @@ final class RelacionCalculoService
             $interesPctQuincena,
             $multaNoPago,
         ): Relacion {
+            // Vuelve a bloquear y revisar aquí adentro: el exists() de arriba corrió sin lock,
+            // así que dos llamadas casi simultáneas (un reintento manual que choca con el job
+            // programado, por ejemplo) podrían pasarlo ambas antes de que cualquiera inserte su
+            // Relacion. lockForUpdate() serializa esa ventana -- la segunda, tras esperar el
+            // commit de la primera, ve la relación recién creada y recibe el mismo
+            // DomainException amigable en vez de un QueryException crudo por el unique constraint.
+            Distribuidora::query()->whereKey($distribuidora->id)->lockForUpdate()->first();
+
+            if (Relacion::query()
+                ->where('distribuidora_id', $distribuidora->id)
+                ->whereDate('fecha_corte', $fechaCorte->toDateString())
+                ->exists()
+            ) {
+                throw new DomainException('Ya existe una relación generada para esta distribuidora en la fecha de corte indicada.');
+            }
+
             /** @var Relacion $relacion */
             $relacion = Relacion::query()->create([
                 'distribuidora_id' => $distribuidora->id,

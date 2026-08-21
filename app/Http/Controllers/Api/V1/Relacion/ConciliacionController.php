@@ -77,7 +77,7 @@ final class ConciliacionController extends ApiController
 
         return $this->success(
             data: $resumen,
-            message: "Archivo procesado: {$resumen['procesadas']} fila(s), {$resumen['conciliadas']} conciliada(s), {$resumen['sin_coincidencia']} sin coincidencia."
+            message: "Archivo procesado: {$resumen['procesadas']} fila(s), {$resumen['conciliadas']} conciliada(s), {$resumen['sin_coincidencia']} sin coincidencia, {$resumen['duplicados']} duplicada(s) (ya procesada antes, ignorada)."
         );
     }
 
