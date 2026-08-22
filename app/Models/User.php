@@ -26,6 +26,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property int|null $role_id
  * @property int|null $datos_id
  * @property int|null $sucursal_id
+ * @property int|null $gerente_id
  * @property bool $is_active
  * @property bool $is_locked
  * @property int $failed_attempts
@@ -40,6 +41,7 @@ use Laravel\Sanctum\HasApiTokens;
     'role_id',
     'datos_id',
     'sucursal_id',
+    'gerente_id',
     'is_active',
     'is_locked',
     'failed_attempts',
@@ -80,6 +82,22 @@ final class User extends Authenticatable implements MustVerifyEmail
     public function distribuidora(): HasOne
     {
         return $this->hasOne(Distribuidora::class, 'usuario_id');
+    }
+
+    /**
+     * Gerente de Sucursal al que reporta este usuario (Coordinador, Verificador o Cajera).
+     */
+    public function gerente(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'gerente_id');
+    }
+
+    /**
+     * Usuarios (Coordinador, Verificador, Cajera) que reportan a este Gerente de Sucursal.
+     */
+    public function personalACargo(): HasMany
+    {
+        return $this->hasMany(User::class, 'gerente_id');
     }
 
     /**

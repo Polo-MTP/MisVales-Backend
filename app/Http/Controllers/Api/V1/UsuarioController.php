@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Api\V1\Usuario\CrearGerenteSucursalRequest;
+use App\Http\Requests\Api\V1\Usuario\CrearPersonalSucursalRequest;
 use App\Http\Resources\UserResource;
 use App\Models\Role;
 use App\Models\User;
@@ -13,6 +14,7 @@ use App\Services\Usuario\MovimientosAutorizadosService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
 final class UsuarioController extends ApiController
 {
@@ -94,5 +96,52 @@ final class UsuarioController extends ApiController
         $usuario->save();
 
         return $this->created(new UserResource($usuario->load(['role', 'sucursal'])));
+    }
+
+    /**
+     * Da de alta Coordinador, Verificador o Cajera. El rol viene del request (ya restringido
+     * a esas 3 opciones por CrearPersonalSucursalRequest), pero sucursal_id/gerente_id NUNCA
+     * se toman tal cual del request cuando quien pide es Gerente de Sucursal: se sobreescriben
+     * con su propia sucursal y su propio id, para que no pueda darse de alta personal fuera de
+     * su sucursal ni asignárselo a otro gerente. Cuando es Gerente General sí manda ambos
+     * explícitamente, y se valida que el gerente indicado sea realmente Gerente de Sucursal de
+     * esa misma sucursal.
+     */
+    public function crearPersonalSucursal(CrearPersonalSucursalRequest $request): JsonResponse
+    {
+        /** @var User $authUser */
+        $authUser = $request->user();
+
+        $rol = Role::query()->where('name', $request->string('rol'))->firstOrFail();
+
+        if ($authUser->role?->name === 'Gerente de Sucursal') {
+            $sucursalId = $authUser->sucursal_id;
+            $gerenteId = $authUser->id;
+        } else {
+            $sucursalId = $request->integer('sucursal_id');
+            $gerenteId = $request->integer('gerente_id');
+
+            $gerente = User::query()->with('role')->find($gerenteId);
+            if (! $gerente || $gerente->role?->name !== 'Gerente de Sucursal' || $gerente->sucursal_id !== $sucursalId) {
+                throw ValidationException::withMessages([
+                    'gerente_id' => 'El gerente indicado debe ser Gerente de Sucursal de la sucursal seleccionada.',
+                ]);
+            }
+        }
+
+        $usuario = User::query()->create([
+            'name' => $request->string('name'),
+            'email' => $request->string('email'),
+            'password' => Hash::make($request->string('password')),
+            'role_id' => $rol->id,
+            'sucursal_id' => $sucursalId,
+            'gerente_id' => $gerenteId,
+            'is_active' => true,
+        ]);
+
+        $usuario->email_verified_at = now();
+        $usuario->save();
+
+        return $this->created(new UserResource($usuario->load(['role', 'sucursal', 'gerente'])));
     }
 }

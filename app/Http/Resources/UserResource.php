@@ -35,6 +35,11 @@ final class UserResource extends JsonResource
                 'codigo' => $this->sucursal->codigo,
                 'es_matriz' => $this->sucursal->es_matriz,
             ] : null,
+            'gerente_id' => $this->gerente_id,
+            'gerente' => $this->whenLoaded('gerente', fn () => $this->gerente ? [
+                'id' => $this->gerente->id,
+                'name' => $this->gerente->name,
+            ] : null),
             'email_verified_at' => $this->email_verified_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),

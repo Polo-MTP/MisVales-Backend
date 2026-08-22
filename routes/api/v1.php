@@ -75,6 +75,14 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
         ->middleware('role:Gerente General')
         ->name('api.v1.usuarios.crear_gerente_sucursal');
 
+    // Da de alta Coordinador, Verificador o Cajera -- el rol viene restringido a esas 3
+    // opciones desde CrearPersonalSucursalRequest. Gerente de Sucursal solo puede darlos de
+    // alta en su propia sucursal, relacionados a sí mismo; Gerente General puede asignar
+    // cualquier sucursal + Gerente de Sucursal válido. 'vpn' por ser alta de cuentas de staff.
+    Route::post('usuarios/personal', [UsuarioController::class, 'crearPersonalSucursal'])
+        ->middleware(['role:Gerente General,Gerente de Sucursal', 'vpn'])
+        ->name('api.v1.usuarios.crear_personal_sucursal');
+
     // MÓDULO: SUCURSALES. Alta/edición solo Gerente General; listar/ver es de cualquier
     // usuario autenticado (lo necesitan varios selectores: crear Gerente de Sucursal, etc.).
     Route::prefix('sucursales')->group(function (): void {
