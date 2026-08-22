@@ -150,7 +150,8 @@ it('un vale que ya entró a un corte NO trae estimación (ya tiene el desglose r
     ]);
 
     RelacionDetalle::create([
-        'relacion_id' => $relacion->id, 'vale_id' => $vale->id, 'cliente_id' => $vale->cliente_id,
+        'relacion_id' => $relacion->id, 'vale_id' => $vale->id, 'concepto' => sprintf('%05d%04d', $vale->id, 1),
+        'cliente_id' => $vale->cliente_id,
         'cuota_numero' => 1, 'cuotas_totales' => 4, 'capital' => 1250, 'comision' => 125,
         'interes' => 250, 'seguro' => 0, 'categoria' => 75, 'recargo' => 0, 'pago' => 0,
         'total' => 1550, 'estado' => 'pendiente',

@@ -7,6 +7,7 @@ namespace App\Services\Relacion;
 use App\Models\AbonoConciliacion;
 use App\Models\PuntoMovimiento;
 use App\Models\Relacion;
+use App\Models\RelacionDetalle;
 use App\Models\User;
 use App\Models\Vale;
 use App\Services\Configuracion\ConfiguracionService;
@@ -94,15 +95,24 @@ final class ConciliacionBancariaService
         }
 
         return DB::transaction(function () use ($abono, $relacion, $ejecutor, $motivo, $autorizadoPorId): AbonoConciliacion {
+            // La corrección manual es por referencia mal capturada (typo en la relación) -- si
+            // el concepto que sí llegó bien coincide con alguno de los detalles de esta
+            // relación, igual se aprovecha para aplicar el abono al vale correcto.
+            $detalle = RelacionDetalle::query()
+                ->where('relacion_id', $relacion->id)
+                ->where('concepto', $abono->referencia_leida)
+                ->first();
+
             $abono->update([
                 'relacion_id' => $relacion->id,
+                'relacion_detalle_id' => $detalle?->id,
                 'estado' => 'conciliado_manual',
                 'conciliado_por' => $ejecutor->id,
                 'autorizado_por' => $autorizadoPorId ?? $ejecutor->id,
                 'motivo_manual' => $motivo,
             ]);
 
-            $this->aplicarAbono($relacion, (float) $abono->monto, Carbon::parse($abono->fecha_pago));
+            $this->aplicarAbono($relacion, (float) $abono->monto, Carbon::parse($abono->fecha_pago), $detalle);
 
             return $abono->fresh();
         });
@@ -140,6 +150,10 @@ final class ConciliacionBancariaService
 
         return [
             'referencia' => $this->normalizarReferencia($fila['referencia'] ?? ''),
+            // Identifica el vale específico cuando el corte junta varios y la distribuidora
+            // los paga por separado -- ver RelacionCalculoService::construirConceptoVale().
+            // Vacío/no-match: el abono se aplica al corte completo, igual que antes.
+            'concepto' => trim((string) ($fila['concepto'] ?? '')),
             'monto' => (float) preg_replace('/[^0-9.\-]/', '', (string) ($fila['pago'] ?? 0)),
             'folio_pago' => isset($fila['folio de pago']) ? trim((string) $fila['folio de pago']) : null,
             'fecha_pago' => $this->parsearFecha($fila['fecha de pago'] ?? null),
@@ -172,8 +186,16 @@ final class ConciliacionBancariaService
 
         $relacion = Relacion::query()->where('referencia_pago', $datos['referencia'])->first();
 
+        // Si el corte tiene más de un vale y la distribuidora puso el concepto de uno en
+        // particular, el abono es de ESE vale, no del corte completo -- buscarlo solo dentro
+        // de los detalles de la relación ya encontrada (el concepto no es global, es por vale).
+        $detalle = ($relacion && $datos['concepto'] !== '')
+            ? RelacionDetalle::query()->where('relacion_id', $relacion->id)->where('concepto', $datos['concepto'])->first()
+            : null;
+
         $abono = AbonoConciliacion::query()->create([
             'relacion_id' => $relacion?->id,
+            'relacion_detalle_id' => $detalle?->id,
             'referencia_leida' => $datos['referencia'],
             'monto' => $datos['monto'],
             'folio_pago' => $datos['folio_pago'],
@@ -187,7 +209,7 @@ final class ConciliacionBancariaService
         ]);
 
         if ($relacion) {
-            $this->aplicarAbono($relacion, (float) $datos['monto'], Carbon::parse($datos['fecha_pago']));
+            $this->aplicarAbono($relacion, (float) $datos['monto'], Carbon::parse($datos['fecha_pago']), $detalle);
         }
 
         return $abono;
@@ -196,14 +218,33 @@ final class ConciliacionBancariaService
     /**
      * Suma el abono al total de la relación y actualiza su estado (parcial/liquidada) según
      * el margen de tolerancia configurado; si queda liquidada, dispara puntos/penalización.
+     *
+     * Si $detalle viene (el concepto identificó a cuál vele corresponde), el abono se aplica
+     * a ESE detalle primero (su propio 'pago'/'estado'), y el total_abonado de la relación se
+     * recalcula sumando todos sus detalles -- así un corte con varios vales pagados por
+     * separado, en distintos momentos, refleja bien cuánto falta en cada uno. Sin $detalle
+     * (corte de un solo vale, o pago sin concepto), se suma directo al total de la relación,
+     * igual que siempre.
      */
-    private function aplicarAbono(Relacion $relacion, float $monto, Carbon $fechaAbono): void
+    private function aplicarAbono(Relacion $relacion, float $monto, Carbon $fechaAbono, ?RelacionDetalle $detalle = null): void
     {
-        DB::transaction(function () use ($relacion, $monto, $fechaAbono): void {
+        DB::transaction(function () use ($relacion, $monto, $fechaAbono, $detalle): void {
             $relacion->refresh();
-            $relacion->total_abonado = (float) $relacion->total_abonado + $monto;
 
             $margenTolerancia = (float) ($this->configuracionService->obtenerValorVigente('margen_tolerancia_conciliacion') ?? 0);
+
+            if ($detalle) {
+                $detalle->refresh();
+                $detalle->pago = (float) $detalle->pago + $monto;
+                $saldoCuota = (float) $detalle->total - (float) $detalle->pago;
+                $detalle->estado = $saldoCuota <= $margenTolerancia ? 'pagado' : 'parcial';
+                $detalle->save();
+
+                $relacion->total_abonado = (float) RelacionDetalle::query()->where('relacion_id', $relacion->id)->sum('pago');
+            } else {
+                $relacion->total_abonado = (float) $relacion->total_abonado + $monto;
+            }
+
             $saldoPendiente = (float) $relacion->total_a_pagar - (float) $relacion->total_abonado;
 
             if ($saldoPendiente <= $margenTolerancia) {

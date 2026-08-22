@@ -233,7 +233,7 @@ final class RelacionCalculoService
      * estimado de su siguiente cuota. Es un estimado "si paga puntual" — no incluye recargo,
      * eso depende de un comportamiento futuro que todavía no pasa.
      *
-     * @return array{fecha_corte: string, fecha_limite_pago: string, referencia_pago: string|null, monto_estimado: float, vales: array<int, array{vale_id: int, monto: float, pago_estimado: float}>}
+     * @return array{fecha_corte: string, fecha_limite_pago: string, referencia_pago: string|null, monto_estimado: float, vales: array<int, array{vale_id: int, monto: float, pago_estimado: float, concepto: string}>}
      */
     public function proximoPago(Distribuidora $distribuidora, ?string $desde = null): array
     {
@@ -270,10 +270,16 @@ final class RelacionCalculoService
             $quincenas = max(1, (int) ($vale->quincenas ?? $vale->producto?->quincenas ?? 1));
             $base = $this->calcularMontosBase((float) $vale->monto, $quincenas, $comisionBasePct, $interesPctQuincena, $porcentajeCategoria);
 
+            $cuotaAnterior = RelacionDetalle::query()->where('vale_id', $vale->id)->latest('id')->first();
+            $cuotaNumero = $cuotaAnterior ? $cuotaAnterior->cuota_numero + 1 : 1;
+
             $vales[] = [
                 'vale_id' => $vale->id,
                 'monto' => (float) $vale->monto,
                 'pago_estimado' => $base['pago_quincenal'],
+                // Lo que la distribuidora debe poner en "Concepto" si paga este vale por
+                // separado dentro de un corte con más de uno -- ver construirConceptoVale().
+                'concepto' => $this->construirConceptoVale($vale->id, $cuotaNumero),
             ];
             $montoEstimado += $base['pago_quincenal'];
         }
@@ -332,6 +338,7 @@ final class RelacionCalculoService
         return RelacionDetalle::query()->create([
             'relacion_id' => $relacion->id,
             'vale_id' => $vale->id,
+            'concepto' => $this->construirConceptoVale($vale->id, $cuotaNumero),
             'cliente_id' => $vale->cliente_id,
             'producto_id' => $vale->producto_id,
             'cuota_numero' => $cuotaNumero,
@@ -396,6 +403,18 @@ final class RelacionCalculoService
     private function construirReferenciaPago(Distribuidora $distribuidora, CarbonInterface $fechaCorte): string
     {
         return sprintf('%09d%09d', $distribuidora->id, (int) $fechaCorte->format('Ymd'));
+    }
+
+    /**
+     * Identificador único por vale/cuota (formato: 5 dígitos de vale_id + 4 de cuota_numero).
+     * A diferencia de referencia_pago (por distribuidora+corte, compartida si el corte junta
+     * varios vales), esto es lo que distingue, DENTRO de un mismo corte, a cuál vale
+     * corresponde cada abono -- la distribuidora lo pone en el campo "Concepto" de su
+     * transferencia cuando paga cada vale por separado (ver ConciliacionBancariaService).
+     */
+    private function construirConceptoVale(int $valeId, int $cuotaNumero): string
+    {
+        return sprintf('%05d%04d', $valeId, $cuotaNumero);
     }
 
     /**

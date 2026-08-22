@@ -68,6 +68,10 @@ final class ValeResource extends JsonResource
             'cortes' => $this->relacionDetalles->map(fn ($detalle) => [
                 'relacion_id' => $detalle->relacion_id,
                 'referencia_pago' => $detalle->relacion?->referencia_pago,
+                // Si el corte junta más de un vale y se paga cada uno por separado, esto es lo
+                // que va en "Concepto" de la transferencia para que se aplique a este vale y
+                // no a otro del mismo corte (ver RelacionCalculoService::construirConceptoVale).
+                'concepto' => $detalle->concepto,
                 'fecha_corte' => $detalle->relacion?->fecha_corte?->toDateString(),
                 'cuota' => "{$detalle->cuota_numero}/{$detalle->cuotas_totales}",
                 'estado_cuota' => $detalle->estado,

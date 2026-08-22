@@ -18,6 +18,10 @@ final class RelacionDetalleResource extends JsonResource
         return [
             'id' => $this->id,
             'vale_id' => $this->vale_id,
+            // Identificador único de esta cuota dentro del corte -- lo que la distribuidora
+            // pone en "Concepto" de su transferencia si paga este vale por separado de los
+            // demás que compartan el mismo referencia_pago del corte.
+            'concepto' => $this->concepto,
             'cliente' => [
                 'id' => $this->cliente?->id,
                 'nombre' => trim(($this->cliente?->datosPersonales?->nombre ?? '').' '.($this->cliente?->datosPersonales?->apellido_paterno ?? '')),

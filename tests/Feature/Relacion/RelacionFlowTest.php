@@ -371,3 +371,65 @@ it('perdona la primera y segunda relación vencida, y marca la tercera como pér
         ->and($r3->estado)->toBe('en_perdida')
         ->and(App\Models\RelacionPerdon::where('distribuidora_id', $distribuidora->id)->count())->toBe(2);
 });
+
+it('un corte con dos vales: cada uno se paga por separado usando su propio "Concepto"', function (): void {
+    $distribuidora = crearDistribuidora();
+    $valeA = crearVale($distribuidora, 15000, 8);
+    $valeB = crearVale($distribuidora, 5000, 4);
+
+    $relacion = app(RelacionCalculoService::class)->generarParaDistribuidora($distribuidora, '2026-02-15');
+    $relacion->loadMissing('detalles');
+
+    expect($relacion->detalles)->toHaveCount(2);
+
+    $detalleA = $relacion->detalles->firstWhere('vale_id', $valeA->id);
+    $detalleB = $relacion->detalles->firstWhere('vale_id', $valeB->id);
+
+    // Los dos comparten la MISMA referencia (es el mismo corte), pero cada uno tiene su
+    // propio concepto único.
+    expect($detalleA->concepto)->not->toBe($detalleB->concepto);
+
+    $cajera = User::factory()->create();
+
+    // Primero paga solo el vale A, usando su concepto -- el corte NO debe liquidarse todavía,
+    // solo el detalle de A.
+    $archivo = crearExcelBanco([
+        [1, $detalleA->concepto, $relacion->referencia_pago, (float) $detalleA->total, 'F-A', '13/2/2026', '10:00', 'Transferencia'],
+    ]);
+    app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, $cajera);
+
+    $relacion->refresh();
+    $detalleA->refresh();
+    $detalleB->refresh();
+
+    expect($detalleA->estado)->toBe('pagado')
+        ->and($detalleB->estado)->toBe('pendiente')
+        ->and($relacion->estado)->toBe('parcial');
+
+    // Ahora paga el vale B, con su propio concepto -- ahí sí se liquida todo el corte.
+    $archivo2 = crearExcelBanco([
+        [1, $detalleB->concepto, $relacion->referencia_pago, (float) $detalleB->total, 'F-B', '13/2/2026', '11:00', 'Transferencia'],
+    ]);
+    app(ConciliacionBancariaService::class)->importarArchivo($archivo2, null, $cajera);
+
+    $relacion->refresh();
+    $detalleB->refresh();
+
+    expect($detalleB->estado)->toBe('pagado')
+        ->and($relacion->estado)->toBe('liquidada');
+});
+
+it('sin concepto (o corte de un solo vale) el abono se sigue aplicando al corte completo, como antes', function (): void {
+    $distribuidora = crearDistribuidora();
+    crearVale($distribuidora, 15000, 8);
+
+    $relacion = app(RelacionCalculoService::class)->generarParaDistribuidora($distribuidora, '2026-02-15');
+    $cajera = User::factory()->create();
+
+    $archivo = crearExcelBanco([
+        [1, 'Pago sin concepto', $relacion->referencia_pago, (float) $relacion->total_a_pagar, 'F-SOLO', '13/2/2026', '10:00', 'Transferencia'],
+    ]);
+    app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, $cajera);
+
+    expect($relacion->fresh()->estado)->toBe('liquidada');
+});

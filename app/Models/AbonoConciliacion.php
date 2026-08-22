@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'relacion_id',
+    'relacion_detalle_id',
     'referencia_leida',
     'monto',
     'folio_pago',
@@ -47,6 +48,16 @@ final class AbonoConciliacion extends Model
     public function relacion(): BelongsTo
     {
         return $this->belongsTo(Relacion::class);
+    }
+
+    /**
+     * Cuota (vale) específica a la que se aplicó este abono, cuando el corte tiene más de
+     * un vale y la distribuidora identificó cuál con el "Concepto" de su transferencia. Null
+     * si se aplicó al corte completo (un solo vale, o pago sin concepto especificado).
+     */
+    public function relacionDetalle(): BelongsTo
+    {
+        return $this->belongsTo(RelacionDetalle::class);
     }
 
     /**
