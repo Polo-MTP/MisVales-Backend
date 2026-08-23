@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             MfaSeeder::class,                  // MFA (si aplica)
             MorosidadDemoSeeder::class,        // Distribuidoras/vales/relaciones vencidas para probar reportes/morosos
             EquipoDemoSeeder::class,           // Cuentas reales del equipo, roles intercalados
+            QaUsersSeeder::class,               // Usuarios de prueba (uno por rol) para entregar a infra/QA
         ]);
     }
 }
