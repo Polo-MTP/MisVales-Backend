@@ -23,6 +23,11 @@ final class DistribuidoraResource extends JsonResource
             'rfc' => $this->rfc,
             'limite_credito' => $this->limite_credito,
             'credito_disponible' => $this->credito_disponible,
+            // 'credito_disponible' es solo crédito no consumido: no sabe nada del estado. Una
+            // distribuidora MOROSA/RECHAZADA lo sigue teniendo alto aunque el backend le rechace
+            // cualquier vale (ver Distribuidora::montoMaximoDisponible()). Con esta bandera la UI
+            // puede decir la verdad en vez de ofrecer un crédito que no se puede usar.
+            'puede_solicitar_vales' => in_array($this->estado, ['ACTIVO', 'EN_VERIFICACION'], true),
             'categoria' => new CategoriaDistribuidoraResource($this->whenLoaded('categoria')),
             'puntos_acumulados' => $this->puntos_acumulados,
             'estado' => $this->estado,

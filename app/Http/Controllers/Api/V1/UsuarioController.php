@@ -83,17 +83,29 @@ final class UsuarioController extends ApiController
      * petición, precisamente para que este endpoint no sirva para crear ningún otro rol
      * (Administrador incluido). La cuenta nace activa y con el correo ya verificado, igual
      * que el resto de altas hechas por staff (ver SolicitudProveedorService).
+     *
+     * La contraseña la genera el sistema y se manda por correo, igual que en
+     * crearPersonalSucursal() -- quien da de alta nunca conoce la contraseña de otra persona.
      */
     public function crearGerenteSucursal(CrearGerenteSucursalRequest $request): JsonResponse
     {
         $rolGerenteSucursal = Role::query()->where('name', 'Gerente de Sucursal')->firstOrFail();
 
+        $sucursal = Sucursal::query()->find($request->integer('sucursal_id'));
+        if (! $sucursal || ! $sucursal->is_active) {
+            throw ValidationException::withMessages([
+                'sucursal_id' => 'La sucursal indicada está deshabilitada y no puede recibir personal nuevo.',
+            ]);
+        }
+
+        $passwordGenerada = Str::password(16);
+
         $usuario = User::query()->create([
             'name' => $request->string('name'),
             'email' => $request->string('email'),
-            'password' => Hash::make($request->string('password')),
+            'password' => Hash::make($passwordGenerada),
             'role_id' => $rolGerenteSucursal->id,
-            'sucursal_id' => $request->integer('sucursal_id'),
+            'sucursal_id' => $sucursal->id,
             'is_active' => true,
         ]);
 
@@ -102,6 +114,13 @@ final class UsuarioController extends ApiController
         // create() de arriba, donde quedaría silenciosamente ignorado.
         $usuario->email_verified_at = now();
         $usuario->save();
+
+        Mail::to((string) $usuario->email)->send(new PersonalCredencialesMail(
+            (string) $usuario->name,
+            (string) $usuario->email,
+            (string) $passwordGenerada,
+            (string) $rolGerenteSucursal->name,
+        ));
 
         return $this->created(new UserResource($usuario->load(['role', 'sucursal'])));
     }

@@ -40,9 +40,25 @@ final class ConciliacionController extends ApiController
 
         $query = AbonoConciliacion::query()->with(['convenioBancario', 'autorizadoPor']);
 
-        if ($usuario->role?->name === 'Distribuidora') {
+        // Mismo alcance por sucursal/cartera que RelacionController::index() -- sin esto una
+        // Cajera veía TODOS los abonos bancarios de la empresa (montos, folios y referencias de
+        // distribuidoras de otras sucursales), aunque las relaciones de esas mismas sucursales sí
+        // le estuvieran vedadas. Los abonos sin coincidencia (relacion_id nulo) se dejan visibles
+        // a propósito: todavía no se sabe de quién son y es justo el trabajo de la cajera
+        // identificarlos y pedir la conciliación manual.
+        $rol = $usuario->role?->name;
+
+        if ($rol === 'Distribuidora') {
             $distribuidoraId = $usuario->distribuidora?->id ?? 0;
             $query->whereHas('relacion', fn ($q) => $q->where('distribuidora_id', $distribuidoraId));
+        } elseif (in_array($rol, ['Cajera', 'Gerente de Sucursal'], true)) {
+            $query->where(fn ($q) => $q
+                ->whereNull('relacion_id')
+                ->orWhereHas('relacion', fn ($r) => $r->where('sucursal_id', $usuario->sucursal_id ?? 0)));
+        } elseif ($rol === 'Coordinador') {
+            $query->where(fn ($q) => $q
+                ->whereNull('relacion_id')
+                ->orWhereHas('relacion.distribuidora', fn ($r) => $r->where('coordinador_id', $usuario->id)));
         }
 
         if ($request->filled('estado')) {

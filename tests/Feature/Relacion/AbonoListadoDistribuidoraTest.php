@@ -65,3 +65,40 @@ it('una distribuidora no ve los abonos de otra distribuidora en el listado', fun
     $response->assertStatus(200);
     expect(collect($response->json('data.data'))->pluck('id'))->not->toContain($abonoB->id);
 });
+
+it('una cajera solo ve abonos de su propia sucursal, más los que aún no coinciden con ninguna relación', function (): void {
+    [$distribuidoraA, $abonoA] = crearDistribuidoraConAbono();
+    [, $abonoB] = crearDistribuidoraConAbono();
+
+    // Abono que el banco reportó pero que todavía no se pudo ligar a ninguna relación: la cajera
+    // sí debe verlo, es justo lo que tiene que identificar para pedir la conciliación manual.
+    $sinCoincidencia = AbonoConciliacion::create([
+        'relacion_id' => null, 'referencia_leida' => 'REF-DESCONOCIDA', 'monto' => 999,
+        'fecha_pago' => '2026-02-14', 'tipo_pago' => 'transferencia', 'estado' => 'sin_coincidencia',
+        'lote_archivo' => 'test', 'subido_por' => $distribuidoraA->usuario_id,
+    ]);
+
+    $rolCajera = Role::firstOrCreate(['name' => 'Cajera']);
+    $cajera = User::factory()->create([
+        'role_id' => $rolCajera->id, 'sucursal_id' => $distribuidoraA->sucursal_id, 'is_active' => true,
+    ]);
+    Sanctum::actingAs($cajera);
+
+    $ids = collect($this->getJson('/api/v1/conciliaciones')->assertStatus(200)->json('data.data'))->pluck('id');
+
+    expect($ids)->toContain($abonoA->id)
+        ->and($ids)->toContain($sinCoincidencia->id)
+        ->and($ids)->not->toContain($abonoB->id);
+});
+
+it('un gerente general sí ve los abonos de todas las sucursales', function (): void {
+    [, $abonoA] = crearDistribuidoraConAbono();
+    [, $abonoB] = crearDistribuidoraConAbono();
+
+    $rol = Role::firstOrCreate(['name' => 'Gerente General']);
+    Sanctum::actingAs(User::factory()->create(['role_id' => $rol->id, 'is_active' => true]));
+
+    $ids = collect($this->getJson('/api/v1/conciliaciones')->assertStatus(200)->json('data.data'))->pluck('id');
+
+    expect($ids)->toContain($abonoA->id)->and($ids)->toContain($abonoB->id);
+});

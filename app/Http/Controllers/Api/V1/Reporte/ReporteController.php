@@ -20,9 +20,17 @@ final class ReporteController extends ApiController
         /** @var User $usuario */
         $usuario = $request->user();
 
+        // Dos formas de estar moroso, y el reporte tiene que enseñar las dos: por relaciones
+        // vencidas/en pérdida, o porque la distribuidora ya quedó marcada MOROSO (lo que le
+        // bloquea pedir vales, ver Distribuidora::montoMaximoDisponible()). Antes solo miraba las
+        // relaciones, así que una distribuidora marcada MOROSO cuyas relaciones ya se perdonaron o
+        // liquidaron salía del reporte pero seguía bloqueada y con el sello MOROSO en el catálogo
+        // -- dos pantallas contestando distinto a "¿quién está moroso?".
         $query = Distribuidora::query()
             ->with('sucursal')
-            ->whereHas('relaciones', fn ($q) => $q->whereIn('estado', ['vencida', 'en_perdida']));
+            ->where(fn ($q) => $q
+                ->whereHas('relaciones', fn ($r) => $r->whereIn('estado', ['vencida', 'en_perdida']))
+                ->orWhere('estado', 'MOROSO'));
 
         // Un Gerente de Sucursal solo ve morosidad de su propia sucursal; Gerente General/Administrador ven todo.
         if ($usuario->role?->name === 'Gerente de Sucursal') {
