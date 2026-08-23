@@ -8,6 +8,8 @@ use App\Models\LoginAttempt;
 use App\Models\MfaMethod;
 use App\Models\MfaType;
 use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
@@ -86,14 +88,20 @@ final class LoginService
     /**
      * @return array<string, mixed>
      */
-    public function logout(?User $user): array
+    public function logout(?User $user, Request $request): array
     {
         Log::debug('LoginService: Iniciando proceso de cierre de sesión', [
             'user_id' => $user?->id,
             'email' => $user?->email,
         ]);
 
-        if ($user && method_exists($user, 'currentAccessToken') && $user->currentAccessToken()) {
+        if ($user && $request->hasSession()) {
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        } elseif ($user && method_exists($user, 'currentAccessToken') && $user->currentAccessToken()) {
+            // Cliente sin sesión de navegador (Bearer token directo, ej. Postman o una futura
+            // app móvil): Sanctum sigue soportando este modo en paralelo al de cookie.
             $user->currentAccessToken()->delete();
         }
 
@@ -178,13 +186,12 @@ final class LoginService
             'email' => $user->email,
         ]);
 
-        $token = $user->createToken('auth-token')->plainTextToken;
+        Auth::guard('web')->login($user);
 
         return [
             'success' => true,
             'message' => 'Login exitoso',
             'user' => $user->load('role'),
-            'token' => $token,
             'code' => 200,
         ];
     }

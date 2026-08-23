@@ -14,6 +14,7 @@ use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
 use DomainException;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -121,11 +122,11 @@ final class MfaService
             ];
         }
 
-        Log::debug('MfaService: Segundo factor completado exitosamente. Generando token Sanctum', [
+        Log::debug('MfaService: Segundo factor completado exitosamente. Iniciando sesión', [
             'user_id' => $user->id,
         ]);
 
-        $token = $user->createToken('auth-token')->plainTextToken;
+        Auth::guard('web')->login($user);
 
         LoginAttempt::record($user->id, $user->email, 'success_factor_2', 2, 'Segundo factor exitoso. Autenticado.');
 
@@ -133,7 +134,6 @@ final class MfaService
             'success' => true,
             'message' => 'Verificación de Segundo Factor exitosa.',
             'user' => $user->load('role'),
-            'token' => $token,
             'code' => 200,
         ];
     }

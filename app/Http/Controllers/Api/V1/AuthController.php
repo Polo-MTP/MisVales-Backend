@@ -43,9 +43,8 @@ final class AuthController extends ApiController
             $request->userAgent()
         );
 
-        // Nunca loguear $result completo: trae el plainTextToken de Sanctum (o el
-        // setup_url firmado del MFA) en texto plano -- cualquiera con lectura del log
-        // podría secuestrar la sesión sin necesitar la contraseña.
+        // Nunca loguear $result completo: trae el setup_url firmado del MFA en texto
+        // plano -- cualquiera con lectura del log podría usarlo antes de que expire.
         Log::debug('AuthController: Proceso de login terminado', [
             'email' => $request->email,
             'success' => $result['success'],
@@ -70,7 +69,6 @@ final class AuthController extends ApiController
         return $this->success(
             data: [
                 'user' => new UserResource($result['user']),
-                'token' => $result['token'],
             ],
             message: (string) $result['message']
         );
@@ -88,7 +86,7 @@ final class AuthController extends ApiController
             'user_id' => $user?->id,
         ]);
 
-        $result = $loginService->logout($user);
+        $result = $loginService->logout($user, $request);
 
         return $this->success(message: (string) $result['message']);
     }
@@ -153,11 +151,15 @@ final class AuthController extends ApiController
             $request->only('email')
         );
 
-        if ($status === Password::RESET_LINK_SENT) {
-            return $this->success(message: 'Enlace de restablecimiento enviado a tu correo electrónico.');
-        }
+        Log::debug('AuthController: Solicitud de restablecimiento de contraseña procesada', [
+            'status' => $status,
+        ]);
 
-        return $this->error('No se pudo enviar el enlace de restablecimiento.', 500);
+        // Se responde el mismo mensaje genérico sin importar si el correo existe, está
+        // limitado por rate limit, etc. -- distinguir el caso "correo no encontrado" convierte
+        // este endpoint en un oráculo para enumerar cuentas registradas (ver auditoría de
+        // seguridad). Quien sí tiene una cuenta con ese correo recibe el enlace igual.
+        return $this->success(message: 'Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.');
     }
 
     /**
@@ -184,8 +186,10 @@ final class AuthController extends ApiController
 
         return $this->error(
             match ($status) {
-                Password::INVALID_TOKEN => 'Token de restablecimiento inválido o expirado.',
-                Password::INVALID_USER => 'Usuario no encontrado.',
+                // INVALID_TOKEN e INVALID_USER responden el mismo mensaje a propósito: distinguirlos
+                // deja usar este endpoint para confirmar si un correo tiene cuenta, con solo mandar
+                // cualquier token y ver cuál de los dos mensajes regresa (ver auditoría de seguridad).
+                Password::INVALID_TOKEN, Password::INVALID_USER => 'Token de restablecimiento inválido o expirado.',
                 default => 'No se pudo restablecer la contraseña.',
             },
             400

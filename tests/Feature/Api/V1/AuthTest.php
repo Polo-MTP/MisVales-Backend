@@ -14,7 +14,10 @@ beforeEach(function (): void {
 });
 
 describe('Login', function (): void {
-    it('nunca loguea el token de sesión emitido en un login exitoso', function (): void {
+    it('nunca loguea la contraseña ni expone un token de sesión en la respuesta', function (): void {
+        // La sesión ahora se autentica por cookie httpOnly (ver auditoría de seguridad,
+        // hallazgo H-02) -- ya no hay un token en texto plano que devolver ni que filtrar de
+        // los logs; lo que sí se sigue verificando es que la contraseña nunca aparezca logueada.
         $user = User::factory()->create([
             'password' => bcrypt('Password123!'),
             'role_id' => null,
@@ -31,11 +34,10 @@ describe('Login', function (): void {
             'recaptcha' => 'bypass-recaptcha',
         ]);
 
-        $token = $response->json('data.token');
-        expect($token)->not->toBeNull();
+        $response->assertJsonMissingPath('data.token');
 
         foreach ($contextosLogueados as $contexto) {
-            expect(json_encode($contexto))->not->toContain($token);
+            expect(json_encode($contexto))->not->toContain('Password123!');
         }
     });
 
@@ -57,9 +59,9 @@ describe('Login', function (): void {
                 'message',
                 'data' => [
                     'user' => ['id', 'name', 'email'],
-                    'token',
                 ],
             ])
+            ->assertJsonMissingPath('data.token')
             ->assertJson([
                 'success' => true,
                 'message' => 'Login exitoso',

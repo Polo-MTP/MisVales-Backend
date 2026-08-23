@@ -79,7 +79,7 @@ it('un usuario nuevo con rol de 2 factores debe configurar MFA antes de poder in
         ->assertJson(['success' => true, 'data' => ['requires_setup' => true, 'email' => $user->email]]);
 });
 
-it('flujo completo de 2 factores: setup, confirmar y login con código entrega el token', function (): void {
+it('flujo completo de 2 factores: setup, confirmar y login con código autentica al usuario', function (): void {
     $user = crearUsuarioConRol('Cajera');
 
     [$mfaMethodId, $secretKey] = configurarSegundoFactor($this, $user);
@@ -92,7 +92,8 @@ it('flujo completo de 2 factores: setup, confirmar y login con código entrega e
 
     $this->postJson('/api/v1/mfa/verify', ['mfa_method_id' => $mfaMethodId, 'code' => $codigo, 'recaptcha' => 'bypass-recaptcha'])
         ->assertStatus(200)
-        ->assertJsonStructure(['success', 'message', 'data' => ['user' => ['id', 'email'], 'token']])
+        ->assertJsonStructure(['success', 'message', 'data' => ['user' => ['id', 'email']]])
+        ->assertJsonMissingPath('data.token')
         ->assertJson(['success' => true]);
 });
 
@@ -108,7 +109,7 @@ it('rechaza un código TOTP incorrecto en la verificación de login', function (
         ->assertJson(['success' => false, 'message' => 'El código de la App es incorrecto.']);
 });
 
-it('flujo completo de 3 factores: tras el TOTP pide un código por correo antes de entregar el token', function (): void {
+it('flujo completo de 3 factores: tras el TOTP pide un código por correo antes de autenticar', function (): void {
     $user = crearUsuarioConRol('Gerente General');
     [$mfaMethodId, $secretKey] = configurarSegundoFactor($this, $user);
 
@@ -127,7 +128,8 @@ it('flujo completo de 3 factores: tras el TOTP pide un código por correo antes 
 
     $this->postJson('/api/v1/mfa/email/verify', ['user_id' => $user->id, 'code' => $codigoCorreo, 'recaptcha' => 'bypass-recaptcha'])
         ->assertStatus(200)
-        ->assertJsonStructure(['success', 'message', 'data' => ['user' => ['id', 'email'], 'token']])
+        ->assertJsonStructure(['success', 'message', 'data' => ['user' => ['id', 'email']]])
+        ->assertJsonMissingPath('data.token')
         ->assertJson(['success' => true]);
 });
 

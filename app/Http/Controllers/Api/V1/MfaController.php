@@ -34,8 +34,6 @@ final class MfaController extends ApiController
             'code' => $request->code,
         ]);
 
-        // Nunca loguear $result completo: si tiene éxito trae el plainTextToken de
-        // Sanctum en texto plano.
         Log::debug('MfaController: Verificación de código MFA terminada', [
             'mfa_method_id' => $request->mfa_method_id,
             'success' => $result['success'],
@@ -59,7 +57,6 @@ final class MfaController extends ApiController
         return $this->success(
             data: [
                 'user' => new UserResource($result['user']),
-                'token' => $result['token'],
             ],
             message: (string) $result['message']
         );
@@ -79,8 +76,6 @@ final class MfaController extends ApiController
             'code' => $request->code,
         ]);
 
-        // Nunca loguear $result completo: si tiene éxito trae el plainTextToken de
-        // Sanctum en texto plano.
         Log::debug('MfaController: Verificación de código OTP por correo terminada', [
             'user_id' => $request->user_id,
             'success' => $result['success'],
@@ -97,7 +92,6 @@ final class MfaController extends ApiController
         return $this->success(
             data: [
                 'user' => new UserResource($result['user']),
-                'token' => $result['token'],
             ],
             message: (string) $result['message']
         );

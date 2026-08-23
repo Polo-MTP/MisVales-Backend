@@ -23,7 +23,10 @@ final class ForgotPasswordRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'email', 'exists:users,email'],
+            // Sin 'exists:users,email' a propósito: que la validación falle solo para correos no
+            // registrados es un oráculo de enumeración de cuentas (ver auditoría de seguridad).
+            // El controller responde siempre el mismo mensaje genérico, exista o no la cuenta.
+            'email' => ['required', 'email'],
             'recaptcha' => ['required', 'string', new Recaptcha()],
         ];
     }

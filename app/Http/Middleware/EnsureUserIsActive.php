@@ -6,19 +6,24 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 final class EnsureUserIsActive
 {
     /**
-     * Si el usuario fue desactivado, revoca su token de acceso actual y rechaza la petición.
+     * Si el usuario fue desactivado, cierra su sesión/token actual y rechaza la petición.
      */
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
 
         if ($user && ! $user->is_active) {
-            if (method_exists($user, 'currentAccessToken') && $user->currentAccessToken()) {
+            if ($request->hasSession()) {
+                Auth::guard('web')->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+            } elseif (method_exists($user, 'currentAccessToken') && $user->currentAccessToken()) {
                 $user->currentAccessToken()->delete();
             }
 

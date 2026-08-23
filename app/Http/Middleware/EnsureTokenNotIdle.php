@@ -6,33 +6,23 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Laravel\Sanctum\PersonalAccessToken;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Cierra la sesión (revoca el token) si pasó demasiado tiempo sin actividad — independiente
- * de la expiración absoluta del token (ver config/sanctum.php 'expiration').
+ * Cierra la sesión si pasó demasiado tiempo sin actividad — independiente de la expiración
+ * absoluta de la sesión (ver config/session.php 'lifetime').
  *
- * Usa su propia columna 'last_activity_at' en vez de 'last_used_at' de Sanctum: ese campo lo
- * actualiza el propio Sanctum a "ahora" durante la autenticación de ESTA MISMA petición (en
- * 'auth:sanctum', que corre antes que este middleware) — para cuando llegamos aquí siempre
- * diría "recién usado" y jamás detectaría inactividad. 'last_activity_at' es de este
- * middleware nada más, así que sí conserva el valor de la petición anterior hasta que la
- * actualizamos al final de este mismo método.
- *
- * $token->exists (no solo `instanceof`): Sanctum::actingAs(), que usan casi todos los tests
- * de este proyecto, autentica con un mock de Mockery del modelo — pasa el `instanceof`, pero
- * no es un registro real de base de datos y forceFill()/save() truena sobre él. `exists` es
- * una propiedad pública normal de Eloquent (no pasa por __get mágico), así que en el mock se
- * queda en su valor por defecto (false) aunque el resto del objeto esté simulado.
+ * La sesión se autentica por cookie httpOnly (ver bootstrap/app.php: statefulApi()), así que el
+ * rastro de actividad vive en la propia sesión de Laravel ('last_activity_at' en el store de
+ * sesión), no en una fila de token como antes -- no hay una fila de "este dispositivo" aparte
+ * que borrar, cerrar la sesión actual es la operación completa.
  */
 final class EnsureTokenNotIdle
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $token = $request->user()?->currentAccessToken();
-
-        if (! $token instanceof PersonalAccessToken || ! $token->exists) {
+        if (! $request->hasSession() || ! $request->user()) {
             /** @var Response $response */
             $response = $next($request);
 
@@ -40,14 +30,16 @@ final class EnsureTokenNotIdle
         }
 
         $minutosInactividadPermitidos = (int) config('security.idle_timeout_minutes', 15);
-        $ultimaActividad = $token->last_activity_at;
+        $ultimaActividad = $request->session()->get('last_activity_at');
 
         // abs(): Carbon 3 cambió el default de diffInMinutes() a devolver el valor CON signo
         // (antes de la 3, siempre regresaba la diferencia absoluta) — sin esto, como
         // $ultimaActividad siempre queda en el pasado respecto a "ahora", el resultado es
         // negativo y la comparación ">" nunca se cumple.
         if ($ultimaActividad !== null && abs(now()->diffInMinutes($ultimaActividad)) > $minutosInactividadPermitidos) {
-            $token->delete();
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
 
             return response()->json([
                 'success' => false,
@@ -55,7 +47,7 @@ final class EnsureTokenNotIdle
             ], Response::HTTP_UNAUTHORIZED);
         }
 
-        $token->forceFill(['last_activity_at' => now()])->save();
+        $request->session()->put('last_activity_at', now());
 
         /** @var Response $response */
         $response = $next($request);

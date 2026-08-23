@@ -21,17 +21,21 @@ describe('Forgot Password', function (): void {
         $response->assertStatus(200)
             ->assertJson([
                 'success' => true,
-                'message' => 'Enlace de restablecimiento enviado a tu correo electrónico.',
+                'message' => 'Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.',
             ]);
     });
 
-    it('fails with non-existent email', function (): void {
+    it('responds with the same generic message for a non-existent email (no account enumeration)', function (): void {
         $response = $this->postJson('/api/v1/forgot-password', [
             'email' => 'nonexistent@example.com',
             'recaptcha' => 'bypass-recaptcha',
         ]);
 
-        $response->assertStatus(422);
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'message' => 'Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.',
+            ]);
     });
 
     it('respects rate limiting', function (): void {
@@ -110,7 +114,7 @@ describe('Reset Password', function (): void {
         $response->assertStatus(422);
     });
 
-    it('fails with non-existent email', function (): void {
+    it('fails with the same generic message for a non-existent email (no account enumeration)', function (): void {
         $response = $this->postJson('/api/v1/reset-password', [
             'email' => 'nonexistent@example.com',
             'token' => 'some-token',
@@ -122,7 +126,7 @@ describe('Reset Password', function (): void {
         $response->assertStatus(400)
             ->assertJson([
                 'success' => false,
-                'message' => 'Usuario no encontrado.',
+                'message' => 'Token de restablecimiento inválido o expirado.',
             ]);
     });
 });

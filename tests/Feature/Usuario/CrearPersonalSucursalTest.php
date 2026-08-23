@@ -118,6 +118,48 @@ it('rechaza un rol distinto a Coordinador, Verificador o Cajera', function (): v
     $response->assertStatus(422)->assertJsonValidationErrors('rol');
 });
 
+it('rechaza dar de alta personal en una sucursal deshabilitada', function (): void {
+    $sucursalInactiva = Sucursal::create(['nombre' => 'Cerrada', 'codigo' => 'SUC-CERRADA', 'es_matriz' => false, 'is_active' => false]);
+    $gerente = crearGerenteDeSucursalPersonal($sucursalInactiva);
+    Sanctum::actingAs(crearGerenteGeneralPersonal());
+
+    $response = $this->postJson('/api/v1/usuarios/personal', [
+        'rol' => 'Cajera',
+        'name' => 'Cajera Sucursal Cerrada',
+        'email' => 'sucursal.cerrada@example.com',
+        'password' => 'Password123',
+        'password_confirmation' => 'Password123',
+        'sucursal_id' => $sucursalInactiva->id,
+        'gerente_id' => $gerente->id,
+    ]);
+
+    $response->assertStatus(422)->assertJsonValidationErrors('sucursal_id');
+    expect(User::where('email', 'sucursal.cerrada@example.com')->exists())->toBeFalse();
+});
+
+it('rechaza asignar personal a un Gerente de Sucursal deshabilitado', function (): void {
+    $sucursal = crearSucursalPersonal();
+    $gerenteInactivo = User::factory()->create([
+        'role_id' => Role::where('name', 'Gerente de Sucursal')->first()->id,
+        'sucursal_id' => $sucursal->id,
+        'is_active' => false,
+    ]);
+    Sanctum::actingAs(crearGerenteGeneralPersonal());
+
+    $response = $this->postJson('/api/v1/usuarios/personal', [
+        'rol' => 'Cajera',
+        'name' => 'Cajera Gerente Inactivo',
+        'email' => 'gerente.inactivo@example.com',
+        'password' => 'Password123',
+        'password_confirmation' => 'Password123',
+        'sucursal_id' => $sucursal->id,
+        'gerente_id' => $gerenteInactivo->id,
+    ]);
+
+    $response->assertStatus(422)->assertJsonValidationErrors('gerente_id');
+    expect(User::where('email', 'gerente.inactivo@example.com')->exists())->toBeFalse();
+});
+
 it('ningún otro rol puede dar de alta personal de sucursal', function (): void {
     $sucursal = crearSucursalPersonal();
     Sanctum::actingAs(User::factory()->create([

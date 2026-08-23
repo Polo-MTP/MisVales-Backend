@@ -6,6 +6,7 @@ namespace App\Services\Auth;
 
 use App\Models\LoginAttempt;
 use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -84,7 +85,7 @@ final class EmailOtpService
             'email' => $user->email,
         ]);
 
-        $token = $user->createToken('auth-token')->plainTextToken;
+        Auth::guard('web')->login($user);
 
         LoginAttempt::record($user->id, $user->email, 'success_factor_3', 3, 'Tercer factor exitoso. Autenticado.');
 
@@ -92,7 +93,6 @@ final class EmailOtpService
             'success' => true,
             'message' => 'Tercer Factor verificado con éxito.',
             'user' => $user,
-            'token' => $token,
             'code' => 200,
         ];
     }

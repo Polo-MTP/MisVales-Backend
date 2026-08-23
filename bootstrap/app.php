@@ -51,6 +51,13 @@ return Application::configure(basePath: dirname(__DIR__))
             ConvertEmptyStringsToNull::class,
         ]);
 
+        // Activa el modo "stateful" de Sanctum: peticiones que vienen de un dominio listado en
+        // SANCTUM_STATEFUL_DOMAINS se autentican por cookie de sesión httpOnly en vez de Bearer
+        // token (evita que un XSS pueda robar la sesión leyendo localStorage -- ver auditoría de
+        // seguridad, hallazgo H-02). Cualquier petición que SÍ traiga un Bearer token válido
+        // sigue funcionando igual que antes; este modo solo se activa para el dominio del SPA.
+        $middleware->statefulApi();
+
         // Detrás del balanceador nuevo, sin esto $request->ip() siempre regresa la IP
         // del balanceador para TODAS las peticiones — rompe throttle:auth (5/min pasa
         // de ser por usuario a compartido entre todos), el ip_address de login_attempts

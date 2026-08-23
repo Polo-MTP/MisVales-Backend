@@ -9,6 +9,21 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 uses(RefreshDatabase::class);
 
+// 'http://localhost:4201' está en SANCTUM_STATEFUL_DOMAINS (.env) -- sin un Referer que
+// coincida, EnsureFrontendRequestsAreStateful nunca activa la sesión y $request->hasSession()
+// da false, con lo que EnsureTokenNotIdle no tendría nada que evaluar.
+const REFERER_FRONTEND = 'http://localhost:4201';
+
+function crearUsuarioConSesion(): User
+{
+    $role = Role::firstOrCreate(['name' => 'Gerente General']);
+    $user = User::factory()->create(['role_id' => $role->id, 'is_active' => true]);
+
+    test()->withHeader('Referer', REFERER_FRONTEND)->actingAs($user, 'web');
+
+    return $user;
+}
+
 function crearUsuarioConToken(): array
 {
     $role = Role::firstOrCreate(['name' => 'Gerente General']);
@@ -19,46 +34,45 @@ function crearUsuarioConToken(): array
 }
 
 it('la primera petición tras el login no se rechaza (no hay actividad previa que comparar)', function (): void {
-    [, $plainTextToken] = crearUsuarioConToken();
+    crearUsuarioConSesion();
 
-    $this->getJson('/api/v1/me', ['Authorization' => "Bearer {$plainTextToken}"])
+    $this->withHeader('Referer', REFERER_FRONTEND)
+        ->getJson('/api/v1/me')
         ->assertStatus(200);
 
-    $token = PersonalAccessToken::findToken($plainTextToken);
-    expect($token->last_activity_at)->not->toBeNull();
+    expect(session('last_activity_at'))->not->toBeNull();
 });
 
 it('sigue viva mientras haya actividad dentro de la ventana de inactividad permitida', function (): void {
-    [, $plainTextToken] = crearUsuarioConToken();
+    crearUsuarioConSesion();
 
-    $this->getJson('/api/v1/me', ['Authorization' => "Bearer {$plainTextToken}"])->assertStatus(200);
+    $this->withHeader('Referer', REFERER_FRONTEND)->getJson('/api/v1/me')->assertStatus(200);
 
     $this->travel(10)->minutes();
 
     // A los 10 min (< 15 configurados) sigue viva, y esta petición vuelve a correr el reloj.
-    $this->getJson('/api/v1/me', ['Authorization' => "Bearer {$plainTextToken}"])->assertStatus(200);
+    $this->withHeader('Referer', REFERER_FRONTEND)->getJson('/api/v1/me')->assertStatus(200);
 
     $this->travel(10)->minutes();
 
     // Otros 10 min desde la ÚLTIMA actividad (no desde el login) -> sigue dentro de la ventana.
-    $this->getJson('/api/v1/me', ['Authorization' => "Bearer {$plainTextToken}"])->assertStatus(200);
+    $this->withHeader('Referer', REFERER_FRONTEND)->getJson('/api/v1/me')->assertStatus(200);
 });
 
 it('se cierra por inactividad tras pasar el límite configurado sin actividad', function (): void {
-    [, $plainTextToken] = crearUsuarioConToken();
+    crearUsuarioConSesion();
 
-    $this->getJson('/api/v1/me', ['Authorization' => "Bearer {$plainTextToken}"])->assertStatus(200);
+    $this->withHeader('Referer', REFERER_FRONTEND)->getJson('/api/v1/me')->assertStatus(200);
 
     $this->travel((int) config('security.idle_timeout_minutes') + 1)->minutes();
 
-    $this->getJson('/api/v1/me', ['Authorization' => "Bearer {$plainTextToken}"])
+    $this->withHeader('Referer', REFERER_FRONTEND)
+        ->getJson('/api/v1/me')
         ->assertStatus(401)
         ->assertJson([
             'success' => false,
             'message' => 'Tu sesión se cerró por inactividad. Inicia sesión de nuevo.',
         ]);
-
-    expect(PersonalAccessToken::findToken($plainTextToken))->toBeNull();
 });
 
 it('el token deja de servir tras pasar su expiración absoluta', function (): void {

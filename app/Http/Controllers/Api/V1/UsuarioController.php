@@ -9,6 +9,7 @@ use App\Http\Requests\Api\V1\Usuario\CrearGerenteSucursalRequest;
 use App\Http\Requests\Api\V1\Usuario\CrearPersonalSucursalRequest;
 use App\Http\Resources\UserResource;
 use App\Models\Role;
+use App\Models\Sucursal;
 use App\Models\User;
 use App\Services\Usuario\MovimientosAutorizadosService;
 use Illuminate\Http\JsonResponse;
@@ -127,6 +128,22 @@ final class UsuarioController extends ApiController
                     'gerente_id' => 'El gerente indicado debe ser Gerente de Sucursal de la sucursal seleccionada.',
                 ]);
             }
+
+            if (! $gerente->is_active) {
+                throw ValidationException::withMessages([
+                    'gerente_id' => 'El gerente indicado está deshabilitado y no puede recibir personal a su cargo.',
+                ]);
+            }
+        }
+
+        // La sucursal debe seguir activa -- cubre tanto el caso en que Gerente General elige una
+        // sucursal deshabilitada, como el caso (más raro) de que la propia sucursal del Gerente de
+        // Sucursal se haya deshabilitado después de que él inició sesión.
+        $sucursal = Sucursal::query()->find($sucursalId);
+        if (! $sucursal || ! $sucursal->is_active) {
+            throw ValidationException::withMessages([
+                'sucursal_id' => 'La sucursal indicada está deshabilitada y no puede recibir personal nuevo.',
+            ]);
         }
 
         $usuario = User::query()->create([
