@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\AbonoConciliacion;
 use App\Models\CategoriaDistribuidora;
 use App\Models\Distribuidora;
+use App\Models\Notificacion;
 use App\Models\Relacion;
 use App\Models\Role;
 use App\Models\Sucursal;
@@ -58,6 +59,24 @@ it('la distribuidora levanta una queja sobre un abono de su propia relación', f
         ->assertJsonPath('data.queja.reportado_por', $usuario->name);
 
     expect($abono->fresh()->queja_por)->toBe($usuario->id);
+});
+
+it('avisa a las Cajeras de la sucursal cuando se levanta una queja, para que inicien la conciliación manual', function (): void {
+    [$distribuidora, $abono, $usuario] = crearDistribuidoraConRelacionYAbono();
+
+    $rolCajera = Role::firstOrCreate(['name' => 'Cajera']);
+    $cajera = User::factory()->create(['role_id' => $rolCajera->id, 'sucursal_id' => $distribuidora->sucursal_id, 'is_active' => true]);
+    // Cajera de otra sucursal: no debe enterarse de una queja que no le toca.
+    $otraSucursal = Sucursal::create(['nombre' => 'Otra', 'codigo' => 'SUC-'.uniqid(), 'es_matriz' => false, 'is_active' => true]);
+    $cajeraDeOtraSucursal = User::factory()->create(['role_id' => $rolCajera->id, 'sucursal_id' => $otraSucursal->id, 'is_active' => true]);
+
+    Sanctum::actingAs($usuario);
+
+    $this->postJson("/api/v1/conciliaciones/{$abono->id}/queja", ['motivo' => 'Yo pagué 2000, no 1500.'])
+        ->assertStatus(200);
+
+    expect(Notificacion::where('destinatario_id', $cajera->id)->where('accion', 'abono_con_queja')->exists())->toBeTrue()
+        ->and(Notificacion::where('destinatario_id', $cajeraDeOtraSucursal->id)->where('accion', 'abono_con_queja')->exists())->toBeFalse();
 });
 
 it('una distribuidora no puede quejarse de un abono que no es de ella', function (): void {

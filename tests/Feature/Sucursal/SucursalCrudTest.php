@@ -75,3 +75,44 @@ it('el Gerente General puede editar y desactivar una sucursal', function (): voi
         ->nombre->toBe('Matriz Renombrada')
         ->is_active->toBeFalse();
 });
+
+it('desactivar una sucursal desactiva en cascada a todo su personal', function (): void {
+    $sucursal = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-001', 'es_matriz' => true, 'is_active' => true]);
+    $otraSucursal = Sucursal::create(['nombre' => 'Otra', 'codigo' => 'SUC-002', 'es_matriz' => false, 'is_active' => true]);
+
+    $rolGS = Role::firstOrCreate(['name' => 'Gerente de Sucursal']);
+    $rolCajera = Role::firstOrCreate(['name' => 'Cajera']);
+
+    $gerente = User::factory()->create(['role_id' => $rolGS->id, 'sucursal_id' => $sucursal->id, 'is_active' => true]);
+    $cajera = User::factory()->create(['role_id' => $rolCajera->id, 'sucursal_id' => $sucursal->id, 'is_active' => true]);
+    $cajeraYaInactiva = User::factory()->create(['role_id' => $rolCajera->id, 'sucursal_id' => $sucursal->id, 'is_active' => false]);
+    $cajeraDeOtraSucursal = User::factory()->create(['role_id' => $rolCajera->id, 'sucursal_id' => $otraSucursal->id, 'is_active' => true]);
+
+    Sanctum::actingAs(crearGerenteGeneralSuc());
+
+    $this->putJson('/api/v1/sucursales/'.$sucursal->id, [
+        'nombre' => 'Matriz',
+        'codigo' => 'SUC-001',
+        'is_active' => false,
+    ])->assertStatus(200);
+
+    expect($gerente->fresh()->is_active)->toBeFalse()
+        ->and($cajera->fresh()->is_active)->toBeFalse()
+        ->and($cajeraDeOtraSucursal->fresh()->is_active)->toBeTrue();
+});
+
+it('reactivar una sucursal NO reactiva automáticamente al personal que ya estaba desactivado', function (): void {
+    $sucursal = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-001', 'es_matriz' => true, 'is_active' => false]);
+    $rolCajera = Role::firstOrCreate(['name' => 'Cajera']);
+    $cajera = User::factory()->create(['role_id' => $rolCajera->id, 'sucursal_id' => $sucursal->id, 'is_active' => false]);
+
+    Sanctum::actingAs(crearGerenteGeneralSuc());
+
+    $this->putJson('/api/v1/sucursales/'.$sucursal->id, [
+        'nombre' => 'Matriz',
+        'codigo' => 'SUC-001',
+        'is_active' => true,
+    ])->assertStatus(200);
+
+    expect($cajera->fresh()->is_active)->toBeFalse();
+});

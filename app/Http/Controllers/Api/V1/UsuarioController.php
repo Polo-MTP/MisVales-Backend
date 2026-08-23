@@ -7,20 +7,27 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Api\V1\Usuario\CrearGerenteSucursalRequest;
 use App\Http\Requests\Api\V1\Usuario\CrearPersonalSucursalRequest;
+use App\Http\Requests\Api\V1\Usuario\ReasignarPersonalRequest;
 use App\Http\Resources\UserResource;
+use App\Mail\PersonalCredencialesMail;
 use App\Models\Role;
 use App\Models\Sucursal;
 use App\Models\User;
+use App\Services\Notificacion\NotificacionService;
 use App\Services\Usuario\MovimientosAutorizadosService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 final class UsuarioController extends ApiController
 {
     public function __construct(
         private readonly MovimientosAutorizadosService $movimientosAutorizadosService,
+        private readonly NotificacionService $notificacionService,
     ) {}
 
     /**
@@ -107,6 +114,11 @@ final class UsuarioController extends ApiController
      * su sucursal ni asignárselo a otro gerente. Cuando es Gerente General sí manda ambos
      * explícitamente, y se valida que el gerente indicado sea realmente Gerente de Sucursal de
      * esa misma sucursal.
+     *
+     * La contraseña la genera el sistema (no la elige quien da de alta) y se manda por correo
+     * al nuevo usuario -- así nadie más que él llega a conocerla. Si quien asigna es distinto
+     * al gerente (Gerente General dando de alta bajo un Gerente de Sucursal específico), ese
+     * gerente recibe una notificación de que tiene personal nuevo a su cargo.
      */
     public function crearPersonalSucursal(CrearPersonalSucursalRequest $request): JsonResponse
     {
@@ -117,12 +129,11 @@ final class UsuarioController extends ApiController
 
         if ($authUser->role?->name === 'Gerente de Sucursal') {
             $sucursalId = $authUser->sucursal_id;
-            $gerenteId = $authUser->id;
+            $gerente = $authUser;
         } else {
             $sucursalId = $request->integer('sucursal_id');
-            $gerenteId = $request->integer('gerente_id');
+            $gerente = User::query()->with('role')->find($request->integer('gerente_id'));
 
-            $gerente = User::query()->with('role')->find($gerenteId);
             if (! $gerente || $gerente->role?->name !== 'Gerente de Sucursal' || $gerente->sucursal_id !== $sucursalId) {
                 throw ValidationException::withMessages([
                     'gerente_id' => 'El gerente indicado debe ser Gerente de Sucursal de la sucursal seleccionada.',
@@ -146,19 +157,94 @@ final class UsuarioController extends ApiController
             ]);
         }
 
+        $passwordGenerada = Str::password(16);
+
         $usuario = User::query()->create([
             'name' => $request->string('name'),
             'email' => $request->string('email'),
-            'password' => Hash::make($request->string('password')),
+            'password' => Hash::make($passwordGenerada),
             'role_id' => $rol->id,
             'sucursal_id' => $sucursalId,
-            'gerente_id' => $gerenteId,
+            'gerente_id' => $gerente->id,
             'is_active' => true,
         ]);
 
         $usuario->email_verified_at = now();
         $usuario->save();
 
+        // $usuario->name/->email siguen siendo el Stringable de $request->string(...) hasta que
+        // se recarga desde la BD (create() no los normaliza) -- Mail::to() necesita un string
+        // real, si no intenta leer ->name de ese objeto como si fuera un destinatario con
+        // nombre y truena con un BadMethodCallException.
+        Mail::to((string) $usuario->email)->send(new PersonalCredencialesMail(
+            (string) $usuario->name,
+            (string) $usuario->email,
+            (string) $passwordGenerada,
+            (string) $rol->name,
+        ));
+
+        if ($gerente->id !== $authUser->id) {
+            $this->notificacionService->crear($gerente, 'personal_asignado', $usuario->name.' ('.$rol->name.')', $authUser);
+        }
+
         return $this->created(new UserResource($usuario->load(['role', 'sucursal', 'gerente'])));
+    }
+
+    /**
+     * Mueve TODO el personal (Coordinador/Verificador/Cajera) de un Gerente de Sucursal a otro
+     * -- típicamente cuando el de origen deja la empresa/sucursal. Solo Gerente General: a
+     * diferencia de reasignarCoordinador (que un Gerente de Sucursal puede hacer sobre su propia
+     * cartera), aquí un Gerente de Sucursal se estaría quedando sin equipo, así que es decisión
+     * de Gerente General. Ambos gerentes deben ser de la MISMA sucursal -- el personal no cambia
+     * de sucursal_id en esta operación, solo de a quién reporta.
+     */
+    public function reasignarPersonal(ReasignarPersonalRequest $request): JsonResponse
+    {
+        $gerenteOrigen = User::query()->with('role')->findOrFail($request->integer('gerente_origen_id'));
+        $gerenteDestino = User::query()->with('role')->findOrFail($request->integer('gerente_destino_id'));
+
+        if ($gerenteOrigen->role?->name !== 'Gerente de Sucursal' || $gerenteDestino->role?->name !== 'Gerente de Sucursal') {
+            abort(422, 'Ambos usuarios deben tener el rol Gerente de Sucursal.');
+        }
+
+        if ($gerenteOrigen->id === $gerenteDestino->id) {
+            abort(422, 'El gerente destino debe ser diferente del gerente de origen.');
+        }
+
+        if ($gerenteDestino->sucursal_id !== $gerenteOrigen->sucursal_id) {
+            abort(422, 'El gerente destino debe pertenecer a la misma sucursal que el de origen.');
+        }
+
+        if (! $gerenteDestino->is_active) {
+            abort(422, 'El gerente destino está deshabilitado y no puede recibir personal a su cargo.');
+        }
+
+        /** @var User $usuario */
+        $usuario = $request->user();
+
+        $total = DB::transaction(function () use ($gerenteOrigen, $gerenteDestino): int {
+            $personal = User::query()->where('gerente_id', $gerenteOrigen->id)->lockForUpdate()->get();
+
+            foreach ($personal as $miembro) {
+                $miembro->gerente_id = $gerenteDestino->id;
+                $miembro->save();
+            }
+
+            return $personal->count();
+        });
+
+        if ($total > 0) {
+            $this->notificacionService->crear(
+                $gerenteDestino,
+                'personal_asignado',
+                $total.' persona(s) reasignada(s) de '.$gerenteOrigen->name,
+                $usuario
+            );
+        }
+
+        return $this->success(
+            data: ['personal_reasignado' => $total],
+            message: "{$total} persona(s) reasignada(s) de {$gerenteOrigen->name} a {$gerenteDestino->name}."
+        );
     }
 }

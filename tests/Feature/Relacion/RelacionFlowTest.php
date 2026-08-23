@@ -433,3 +433,31 @@ it('sin concepto (o corte de un solo vale) el abono se sigue aplicando al corte 
 
     expect($relacion->fresh()->estado)->toBe('liquidada');
 });
+
+it('si el banco reporta más de lo que se debía, avisa al Gerente de Sucursal y al Coordinador del excedente', function (): void {
+    $distribuidora = crearDistribuidora();
+    crearVale($distribuidora, 15000, 8);
+
+    $relacion = app(RelacionCalculoService::class)->generarParaDistribuidora($distribuidora, '2026-02-15');
+    $cajera = User::factory()->create();
+
+    $rolGS = Role::firstOrCreate(['name' => 'Gerente de Sucursal'], ['factor_count' => 3]);
+    $rolCoordinador = Role::firstOrCreate(['name' => 'Coordinador'], ['factor_count' => 2]);
+    $gerente = User::factory()->create(['role_id' => $rolGS->id, 'sucursal_id' => $distribuidora->sucursal_id]);
+    $coordinador = User::factory()->create(['role_id' => $rolCoordinador->id, 'sucursal_id' => $distribuidora->sucursal_id]);
+
+    $montoExcedente = (float) $relacion->total_a_pagar + 500;
+    $archivo = crearExcelBanco([
+        [1, 'Pago de más', $relacion->referencia_pago, $montoExcedente, 'F-EXTRA', '13/2/2026', '10:00', 'Transferencia'],
+    ]);
+    app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, $cajera);
+
+    expect($relacion->fresh()->estado)->toBe('liquidada');
+
+    $notificacionGerente = \App\Models\Notificacion::where('destinatario_id', $gerente->id)->where('accion', 'abono_excedente')->first();
+    $notificacionCoordinador = \App\Models\Notificacion::where('destinatario_id', $coordinador->id)->where('accion', 'abono_excedente')->first();
+
+    expect($notificacionGerente)->not->toBeNull()
+        ->and($notificacionGerente->recurso)->toContain('500.00')
+        ->and($notificacionCoordinador)->not->toBeNull();
+});

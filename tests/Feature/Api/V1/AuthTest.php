@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 
 uses(RefreshDatabase::class);
@@ -169,5 +170,63 @@ describe('Me', function (): void {
         $response = $this->getJson('/api/v1/me');
 
         $response->assertStatus(401);
+    });
+});
+
+describe('Cambiar contraseña', function (): void {
+    it('el usuario autenticado cambia su propia contraseña y puede volver a iniciar sesión con la nueva', function (): void {
+        $user = User::factory()->create(['role_id' => null, 'password' => bcrypt('Actual123!')]);
+        $token = $user->createToken('test-token')->plainTextToken;
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->putJson('/api/v1/me/password', [
+                'current_password' => 'Actual123!',
+                'password' => 'Nueva123!',
+                'password_confirmation' => 'Nueva123!',
+            ])
+            ->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        expect(Hash::check('Nueva123!', $user->fresh()->password))->toBeTrue();
+    });
+
+    it('revoca los demás tokens Bearer al cambiar la contraseña', function (): void {
+        $user = User::factory()->create(['role_id' => null, 'password' => bcrypt('Actual123!')]);
+        $tokenViejo = $user->createToken('otro-dispositivo')->plainTextToken;
+        $tokenActual = $user->createToken('este-dispositivo')->plainTextToken;
+
+        $this->withHeader('Authorization', 'Bearer '.$tokenActual)
+            ->putJson('/api/v1/me/password', [
+                'current_password' => 'Actual123!',
+                'password' => 'Nueva123!',
+                'password_confirmation' => 'Nueva123!',
+            ])
+            ->assertStatus(200);
+
+        expect($user->fresh()->tokens()->count())->toBe(0);
+    });
+
+    it('rechaza el cambio si la contraseña actual no coincide', function (): void {
+        $user = User::factory()->create(['role_id' => null, 'password' => bcrypt('Actual123!')]);
+        $token = $user->createToken('test-token')->plainTextToken;
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->putJson('/api/v1/me/password', [
+                'current_password' => 'Incorrecta',
+                'password' => 'Nueva123!',
+                'password_confirmation' => 'Nueva123!',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('current_password');
+
+        expect(Hash::check('Actual123!', $user->fresh()->password))->toBeTrue();
+    });
+
+    it('requiere autenticación', function (): void {
+        $this->putJson('/api/v1/me/password', [
+            'current_password' => 'Actual123!',
+            'password' => 'Nueva123!',
+            'password_confirmation' => 'Nueva123!',
+        ])->assertStatus(401);
     });
 });

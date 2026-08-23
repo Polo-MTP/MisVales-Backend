@@ -49,6 +49,7 @@ Route::middleware('throttle:auth')->group(function (): void {
 Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])->group(function (): void {
     Route::post('logout', [AuthController::class, 'logout'])->name('api.v1.logout');
     Route::get('me', [AuthController::class, 'me'])->name('api.v1.me');
+    Route::put('me/password', [AuthController::class, 'changePassword'])->name('api.v1.me.password');
     Route::get('upload-url', [UploadController::class, 'getPresignedUrl'])->name('api.v1.upload_url');
     Route::get('read-url', [UploadController::class, 'getPresignedReadUrl'])->name('api.v1.read_url');
 
@@ -82,6 +83,13 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
     Route::post('usuarios/personal', [UsuarioController::class, 'crearPersonalSucursal'])
         ->middleware(['role:Gerente General,Gerente de Sucursal', 'vpn'])
         ->name('api.v1.usuarios.crear_personal_sucursal');
+
+    // Mueve todo el personal de un Gerente de Sucursal a otro (mismo patrón que
+    // distribuidoras/reasignar-coordinador) -- típico cuando el de origen deja la empresa.
+    // Solo Gerente General, como el resto de altas/bajas de Gerente de Sucursal.
+    Route::post('usuarios/reasignar-gerente', [UsuarioController::class, 'reasignarPersonal'])
+        ->middleware(['role:Gerente General', 'vpn'])
+        ->name('api.v1.usuarios.reasignar_personal');
 
     // MÓDULO: SUCURSALES. Alta/edición solo Gerente General; listar/ver es de cualquier
     // usuario autenticado (lo necesitan varios selectores: crear Gerente de Sucursal, etc.).

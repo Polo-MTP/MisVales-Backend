@@ -6,7 +6,6 @@ namespace App\Http\Requests\Api\V1\Usuario;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 
 final class CrearPersonalSucursalRequest extends FormRequest
 {
@@ -27,6 +26,10 @@ final class CrearPersonalSucursalRequest extends FormRequest
      * Gerente General -- si es Gerente de Sucursal, el controller los ignora y los fija a su
      * propia sucursal/id, así que aquí basta con que sean opcionales para ese caso.
      *
+     * No se pide contraseña: el controller genera una aleatoria y se la manda por correo al
+     * nuevo usuario -- así quien lo da de alta nunca llega a conocer/elegir la contraseña de
+     * otra persona.
+     *
      * @return array<string, mixed>
      */
     public function rules(): array
@@ -37,7 +40,6 @@ final class CrearPersonalSucursalRequest extends FormRequest
             'rol' => ['required', 'string', Rule::in(['Coordinador', 'Verificador', 'Cajera'])],
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255|unique:users,email',
-            'password' => ['required', 'confirmed', Password::defaults()],
             'sucursal_id' => [$esGerenteGeneral ? 'required' : 'nullable', 'integer', 'exists:sucursales,id'],
             'gerente_id' => [$esGerenteGeneral ? 'required' : 'nullable', 'integer', 'exists:users,id'],
         ];

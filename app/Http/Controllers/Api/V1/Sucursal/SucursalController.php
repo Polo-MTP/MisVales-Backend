@@ -9,6 +9,7 @@ use App\Http\Requests\Api\V1\Sucursal\SucursalStoreRequest;
 use App\Http\Requests\Api\V1\Sucursal\SucursalUpdateRequest;
 use App\Http\Resources\Sucursal\SucursalResource;
 use App\Models\Sucursal;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -48,11 +49,25 @@ final class SucursalController extends ApiController
     }
 
     /**
-     * Actualiza los datos de una sucursal existente.
+     * Actualiza los datos de una sucursal existente. Si se desactiva, desactiva en cascada al
+     * personal que trabaja ahí (Gerente de Sucursal, Coordinador, Verificador, Cajera) -- sin
+     * esto, cerrar una sucursal no le quitaba el acceso a nadie que ya trabajara en ella, solo
+     * bloqueaba altas nuevas (ver UsuarioController::crearPersonalSucursal()). El bloqueo real
+     * lo aplica EnsureUserIsActive en su siguiente petición, igual que cualquier otra baja.
      */
     public function update(SucursalUpdateRequest $request, Sucursal $sucursal): JsonResponse
     {
-        $sucursal->update($request->validated());
+        $datos = $request->validated();
+        $seDesactiva = $sucursal->is_active && array_key_exists('is_active', $datos) && ! $datos['is_active'];
+
+        $sucursal->update($datos);
+
+        if ($seDesactiva) {
+            User::query()
+                ->where('sucursal_id', $sucursal->id)
+                ->where('is_active', true)
+                ->update(['is_active' => false]);
+        }
 
         return $this->success(new SucursalResource($sucursal));
     }

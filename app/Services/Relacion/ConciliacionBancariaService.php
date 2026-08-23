@@ -138,6 +138,17 @@ final class ConciliacionBancariaService
         $abono->queja_fecha = now();
         $abono->save();
 
+        // Sin esto, una queja se queda invisible hasta que alguien entra a buscarla a mano en el
+        // listado de abonos -- avisa a las Cajeras de la sucursal de la relación para que sepan
+        // que deben iniciar la conciliación manual (solicitarAutorizacion) sobre este abono.
+        $this->notificacionService->notificarRolEnSucursal(
+            'Cajera',
+            $abono->relacion?->sucursal_id,
+            'abono_con_queja',
+            'Abono #'.$abono->id,
+            $distribuidoraUsuario
+        );
+
         return $abono->fresh(['relacion', 'quejaPor']);
     }
 
@@ -258,6 +269,17 @@ final class ConciliacionBancariaService
             if ($relacion->estado === 'liquidada') {
                 $this->procesarPuntos($relacion, $fechaAbono);
                 $this->marcarValesPagados($relacion);
+            }
+
+            // Si el banco reportó más de lo que se debía (o dos abonos distintos matchearon el
+            // mismo concepto por error), el excedente no se refleja en ningún lado más que aquí
+            // -- sin avisar, ese dinero de más queda invisible en vez de esperar a que alguien
+            // decida si se aplica al siguiente corte o se reembolsa a la distribuidora.
+            $excedente = (float) $relacion->total_abonado - (float) $relacion->total_a_pagar;
+            if ($excedente > $margenTolerancia) {
+                $recurso = 'Relación #'.$relacion->id.' — excedente $'.number_format($excedente, 2);
+                $this->notificacionService->notificarRolEnSucursal('Gerente de Sucursal', $relacion->sucursal_id, 'abono_excedente', $recurso);
+                $this->notificacionService->notificarRolEnSucursal('Coordinador', $relacion->sucursal_id, 'abono_excedente', $recurso);
             }
         });
     }
