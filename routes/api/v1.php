@@ -61,9 +61,12 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
         ->middleware('throttle:6,1')
         ->name('verification.send');
 
-    // Listado de usuarios (ej. verificadores disponibles para asignar en alta-proveedor)
+    // Listado de usuarios (ej. verificadores disponibles para asignar en alta-proveedor). El
+    // controller ya contempla a Administrador ("ve todas las sucursales", igual que Gerente
+    // General) pero el middleware no lo dejaba pasar -- lo necesita para poder filtrar la
+    // bitácora de auditoría por usuario eligiéndolo por nombre, no adivinando su ID.
     Route::get('usuarios', [UsuarioController::class, 'index'])
-        ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General')
+        ->middleware('role:Coordinador,Verificador,Gerente de Sucursal,Gerente General,Administrador')
         ->name('api.v1.usuarios.index');
 
     // Feed de "lo que yo he autorizado" -- sin restricción de rol, siempre es sobre uno mismo.
