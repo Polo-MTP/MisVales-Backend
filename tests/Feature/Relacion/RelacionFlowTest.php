@@ -205,6 +205,38 @@ it('concilia un abono bancario, liquida la relación y genera puntos por pago an
         ->and($relacion->puntos_generados)->toBeGreaterThanOrEqual(0);
 });
 
+it('NO liquida una relación con saldo pendiente real, aunque caiga dentro de un margen de tolerancia de conciliación grande', function (): void {
+    // margen_tolerancia_conciliacion sigue existiendo para decidir si un EXCEDENTE amerita
+    // avisar a alguien -- pero ya NO decide si algo cuenta como "pagado" (ver
+    // ConciliacionBancariaService::EPSILON_LIQUIDACION). Antes de ese fix, un margen grande
+    // como este ($300, el mismo default real) dejaba "Liquidada" una relación con un saldo
+    // real pendiente por debajo de esa cantidad.
+    Configuracion::create([
+        'clave' => 'margen_tolerancia_conciliacion', 'valor' => '300', 'tipo_dato' => 'decimal',
+        'vigente_desde' => '2025-01-01', 'modificado_por' => User::factory()->create()->id,
+    ]);
+
+    $distribuidora = crearDistribuidora();
+    crearVale($distribuidora, 15000, 8, '2026-02-01');
+
+    $relacion = app(RelacionCalculoService::class)->generarParaDistribuidora($distribuidora, '2026-02-15');
+    $cajera = User::factory()->create();
+
+    // Total a pagar real: 2712 (igual que el resto de tests de este archivo). Paga 2460,
+    // dejando 252 pendientes -- por debajo del margen de $300, pero un saldo real de todos modos.
+    $archivo = crearExcelBanco([
+        [1, 'Pago de distribuidora', $relacion->referencia_pago, 2460, 'F900', '13/2/2026', '14:00', 'Transferencia'],
+    ]);
+
+    $resumen = app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, $cajera);
+
+    expect($resumen['conciliadas'])->toBe(1);
+
+    $relacion->refresh();
+    expect($relacion->estado)->toBe('parcial')
+        ->and((float) $relacion->total_a_pagar - (float) $relacion->total_abonado)->toBe(252.0);
+});
+
 it('concilia aunque el banco exporte la referencia como número y pierda los ceros a la izquierda', function (): void {
     $distribuidora = crearDistribuidora();
     crearVale($distribuidora, 15000, 8, '2026-02-01');

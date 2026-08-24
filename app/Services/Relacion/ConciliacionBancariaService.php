@@ -237,8 +237,21 @@ final class ConciliacionBancariaService
     }
 
     /**
-     * Suma el abono al total de la relación y actualiza su estado (parcial/liquidada) según
-     * el margen de tolerancia configurado; si queda liquidada, dispara puntos/penalización.
+     * Saldo pendiente por debajo de este umbral se considera pagado. Es un epsilon de
+     * redondeo de centavos (float), NO una cantidad de negocio que se perdona -- a propósito
+     * mucho más chico que margen_tolerancia_conciliacion (ver abajo), que puede configurarse
+     * en cientos de pesos para otros fines. Antes 'liquidada'/'pagado' usaban ese mismo margen
+     * configurable: un corte con $252 todavía sin pagar (por debajo de un margen de $300)
+     * salía marcado "Liquidada" en la app de la distribuidora, mostrando a la vez un saldo
+     * pendiente > 0 y el badge de pagado -- dinero real quedaba condonado en silencio, sin que
+     * nadie lo autorizara explícitamente. Perdonar un saldo real es una decisión de gerencia
+     * (ver RelacionEstadoService::perdonar()), no un efecto secundario de este margen.
+     */
+    private const EPSILON_LIQUIDACION = 0.01;
+
+    /**
+     * Suma el abono al total de la relación y actualiza su estado (parcial/liquidada); si
+     * queda liquidada, dispara puntos/penalización.
      *
      * Si $detalle viene (el concepto identificó a cuál vele corresponde), el abono se aplica
      * a ESE detalle primero (su propio 'pago'/'estado'), y el total_abonado de la relación se
@@ -252,13 +265,16 @@ final class ConciliacionBancariaService
         DB::transaction(function () use ($relacion, $monto, $fechaAbono, $detalle): void {
             $relacion->refresh();
 
+            // margen_tolerancia_conciliacion sigue vigente más abajo, pero solo para decidir
+            // si un EXCEDENTE (pagaron de más) amerita avisarle a alguien -- no para decidir
+            // si algo ya quedó pagado, ver EPSILON_LIQUIDACION arriba.
             $margenTolerancia = (float) ($this->configuracionService->obtenerValorVigente('margen_tolerancia_conciliacion') ?? 0);
 
             if ($detalle) {
                 $detalle->refresh();
                 $detalle->pago = (float) $detalle->pago + $monto;
                 $saldoCuota = (float) $detalle->total - (float) $detalle->pago;
-                $detalle->estado = $saldoCuota <= $margenTolerancia ? 'pagado' : 'parcial';
+                $detalle->estado = $saldoCuota <= self::EPSILON_LIQUIDACION ? 'pagado' : 'parcial';
                 $detalle->save();
 
                 $relacion->total_abonado = (float) RelacionDetalle::query()->where('relacion_id', $relacion->id)->sum('pago');
@@ -268,7 +284,7 @@ final class ConciliacionBancariaService
 
             $saldoPendiente = (float) $relacion->total_a_pagar - (float) $relacion->total_abonado;
 
-            if ($saldoPendiente <= $margenTolerancia) {
+            if ($saldoPendiente <= self::EPSILON_LIQUIDACION) {
                 $relacion->estado = 'liquidada';
             } elseif ((float) $relacion->total_abonado > 0) {
                 $relacion->estado = 'parcial';
