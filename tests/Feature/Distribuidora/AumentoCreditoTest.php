@@ -32,25 +32,28 @@ function crearDistribuidoraParaAumento(): array
     return compact('gerente', 'usuarioDistribuidora', 'distribuidora');
 }
 
-it('flujo completo por HTTP: solicitar y aprobar un aumento incrementa el limite_credito', function (): void {
+it('flujo completo por HTTP: solicitar y aprobar un aumento fija el limite_credito al monto otorgado (no lo suma al anterior)', function (): void {
     ['gerente' => $gerente, 'usuarioDistribuidora' => $usuarioDistribuidora, 'distribuidora' => $distribuidora] = crearDistribuidoraParaAumento();
 
+    // Límite actual: 10000. Pide subir a 15000 ("de 10000 a 15000").
     Sanctum::actingAs($usuarioDistribuidora);
     $response = $this->postJson("/api/v1/distribuidoras/{$distribuidora->id}/aumento-credito", [
-        'monto_solicitado' => 5000,
+        'monto_solicitado' => 15000,
         'motivo' => 'Buen historial de pagos',
     ]);
     $response->assertStatus(201)->assertJsonPath('data.estado', 'pendiente');
     $solicitudId = $response->json('data.id');
 
+    // El gerente negocia y solo otorga 13000 (menos de lo pedido, nunca más) -- ese 13000 es
+    // el nuevo límite total, no algo que se sume a los 10000 que ya tenía.
     Sanctum::actingAs($gerente);
     $response = $this->putJson("/api/v1/distribuidoras/aumento-credito/{$solicitudId}/decidir", [
         'decision' => 'aprobada',
-        'monto_otorgado' => 3000,
+        'monto_otorgado' => 13000,
     ]);
     $response->assertStatus(200)
         ->assertJsonPath('data.estado', 'aprobada')
-        ->assertJsonPath('data.monto_otorgado', 3000);
+        ->assertJsonPath('data.monto_otorgado', 13000);
 
     expect((float) $distribuidora->fresh()->limite_credito)->toBe(13000.0);
 });
@@ -59,9 +62,9 @@ it('el gerente no puede otorgar más de lo solicitado', function (): void {
     ['gerente' => $gerente, 'usuarioDistribuidora' => $usuarioDistribuidora, 'distribuidora' => $distribuidora] = crearDistribuidoraParaAumento();
 
     $service = app(SolicitudAumentoCreditoService::class);
-    $solicitud = $service->solicitar($distribuidora, $usuarioDistribuidora, 5000, 'motivo');
+    $solicitud = $service->solicitar($distribuidora, $usuarioDistribuidora, 15000, 'motivo');
 
-    expect(fn () => $service->decidir($solicitud, 'aprobada', 6000, null, $gerente))
+    expect(fn () => $service->decidir($solicitud, 'aprobada', 20000, null, $gerente))
         ->toThrow(Symfony\Component\HttpKernel\Exception\HttpException::class, 'El monto otorgado no puede ser mayor al monto solicitado.');
 });
 
