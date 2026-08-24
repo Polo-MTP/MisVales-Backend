@@ -18,7 +18,7 @@ it('un intento de login fallido no genera ruido en audit_log (User no está en e
     $role = Role::query()->where('name', 'Cajera')->firstOrFail();
     $user = User::factory()->create(['password' => bcrypt('Passw0rd1'), 'role_id' => $role->id]);
 
-    // El propio User::factory()->create() ya deja UNA fila (User.registrado, vía el
+    // El propio User::factory()->create() ya deja UNA fila (User.creado, vía el
     // listener dedicado de creación) — ese es el rastro que sí queremos conservar.
     $auditCountTrasCrear = AuditLog::where('resource', 'User#'.$user->id)->count();
     expect($auditCountTrasCrear)->toBe(1);

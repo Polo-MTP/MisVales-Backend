@@ -84,7 +84,7 @@ it('acepta un password fuerte, crea la cuenta y deja un solo rastro de auditorí
         // se ignora en silencio. Regresión: la cuenta debe quedar realmente verificada.
         ->and($nuevoUsuario->email_verified_at)->not->toBeNull();
 
-    expect(AuditLog::where('action', 'User.registrado')->where('resource', 'User#'.$nuevoUsuario->id)->count())->toBe(1);
+    expect(AuditLog::where('action', 'User.creado')->where('resource', 'User#'.$nuevoUsuario->id)->count())->toBe(1);
 
     $auditDistribuidora = AuditLog::where('action', 'Distribuidora.creado')->latest()->first();
     expect($auditDistribuidora)->not->toBeNull()

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\AuditLog;
 use App\Models\CategoriaDistribuidora;
 use App\Models\Distribuidora;
 use App\Models\Notificacion;
@@ -34,6 +35,24 @@ it('crear una distribuidora genera una notificación con la sucursal resuelta', 
     expect($notificacion)->not->toBeNull()
         ->and($notificacion->accion)->toBe('Distribuidora.creado')
         ->and($notificacion->sucursal_id)->toBe($sucursal->id);
+});
+
+/**
+ * AuditLogObserver está registrado sobre catálogos/configuración (Sucursal,
+ * CategoriaDistribuidora, Producto, etc. -- ver AppServiceProvider::configureAuditLog()) para
+ * que la bitácora forense (AuditLog) los cubra, pero esos altas NO deben generar Notificacion:
+ * un Gerente de Sucursal no necesita enterarse de que alguien dio de alta una categoría o una
+ * sucursal nueva, y antes de este fix sí se generaba, inflando el feed (ver
+ * AuditLogObserver::MODELOS_CON_NOTIFICACION).
+ */
+it('crear un catálogo (Sucursal/CategoriaDistribuidora) deja rastro en AuditLog pero no genera Notificacion', function (): void {
+    $sucursal = Sucursal::create(['nombre' => 'Solo Catálogo', 'codigo' => 'SUC-'.uniqid(), 'es_matriz' => false, 'is_active' => true]);
+    $categoria = CategoriaDistribuidora::create(['nombre' => 'BRONCE-'.uniqid(), 'porcentaje_comision' => 6, 'activo' => true]);
+
+    expect(AuditLog::where('resource', 'Sucursal#'.$sucursal->id)->exists())->toBeTrue()
+        ->and(Notificacion::where('recurso', 'Sucursal#'.$sucursal->id)->exists())->toBeFalse()
+        ->and(AuditLog::where('resource', 'CategoriaDistribuidora#'.$categoria->id)->exists())->toBeTrue()
+        ->and(Notificacion::where('recurso', 'CategoriaDistribuidora#'.$categoria->id)->exists())->toBeFalse();
 });
 
 it('el gerente de sucursal solo ve por HTTP las notificaciones de su propia sucursal', function (): void {

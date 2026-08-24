@@ -34,7 +34,15 @@ use Illuminate\Support\Arr;
 /**
  * Observer genérico de auditoría registrado sobre todos los modelos de negocio.
  * Escribe un `AuditLog` detallado con diff JSON (antes vs después), sucursal resuelta,
- * IP real, User-Agent y nivel de severidad.
+ * IP real, User-Agent y nivel de severidad -- para TODOS los modelos observados (ver
+ * AppServiceProvider::configureAuditLog()).
+ *
+ * La `Notificacion` (el feed que ve Gerente de Sucursal/General/Administrador) es un
+ * propósito distinto y deliberadamente NO se genera para todos esos modelos, solo para
+ * MODELOS_CON_NOTIFICACION -- si se generara para todos, dar de alta un catálogo (Sucursal,
+ * CategoriaDistribuidora, Producto, SeguroTabla, Configuracion...) o generar un corte con
+ * varios vales (una RelacionDetalle por vale) inundaría el feed de un Gerente de Sucursal con
+ * ruido administrativo que no le corresponde revisar.
  */
 final class AuditLogObserver
 {
@@ -44,6 +52,26 @@ final class AuditLogObserver
         'remember_token',
         'two_factor_secret',
         'two_factor_recovery_codes',
+    ];
+
+    /**
+     * Modelos cuyos eventos también generan una Notificacion, además del AuditLog. Es el
+     * mismo conjunto "operativo" de antes de que la auditoría se ampliara a catálogos y
+     * configuración -- eventos puntuales sobre una distribuidora/cliente/vale concretos que
+     * un gerente sí necesita ver en su feed, no altas/bajas de catálogo.
+     *
+     * @var array<int, class-string<Model>>
+     */
+    private const MODELOS_CON_NOTIFICACION = [
+        Vale::class,
+        Distribuidora::class,
+        Cliente::class,
+        AbonoConciliacion::class,
+        Relacion::class,
+        PuntoMovimiento::class,
+        SolicitudProveedor::class,
+        SolicitudConciliacion::class,
+        SolicitudEdicionCliente::class,
     ];
 
     public function created(Model $model): void
@@ -77,7 +105,8 @@ final class AuditLogObserver
     }
 
     /**
-     * Escribe el AuditLog y la Notificacion correspondientes al evento del modelo.
+     * Escribe el AuditLog (siempre) y la Notificacion (solo para MODELOS_CON_NOTIFICACION)
+     * correspondientes al evento del modelo.
      *
      * @param  array<string, mixed>  $diffData
      */
@@ -113,12 +142,14 @@ final class AuditLogObserver
             'datos_adicionales' => $datosAdicionales,
         ]);
 
-        Notificacion::query()->create([
-            'sucursal_id' => $sucursalId,
-            'user_id' => $user?->id,
-            'accion' => $accion,
-            'recurso' => $recurso,
-        ]);
+        if (in_array($model::class, self::MODELOS_CON_NOTIFICACION, true)) {
+            Notificacion::query()->create([
+                'sucursal_id' => $sucursalId,
+                'user_id' => $user?->id,
+                'accion' => $accion,
+                'recurso' => $recurso,
+            ]);
+        }
     }
 
     private function resolverModulo(Model $model): string
