@@ -7,6 +7,7 @@ namespace App\Services\Distribuidora;
 use App\Models\Cliente;
 use App\Models\SolicitudEdicionCliente;
 use App\Models\User;
+use App\Services\Notificacion\NotificacionService;
 use DomainException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,10 @@ use Illuminate\Support\Facades\DB;
  */
 final class SolicitudEdicionClienteService
 {
+    public function __construct(
+        private readonly NotificacionService $notificacionService,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $datosPersonalesPropuestos
      * @param  array<string, mixed>  $direccionPropuesta
@@ -42,7 +47,19 @@ final class SolicitudEdicionClienteService
             'estado' => 'pendiente',
         ]);
 
-        return $solicitud->fresh(['cliente', 'solicitante']);
+        $solicitud = $solicitud->fresh(['cliente.datosPersonales', 'solicitante']);
+
+        // Sin esto, el Gerente de Sucursal tenía que entrar a "Ediciones Pendientes" a ciegas
+        // para descubrir que una cajera está esperando su autorización para corregir un dato.
+        $this->notificacionService->notificarRolEnSucursal(
+            'Gerente de Sucursal',
+            $cajera->sucursal_id,
+            'edicion_cliente_solicitada',
+            $this->nombreCliente($solicitud),
+            $cajera
+        );
+
+        return $solicitud;
     }
 
     public function decidir(SolicitudEdicionCliente $solicitud, string $decision, ?string $comentario, User $autorizador): SolicitudEdicionCliente
@@ -64,7 +81,30 @@ final class SolicitudEdicionClienteService
             'fecha_decision' => now(),
         ]);
 
-        return $solicitud->fresh(['cliente', 'solicitante', 'autorizador']);
+        $solicitud = $solicitud->fresh(['cliente.datosPersonales', 'solicitante', 'autorizador']);
+
+        // La cajera es quien tiene que APLICAR la corrección una vez aprobada: si no se entera
+        // de la decisión, la solicitud se queda aprobada pero sin aplicar indefinidamente.
+        if ($solicitante = $solicitud->solicitante) {
+            $this->notificacionService->crear(
+                $solicitante,
+                $solicitud->estado === 'aprobada' ? 'edicion_cliente_aprobada' : 'edicion_cliente_rechazada',
+                $this->nombreCliente($solicitud),
+                $autorizador
+            );
+        }
+
+        return $solicitud;
+    }
+
+    /** Etiqueta legible para la notificación: sin esto solo se vería un id de cliente. */
+    private function nombreCliente(SolicitudEdicionCliente $solicitud): string
+    {
+        $datos = $solicitud->cliente?->datosPersonales;
+
+        return $datos
+            ? trim("{$datos->nombre} {$datos->apellido_paterno}")
+            : 'Cliente #'.$solicitud->cliente_id;
     }
 
     public function aplicar(SolicitudEdicionCliente $solicitud, User $cajera): Cliente

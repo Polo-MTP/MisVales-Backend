@@ -21,7 +21,15 @@ final class SolicitudAumentoCreditoResource extends JsonResource
         return [
             'id' => $this->id,
             'distribuidora_id' => $this->distribuidora_id,
-            'distribuidora' => $this->whenLoaded('distribuidora', fn () => $this->distribuidora?->numero_distribuidora),
+            // Nombre + número: el Gerente decide sobre dinero real y con solo "DIST-00001" no
+            // sabe a quién le está subiendo la línea de crédito.
+            'distribuidora' => $this->whenLoaded('distribuidora', function () {
+                $nombre = $this->distribuidora?->nombre;
+
+                return $nombre
+                    ? "{$nombre} ({$this->distribuidora->numero_distribuidora})"
+                    : $this->distribuidora?->numero_distribuidora;
+            }),
             'solicitado_por' => $this->solicitado_por,
             'solicitante' => $this->whenLoaded('solicitante', fn () => $this->solicitante?->name),
             'limite_credito_anterior' => (float) $this->limite_credito_anterior,

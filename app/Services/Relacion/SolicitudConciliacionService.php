@@ -20,6 +20,7 @@ final class SolicitudConciliacionService
 {
     public function __construct(
         private readonly ConciliacionBancariaService $conciliacionBancariaService,
+        private readonly \App\Services\Notificacion\NotificacionService $notificacionService,
     ) {}
 
     /**
@@ -43,6 +44,16 @@ final class SolicitudConciliacionService
             'motivo' => $motivo,
             'estado' => 'pendiente',
         ]);
+
+        // Mueve dinero real sobre un corte: quien autoriza necesita enterarse de que hay algo
+        // esperando, no descubrirlo entrando a la pantalla de autorizaciones por su cuenta.
+        $this->notificacionService->notificarRolEnSucursal(
+            'Gerente de Sucursal',
+            $cajera->sucursal_id,
+            'conciliacion_manual_solicitada',
+            'Abono #'.$abono->id.' → Ref. '.$relacion->referencia_pago,
+            $cajera
+        );
 
         return $solicitud->fresh(['abono', 'relacion', 'solicitante']);
     }
@@ -70,7 +81,20 @@ final class SolicitudConciliacionService
             'fecha_decision' => now(),
         ]);
 
-        return $solicitud->fresh(['abono', 'relacion', 'solicitante', 'autorizador']);
+        $solicitud = $solicitud->fresh(['abono', 'relacion', 'solicitante', 'autorizador']);
+
+        // La cajera es quien debe EJECUTAR la conciliación aprobada (paso 3 del control de
+        // cuatro ojos): sin aviso, el dinero se queda sin aplicar aunque ya esté autorizado.
+        if ($solicitante = $solicitud->solicitante) {
+            $this->notificacionService->crear(
+                $solicitante,
+                $solicitud->estado === 'aprobada' ? 'conciliacion_manual_aprobada' : 'conciliacion_manual_rechazada',
+                'Abono #'.$solicitud->abono_conciliacion_id,
+                $autorizador
+            );
+        }
+
+        return $solicitud;
     }
 
     /**

@@ -7,6 +7,7 @@ namespace App\Services\Distribuidora;
 use App\Models\Distribuidora;
 use App\Models\SolicitudAumentoCredito;
 use App\Models\User;
+use App\Services\Notificacion\NotificacionService;
 use DomainException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,10 @@ use Illuminate\Support\Facades\DB;
  */
 final class SolicitudAumentoCreditoService
 {
+    public function __construct(
+        private readonly NotificacionService $notificacionService,
+    ) {}
+
     public function solicitar(Distribuidora $distribuidora, User $usuario, float $montoSolicitado, string $motivo): SolicitudAumentoCredito
     {
         $this->verificarAutoridadSobreDistribuidora($distribuidora, $usuario);
@@ -51,7 +56,17 @@ final class SolicitudAumentoCreditoService
             'motivo' => $motivo,
         ]);
 
-        return $solicitud->fresh(['distribuidora', 'solicitante']);
+        // Quien decide (Gerente de Sucursal) no tenía forma de saber que llegó una solicitud:
+        // debía entrar a la pantalla de aumentos a ver "por si acaso".
+        $this->notificacionService->notificarRolEnSucursal(
+            'Gerente de Sucursal',
+            $distribuidora->sucursal_id,
+            'aumento_credito_solicitado',
+            $distribuidora->nombre ?? $distribuidora->numero_distribuidora,
+            $usuario
+        );
+
+        return $solicitud->fresh(['distribuidora.usuario.datosPersonales', 'solicitante']);
     }
 
     public function decidir(SolicitudAumentoCredito $solicitud, string $decision, ?float $montoOtorgado, ?string $comentario, User $gerente): SolicitudAumentoCredito
@@ -75,7 +90,9 @@ final class SolicitudAumentoCreditoService
                 'fecha_decision' => now(),
             ]);
 
-            return $solicitud->fresh(['distribuidora', 'solicitante', 'decisor']);
+            $this->notificarDecision($solicitud, 'aumento_credito_rechazado', $gerente);
+
+            return $solicitud->fresh(['distribuidora.usuario.datosPersonales', 'solicitante', 'decisor']);
         }
 
         if ($montoOtorgado === null || $montoOtorgado <= 0) {
@@ -98,8 +115,36 @@ final class SolicitudAumentoCreditoService
                 'fecha_decision' => now(),
             ]);
 
-            return $solicitud->fresh(['distribuidora', 'solicitante', 'decisor']);
+            $this->notificarDecision($solicitud, 'aumento_credito_aprobado', $gerente);
+
+            return $solicitud->fresh(['distribuidora.usuario.datosPersonales', 'solicitante', 'decisor']);
         });
+    }
+
+    /**
+     * Avisa a la distribuidora (y a quien pidió el aumento en su nombre, si fue el coordinador)
+     * cómo quedó su solicitud -- antes tenía que volver a entrar a la pantalla a averiguarlo.
+     */
+    private function notificarDecision(SolicitudAumentoCredito $solicitud, string $accion, User $gerente): void
+    {
+        $recurso = $solicitud->estado === 'aprobada'
+            ? 'Aumento otorgado: $'.number_format((float) $solicitud->monto_otorgado, 2)
+            : 'Aumento solicitado: $'.number_format((float) $solicitud->monto_solicitado, 2);
+
+        $avisados = [];
+
+        if ($distribuidoraUsuario = $solicitud->distribuidora?->usuario) {
+            $this->notificacionService->crear($distribuidoraUsuario, $accion, $recurso, $gerente);
+            $avisados[] = $distribuidoraUsuario->id;
+        }
+
+        // El coordinador puede pedir el aumento en nombre de la distribuidora (ver solicitar):
+        // si fue él, también necesita saber en qué quedó.
+        if ($solicitante = $solicitud->solicitante) {
+            if (! in_array($solicitante->id, $avisados, true)) {
+                $this->notificacionService->crear($solicitante, $accion, $recurso, $gerente);
+            }
+        }
     }
 
     /**
@@ -110,7 +155,7 @@ final class SolicitudAumentoCreditoService
      */
     public function listar(User $usuario, array $filters = []): LengthAwarePaginator
     {
-        $query = SolicitudAumentoCredito::query()->with(['distribuidora', 'solicitante', 'decisor']);
+        $query = SolicitudAumentoCredito::query()->with(['distribuidora.usuario.datosPersonales', 'solicitante', 'decisor']);
 
         $role = $usuario->role?->name;
 
