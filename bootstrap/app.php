@@ -70,8 +70,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // literalmente tumba el boot de la app ("Target class [config] does not exist"),
         // ya lo comprobé. bootstrap/app.php es de los pocos lugares donde env() directo
         // es el patrón correcto (así lo muestra la propia guía de Laravel para esto).
+        $trustedProxies = env('TRUSTED_PROXIES', '*');
+
         $middleware->trustProxies(
-            at: array_values(array_filter(array_map('trim', explode(',', (string) env('TRUSTED_PROXIES', ''))))),
+            at: ($trustedProxies === '*' || $trustedProxies === '**')
+                ? '*'
+                : (empty($trustedProxies) ? null : array_values(array_filter(array_map('trim', explode(',', (string) $trustedProxies))))),
             headers: Request::HEADER_X_FORWARDED_FOR
                 | Request::HEADER_X_FORWARDED_HOST
                 | Request::HEADER_X_FORWARDED_PORT

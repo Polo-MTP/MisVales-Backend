@@ -61,7 +61,7 @@ final class AuditLogObserver
             'user_id' => auth()->id(),
             'action' => $accion,
             'resource' => $recurso,
-            'ip_address' => request()->ip(),
+            'ip_address' => request()->ip() ?? '127.0.0.1',
         ]);
 
         Notificacion::query()->create([
