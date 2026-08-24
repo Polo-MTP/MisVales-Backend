@@ -20,13 +20,18 @@ final class ConfiguracionService
     {
         $fechaConsulta = $fecha ?? now()->toDateString();
 
+        // whereDate(), no where(): vigente_desde se guarda con hora ("2026-08-24 00:00:00"),
+        // pero $fechaConsulta es solo fecha ("2026-08-24"). Comparando esos strings tal cual,
+        // "2026-08-24 00:00:00" <= "2026-08-24" da FALSE (el string más largo ordena después),
+        // así que un cambio marcado "vigente desde hoy" nunca se activaba el mismo día en que
+        // se guardaba -- solo hasta el día siguiente. whereDate() compara solo la parte de fecha.
         /** @var Configuracion|null $config */
         $config = Configuracion::query()
             ->where('clave', $clave)
-            ->where('vigente_desde', '<=', $fechaConsulta)
+            ->whereDate('vigente_desde', '<=', $fechaConsulta)
             ->where(function ($q) use ($fechaConsulta): void {
                 $q->whereNull('vigente_hasta')
-                    ->orWhere('vigente_hasta', '>=', $fechaConsulta);
+                    ->orWhereDate('vigente_hasta', '>=', $fechaConsulta);
             })
             ->latest('id')
             ->first();
@@ -113,14 +118,16 @@ final class ConfiguracionService
 
         // 1. Intentar regla específica de la sucursal
         if ($sucursalId !== null) {
+            // whereDate(), no where(): ver el comentario en obtenerValorVigente() -- mismo
+            // problema de comparar un string con hora contra uno de solo fecha.
             /** @var ConfiguracionFechas|null $especifica */
             $especifica = ConfiguracionFechas::query()
                 ->with(['sucursal', 'modificadoPor'])
                 ->where('sucursal_id', $sucursalId)
-                ->where('vigente_desde', '<=', $fechaConsulta)
+                ->whereDate('vigente_desde', '<=', $fechaConsulta)
                 ->where(function ($q) use ($fechaConsulta): void {
                     $q->whereNull('vigente_hasta')
-                        ->orWhere('vigente_hasta', '>=', $fechaConsulta);
+                        ->orWhereDate('vigente_hasta', '>=', $fechaConsulta);
                 })
                 ->latest('id')
                 ->first();
@@ -135,10 +142,10 @@ final class ConfiguracionService
         $global = ConfiguracionFechas::query()
             ->with(['sucursal', 'modificadoPor'])
             ->whereNull('sucursal_id')
-            ->where('vigente_desde', '<=', $fechaConsulta)
+            ->whereDate('vigente_desde', '<=', $fechaConsulta)
             ->where(function ($q) use ($fechaConsulta): void {
                 $q->whereNull('vigente_hasta')
-                    ->orWhere('vigente_hasta', '>=', $fechaConsulta);
+                    ->orWhereDate('vigente_hasta', '>=', $fechaConsulta);
             })
             ->latest('id')
             ->first();
