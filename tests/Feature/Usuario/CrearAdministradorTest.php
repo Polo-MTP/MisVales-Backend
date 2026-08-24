@@ -56,7 +56,7 @@ it('el Gerente General puede dar de alta un Administrador, con contraseña gener
     Mail::assertSent(PersonalCredencialesMail::class, fn ($mail) => $mail->hasTo('nuevo.admin@example.com') && strlen($mail->password) >= 16);
 });
 
-it('el Gerente de Sucursal también puede dar de alta un Administrador', function (): void {
+it('el Gerente de Sucursal NO puede dar de alta un Administrador -- escalaría su alcance más allá de su sucursal', function (): void {
     Sanctum::actingAs(crearGerenteSucursalAdmin());
 
     $response = $this->postJson('/api/v1/usuarios/administrador', [
@@ -64,8 +64,8 @@ it('el Gerente de Sucursal también puede dar de alta un Administrador', functio
         'email' => 'admin.sucursal@example.com',
     ]);
 
-    $response->assertStatus(201)->assertJsonPath('data.role.name', 'Administrador');
-    expect(User::where('email', 'admin.sucursal@example.com')->first())->not->toBeNull();
+    $response->assertStatus(403);
+    expect(User::where('email', 'admin.sucursal@example.com')->exists())->toBeFalse();
 });
 
 it('no se puede colar otro rol -- el endpoint siempre crea Administrador, ignora cualquier role_id que manden', function (): void {

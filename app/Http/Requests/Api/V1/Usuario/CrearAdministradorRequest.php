@@ -9,15 +9,15 @@ use Illuminate\Foundation\Http\FormRequest;
 final class CrearAdministradorRequest extends FormRequest
 {
     /**
-     * Gerente General y Gerente de Sucursal pueden dar de alta Administradores -- la
-     * restricción real de "solo por red interna" la aplica el middleware 'vpn' en la ruta,
-     * no este authorize() (mismo patrón que el resto de altas/decisiones que exigen VPN).
+     * Solo Gerente General puede dar de alta Administradores -- un Administrador ve todo el
+     * sistema sin acotar por sucursal (igual que Gerente General), así que dejar que un
+     * Gerente de Sucursal cree uno sería escalar su propio alcance más allá de su sucursal.
      */
     public function authorize(): bool
     {
         $user = $this->user();
 
-        return $user && in_array($user->role?->name, ['Gerente General', 'Gerente de Sucursal'], true);
+        return $user && $user->role?->name === 'Gerente General';
     }
 
     /**
