@@ -106,6 +106,17 @@ it('las dos rutas de decisión confirmadas por infra tienen el middleware vpn ad
 });
 
 /**
+ * Se había quedado sin 'vpn' -- a diferencia de usuarios/personal (mismo tipo de alta de
+ * cuentas de staff, que sí lo tenía), nada lo cubría con un test.
+ */
+it('la alta de Gerente de Sucursal tiene el middleware vpn adjunto', function (): void {
+    $ruta = Route::getRoutes()->getByName('api.v1.usuarios.crear_gerente_sucursal');
+
+    expect($ruta)->not->toBeNull()
+        ->and($ruta->middleware())->toContain('vpn');
+});
+
+/**
  * Cambiar los parámetros de la fórmula (comisión, %quincena, multa, categoría, seguro, fechas
  * de corte) afecta a TODOS los vales que se generen de ahí en adelante — mayor radio de
  * impacto que una decisión puntual sobre un solo caso, así que también exige VPN.

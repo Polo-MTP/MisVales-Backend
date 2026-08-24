@@ -74,9 +74,10 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
         ->name('api.v1.usuarios.mis_autorizaciones');
 
     // Solo da de alta Gerente de Sucursal -- el rol queda fijo en el controller, no lo manda
-    // quien hace la petición.
+    // quien hace la petición. 'vpn' por ser alta de cuentas de staff, igual que
+    // usuarios/personal (se había quedado fuera, sin test que lo cubriera).
     Route::post('usuarios/gerente-sucursal', [UsuarioController::class, 'crearGerenteSucursal'])
-        ->middleware('role:Gerente General')
+        ->middleware(['role:Gerente General', 'vpn'])
         ->name('api.v1.usuarios.crear_gerente_sucursal');
 
     // Da de alta Coordinador, Verificador o Cajera -- el rol viene restringido a esas 3
