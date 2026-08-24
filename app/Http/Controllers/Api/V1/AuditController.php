@@ -16,11 +16,14 @@ final class AuditController extends ApiController
     ) {}
 
     /**
-     * Devuelve el historial reciente de intentos de login (últimos 10 días).
+     * Devuelve el historial reciente de intentos de login con filtros.
      */
-    public function getHistoricalData(): JsonResponse
+    public function getHistoricalData(Request $request): JsonResponse
     {
-        $logs = $this->auditService->getHistoricalLoginData(10);
+        $logs = $this->auditService->getHistoricalLoginData(
+            (int) $request->input('per_page', 10),
+            $request->only(['user_id', 'status', 'search'])
+        );
 
         return $this->success(
             data: $logs,
@@ -29,13 +32,13 @@ final class AuditController extends ApiController
     }
 
     /**
-     * Lista el log de auditoría paginado, filtrable por usuario y acción.
+     * Lista el log de auditoría paginado, filtrable por usuario, sucursal, módulo, nivel, acción y texto.
      */
     public function getAuditLog(Request $request): JsonResponse
     {
         $logs = $this->auditService->getAuditLog(
             (int) $request->input('per_page', 20),
-            $request->only(['user_id', 'action'])
+            $request->only(['user_id', 'sucursal_id', 'modulo', 'nivel', 'action', 'search'])
         );
 
         return $this->success(

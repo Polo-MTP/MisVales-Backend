@@ -12,6 +12,7 @@ use App\Http\Requests\Api\V1\ResendVerificationRequest;
 use App\Http\Requests\Api\V1\ResetPasswordRequest;
 use App\Http\Requests\Api\V1\VerifyEmailRequest;
 use App\Http\Resources\UserResource;
+use App\Models\AuditLog;
 use App\Models\User;
 use App\Services\Auth\LoginService;
 use Illuminate\Auth\Events\PasswordReset;
@@ -125,6 +126,24 @@ final class AuthController extends ApiController
 
         Log::debug('AuthController: Contraseña actualizada por el propio usuario', ['user_id' => $user->id]);
 
+        AuditLog::query()->create([
+            'user_id' => $user->id,
+            'sucursal_id' => $user->sucursal_id,
+            'action' => 'Password.cambiado',
+            'modulo' => 'Seguridad',
+            'nivel' => 'INFO',
+            'descripcion' => "El usuario {$user->name} ({$user->email}) cambió su contraseña de acceso.",
+            'resource' => 'User#'.$user->id,
+            'ip_address' => request()->ip() ?? '127.0.0.1',
+            'user_agent' => request()->userAgent(),
+            'datos_adicionales' => [
+                'tipo' => 'cambio_password',
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'role' => $user->role?->name,
+            ],
+        ]);
+
         return $this->success(message: 'Contraseña actualizada exitosamente.');
     }
 
@@ -181,6 +200,24 @@ final class AuthController extends ApiController
             'status' => $status,
         ]);
 
+        $targetUser = User::query()->where('email', $request->email)->first();
+        AuditLog::query()->create([
+            'user_id' => $targetUser?->id,
+            'sucursal_id' => $targetUser?->sucursal_id,
+            'action' => 'Password.solicitud_reset',
+            'modulo' => 'Seguridad',
+            'nivel' => 'INFO',
+            'descripcion' => "Se solicitó enlace para restablecer contraseña para el correo {$request->email}.",
+            'resource' => 'Email#'.$request->email,
+            'ip_address' => request()->ip() ?? '127.0.0.1',
+            'user_agent' => request()->userAgent(),
+            'datos_adicionales' => [
+                'tipo' => 'solicitud_reset_password',
+                'email' => $request->email,
+                'status' => $status,
+            ],
+        ]);
+
         // Se responde el mismo mensaje genérico sin importar si el correo existe, está
         // limitado por rate limit, etc. -- distinguir el caso "correo no encontrado" convierte
         // este endpoint en un oráculo para enumerar cuentas registradas (ver auditoría de
@@ -201,6 +238,23 @@ final class AuthController extends ApiController
                 ])->save();
 
                 $user->tokens()->delete();
+
+                AuditLog::query()->create([
+                    'user_id' => $user->id,
+                    'sucursal_id' => $user->sucursal_id,
+                    'action' => 'Password.restablecido',
+                    'modulo' => 'Seguridad',
+                    'nivel' => 'WARNING',
+                    'descripcion' => "Se completó el restablecimiento de contraseña para {$user->email}.",
+                    'resource' => 'User#'.$user->id,
+                    'ip_address' => request()->ip() ?? '127.0.0.1',
+                    'user_agent' => request()->userAgent(),
+                    'datos_adicionales' => [
+                        'tipo' => 'reset_password_exitoso',
+                        'user_id' => $user->id,
+                        'email' => $user->email,
+                    ],
+                ]);
 
                 event(new PasswordReset($user));
             }

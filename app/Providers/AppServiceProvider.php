@@ -119,36 +119,90 @@ final class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * El Administrador solo ve logs: estos son los modelos de negocio cuyos cambios
-     * quedan registrados en `audit_log` (ver AuditLogObserver).
+     * Registro completo de todos los modelos de negocio, catálogos y operaciones del sistema
+     * en la bitácora forense de auditoría (`audit_log`).
      */
     private function configureAuditLog(): void
     {
         foreach ([
-            Vale::class,
-            Distribuidora::class,
-            Cliente::class,
-            AbonoConciliacion::class,
-            Relacion::class,
-            PuntoMovimiento::class,
-            SolicitudProveedor::class,
-            SolicitudConciliacion::class,
-            SolicitudEdicionCliente::class,
+            \App\Models\Vale::class,
+            \App\Models\Distribuidora::class,
+            \App\Models\CategoriaDistribuidora::class,
+            \App\Models\Cliente::class,
+            \App\Models\AbonoConciliacion::class,
+            \App\Models\Relacion::class,
+            \App\Models\RelacionDetalle::class,
+            \App\Models\RelacionPerdon::class,
+            \App\Models\PuntoMovimiento::class,
+            \App\Models\SolicitudProveedor::class,
+            \App\Models\SolicitudConciliacion::class,
+            \App\Models\SolicitudEdicionCliente::class,
+            \App\Models\SolicitudAumentoCredito::class,
+            \App\Models\SolicitudTransferenciaCliente::class,
+            \App\Models\Sucursal::class,
+            \App\Models\Producto::class,
+            \App\Models\SeguroTabla::class,
+            \App\Models\Evidencia::class,
+            \App\Models\ConvenioBancario::class,
+            \App\Models\Configuracion::class,
+            \App\Models\ConfiguracionFechas::class,
         ] as $modelo) {
             $modelo::observe(AuditLogObserver::class);
         }
 
-        // User se registra aparte (no vía AuditLogObserver genérico): un login fallido
-        // o exitoso guarda el modelo (failed_attempts, locked_until...) en CADA intento,
-        // así que observar 'updated' ahí inundaría audit_log con ruido. Solo interesa
-        // dejar rastro de cuándo se crea una cuenta.
+        // Auditoría explícita de cuentas de usuario
         User::created(function (User $user): void {
+            $actor = auth()->user();
             AuditLog::query()->create([
-                'user_id' => auth()->id(),
-                'action' => 'User.registrado',
+                'user_id' => $actor?->id,
+                'sucursal_id' => $user->sucursal_id,
+                'action' => 'User.creado',
+                'modulo' => 'Usuarios',
+                'nivel' => 'INFO',
+                'descripcion' => "Se dio de alta el usuario {$user->name} ({$user->email}) con rol {$user->role?->name}.",
                 'resource' => 'User#'.$user->id,
-                'ip_address' => request()->ip(),
+                'ip_address' => request()->ip() ?? '127.0.0.1',
+                'user_agent' => request()->userAgent(),
+                'datos_adicionales' => [
+                    'tipo' => 'creacion_usuario',
+                    'nuevo_usuario' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'role_id' => $user->role_id,
+                        'sucursal_id' => $user->sucursal_id,
+                    ],
+                    'creado_por' => $actor ? ['id' => $actor->id, 'name' => $actor->name, 'email' => $actor->email] : 'Sistema',
+                ],
             ]);
+        });
+
+        User::updated(function (User $user): void {
+            if ($user->wasChanged(['is_active', 'role_id', 'sucursal_id', 'is_locked'])) {
+                $actor = auth()->user();
+                $cambios = $user->getChanges();
+                $original = array_intersect_key($user->getOriginal(), $cambios);
+
+                AuditLog::query()->create([
+                    'user_id' => $actor?->id,
+                    'sucursal_id' => $user->sucursal_id,
+                    'action' => 'User.estado_modificado',
+                    'modulo' => 'Usuarios',
+                    'nivel' => 'WARNING',
+                    'descripcion' => "Se modificó el estado o perfil del usuario {$user->name} ({$user->email}).",
+                    'resource' => 'User#'.$user->id,
+                    'ip_address' => request()->ip() ?? '127.0.0.1',
+                    'user_agent' => request()->userAgent(),
+                    'datos_adicionales' => [
+                        'tipo' => 'cambio_estado_usuario',
+                        'cambios' => [
+                            'antes' => $original,
+                            'despues' => $cambios,
+                        ],
+                        'modificado_por' => $actor ? ['id' => $actor->id, 'name' => $actor->name, 'email' => $actor->email] : 'Sistema',
+                    ],
+                ]);
+            }
         });
     }
 }

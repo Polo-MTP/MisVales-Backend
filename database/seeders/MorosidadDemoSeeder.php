@@ -339,6 +339,8 @@ final class MorosidadDemoSeeder extends Seeder
      */
     private function crearDetalle(Relacion $relacion, Vale $vale, Cliente $cliente, ?Producto $producto, int $cuotaNumero, int $cuotasTotales, array $cuota, string $estadoDetalle): RelacionDetalle
     {
+        $concepto = sprintf('%05d%04d', $vale->id, $cuotaNumero);
+
         return RelacionDetalle::query()->firstOrCreate(
             [
                 'relacion_id' => $relacion->id,
@@ -346,6 +348,7 @@ final class MorosidadDemoSeeder extends Seeder
             ],
             [
                 'vale_id' => $vale->id,
+                'concepto' => $concepto,
                 'cliente_id' => $cliente->id,
                 'producto_id' => $producto?->id,
                 'cuotas_totales' => $cuotasTotales,

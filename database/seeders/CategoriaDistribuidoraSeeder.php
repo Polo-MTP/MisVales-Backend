@@ -16,7 +16,7 @@ class CategoriaDistribuidoraSeeder extends Seeder
         ];
 
         foreach ($categorias as $categoria) {
-            CategoriaDistribuidora::create($categoria);
+            CategoriaDistribuidora::query()->updateOrCreate(['nombre' => $categoria['nombre']], $categoria);
         }
     }
 }

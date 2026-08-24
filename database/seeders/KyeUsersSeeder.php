@@ -76,7 +76,7 @@ final class KyeUsersSeeder extends Seeder
                         ]);
                         $datos = DatosPersonales::query()->create([
                             'nombre' => 'Kye', 'apellido_paterno' => sprintf('Distribuidora %d', $i),
-                            'curp' => sprintf('KYE%02d250101HDGZLA0%d', $i, $i), 'direccion_id' => $direccion->id,
+                            'curp' => sprintf('KYE%d250101HDGZLA0%d', $i, $i), 'direccion_id' => $direccion->id,
                         ]);
                         $user->datos_id = $datos->id;
                         $user->save();

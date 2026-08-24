@@ -12,10 +12,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'user_id',
+    'sucursal_id',
     'session_id',
     'action',
+    'modulo',
+    'nivel',
+    'descripcion',
     'resource',
     'ip_address',
+    'user_agent',
+    'datos_adicionales',
 ])]
 final class AuditLog extends Model
 {
@@ -24,12 +30,24 @@ final class AuditLog extends Model
 
     protected $table = 'audit_log';
 
+    protected $casts = [
+        'datos_adicionales' => 'array',
+    ];
+
     /**
      * Usuario que realizó la acción registrada.
      */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Sucursal asociada a la acción.
+     */
+    public function sucursal(): BelongsTo
+    {
+        return $this->belongsTo(Sucursal::class);
     }
 
     /**
