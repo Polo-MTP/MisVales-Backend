@@ -32,8 +32,11 @@ final class ReporteController extends ApiController
                 ->whereHas('relaciones', fn ($r) => $r->whereIn('estado', ['vencida', 'en_perdida']))
                 ->orWhere('estado', 'MOROSO'));
 
-        // Un Gerente de Sucursal solo ve morosidad de su propia sucursal; Gerente General/Administrador ven todo.
-        if ($usuario->role?->name === 'Gerente de Sucursal') {
+        // Gerente de Sucursal y Cajera solo ven morosidad de su propia sucursal; Gerente
+        // General/Administrador ven todo. Cajera se había quedado fuera de este switch --
+        // caía en el mismo "sin filtro" que Gerente General y veía morosas de cualquier
+        // sucursal, no solo la suya.
+        if (in_array($usuario->role?->name, ['Gerente de Sucursal', 'Cajera'], true)) {
             $query->where('sucursal_id', $usuario->sucursal_id);
         } elseif ($usuario->role?->name === 'Coordinador') {
             $query->where('coordinador_id', $usuario->id);
