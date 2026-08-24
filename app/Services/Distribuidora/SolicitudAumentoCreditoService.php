@@ -104,7 +104,11 @@ final class SolicitudAumentoCreditoService
         }
 
         return DB::transaction(function () use ($solicitud, $montoOtorgado, $comentario, $gerente, $distribuidora): SolicitudAumentoCredito {
-            $distribuidora->limite_credito = (float) $distribuidora->limite_credito + $montoOtorgado;
+            // monto_otorgado es el LÍMITE TOTAL nuevo, no un incremento a sumar -- la
+            // distribuidora pide "de $25,000 a $75,000" (ver limite_credito_anterior, guardado
+            // como snapshot al solicitar, y la etiqueta "De X a Y" en el frontend). Sumarlo al
+            // límite ya vigente duplicaba el otorgado de más en cada aprobación.
+            $distribuidora->limite_credito = $montoOtorgado;
             $distribuidora->save();
 
             $solicitud->update([
