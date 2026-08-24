@@ -29,7 +29,6 @@ final class Distribuidora extends Model
         'sucursal_id',
         'coordinador_id',
         'verificador_id',
-        'nombre',
         'rfc',
         'usuario_acceso',
         'password_hash',
@@ -159,6 +158,23 @@ final class Distribuidora extends Model
     public function solicitudesAumentoCredito(): HasMany
     {
         return $this->hasMany(SolicitudAumentoCredito::class);
+    }
+
+    /**
+     * Es persona física, no persona moral: no existe un "nombre de negocio" propio, guardado
+     * aparte -- es su nombre de siempre (datos_personales.nombre + apellidos). Calculado aquí
+     * en vez de duplicado en columna para que nunca pueda desincronizarse de una corrección
+     * hecha directo sobre datos_personales.
+     */
+    public function getNombreAttribute(): ?string
+    {
+        $datos = $this->usuario?->datosPersonales;
+
+        if (! $datos) {
+            return null;
+        }
+
+        return trim($datos->nombre.' '.$datos->apellido_paterno.' '.($datos->apellido_materno ?? ''));
     }
 
     /**

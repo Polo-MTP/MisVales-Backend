@@ -24,7 +24,7 @@ uses(RefreshDatabase::class);
  * número de distribuidora — el frontend no tenía forma de mostrar a quién pertenecía la
  * relación en Conciliación Bancaria / /gerente/relaciones sin este dato.
  */
-it('el JSON de una relación incluye el número y la razón social de la distribuidora, no solo su id', function (): void {
+it('el JSON de una relación incluye el número y el nombre de la distribuidora, no solo su id', function (): void {
     $admin = User::factory()->create();
     foreach ([
         'comision_base_pct' => '10',
@@ -42,9 +42,11 @@ it('el JSON de una relación incluye el número y la razón social de la distrib
     $sucursal = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-001', 'es_matriz' => true, 'is_active' => true]);
     $categoria = CategoriaDistribuidora::create(['nombre' => 'PLATA', 'porcentaje_comision' => 6, 'activo' => true]);
     $roleDist = Role::create(['name' => 'Distribuidora', 'factor_count' => 1]);
-    $userDist = User::factory()->create(['role_id' => $roleDist->id, 'sucursal_id' => $sucursal->id]);
+    $direccionDist = Direccion::create(['calle' => 'Test', 'colonia' => 'Test', 'numero_ext' => '1', 'codigo_postal' => '00000', 'estado' => 'Coahuila', 'ciudad' => 'Torreón']);
+    $datosDist = DatosPersonales::create(['nombre' => 'Juana', 'apellido_paterno' => 'Prueba', 'apellido_materno' => 'SA de CV', 'curp' => 'CUPD'.uniqid(), 'direccion_id' => $direccionDist->id]);
+    $userDist = User::factory()->create(['role_id' => $roleDist->id, 'sucursal_id' => $sucursal->id, 'datos_id' => $datosDist->id]);
     $distribuidora = Distribuidora::create([
-        'usuario_id' => $userDist->id, 'numero_distribuidora' => 'DIST-90099', 'nombre' => 'Distribuidora de Prueba SA de CV',
+        'usuario_id' => $userDist->id, 'numero_distribuidora' => 'DIST-90099',
         'limite_credito' => 20000, 'categoria_id' => $categoria->id, 'puntos_acumulados' => 0, 'estado' => 'ACTIVO', 'sucursal_id' => $sucursal->id,
     ]);
 
@@ -65,5 +67,5 @@ it('el JSON de una relación incluye el número y la razón social de la distrib
     $this->getJson('/api/v1/relaciones')
         ->assertStatus(200)
         ->assertJsonPath('data.data.0.distribuidora.numero_distribuidora', 'DIST-90099')
-        ->assertJsonPath('data.data.0.distribuidora.nombre', 'Distribuidora de Prueba SA de CV');
+        ->assertJsonPath('data.data.0.distribuidora.nombre', 'Juana Prueba SA de CV');
 });

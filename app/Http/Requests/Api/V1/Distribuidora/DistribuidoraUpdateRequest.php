@@ -27,7 +27,8 @@ final class DistribuidoraUpdateRequest extends FormRequest
         $id = $this->route('distribuidora')?->id;
 
         return [
-            'nombre' => 'sometimes|string|max:255',
+            // No hay 'nombre' de negocio: es persona física, su nombre se edita vía
+            // datos_personales.nombre/apellidos (ver Distribuidora::getNombreAttribute()).
             'rfc' => ['sometimes', 'string', 'size:13', Rule::unique('distribuidoras', 'rfc')->ignore($id)],
             'sucursal_id' => 'sometimes|exists:sucursales,id',
             'coordinador_id' => 'sometimes|exists:users,id',

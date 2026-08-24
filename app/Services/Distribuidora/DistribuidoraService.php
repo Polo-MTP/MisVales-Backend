@@ -30,7 +30,7 @@ final class DistribuidoraService
     public function listarPorRol(): Collection
     {
         $user = auth()->guard()->user();
-        $query = Distribuidora::with(['sucursal', 'coordinador', 'categoria']);
+        $query = Distribuidora::with(['sucursal', 'coordinador', 'categoria', 'usuario.datosPersonales']);
 
         if (! $user) {
             return $query->orderBy('created_at', 'desc')->get();

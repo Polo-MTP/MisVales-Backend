@@ -71,7 +71,6 @@ final class SolicitudProveedorService
                 'coordinador_id' => $coordinador->id,
                 'verificador_id' => $data['verificador_id'] ?? null,
                 'estado' => isset($data['verificador_id']) ? 'en_verificacion' : 'pendiente_verificacion',
-                'nombre' => $data['nombre_negocio'],
                 'rfc' => $data['rfc'],
                 'datos_familiares' => $data['datos_familiares'] ?? null,
                 'datos_vehiculos' => $data['datos_vehiculos'] ?? null,
@@ -317,7 +316,6 @@ final class SolicitudProveedorService
                 $distribuidora = Distribuidora::query()->create([
                     'usuario_id' => $distribuidoraUser->id,
                     'numero_distribuidora' => 'DIST-'.mb_str_pad((string) $distribuidoraUser->id, 5, '0', STR_PAD_LEFT),
-                    'nombre' => $solicitud->nombre,
                     'rfc' => $solicitud->rfc,
                     'sucursal_id' => $solicitud->sucursal_id,
                     'coordinador_id' => $solicitud->coordinador_id,

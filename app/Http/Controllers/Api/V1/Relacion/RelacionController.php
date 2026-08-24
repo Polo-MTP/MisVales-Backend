@@ -32,7 +32,7 @@ final class RelacionController extends ApiController
         /** @var User $usuario */
         $usuario = $request->user();
 
-        $query = Relacion::query()->with(['distribuidora', 'sucursal', 'categoriaSnapshot']);
+        $query = Relacion::query()->with(['distribuidora.usuario.datosPersonales', 'sucursal', 'categoriaSnapshot']);
 
         // La cajera necesita poder buscar la relación de un pago sin adivinar el ID a mano
         // (ver flujo de conciliación manual), pero solo dentro de su propia sucursal. El
@@ -91,7 +91,7 @@ final class RelacionController extends ApiController
             abort(403, 'No puedes ver relaciones de otra distribuidora.');
         }
 
-        $relacion->load(['distribuidora', 'sucursal', 'categoriaSnapshot', 'detalles.vale', 'detalles.cliente.datosPersonales', 'detalles.producto']);
+        $relacion->load(['distribuidora.usuario.datosPersonales', 'sucursal', 'categoriaSnapshot', 'detalles.vale', 'detalles.cliente.datosPersonales', 'detalles.producto']);
 
         return $this->success(
             data: new RelacionResource($relacion),
@@ -150,7 +150,7 @@ final class RelacionController extends ApiController
                 }
 
                 return $this->created(
-                    data: new RelacionResource($relacion->load(['detalles.vale', 'detalles.cliente', 'detalles.producto', 'distribuidora', 'sucursal', 'categoriaSnapshot'])),
+                    data: new RelacionResource($relacion->load(['detalles.vale', 'detalles.cliente', 'detalles.producto', 'distribuidora.usuario.datosPersonales', 'sucursal', 'categoriaSnapshot'])),
                     message: 'Relación generada exitosamente.'
                 );
             }

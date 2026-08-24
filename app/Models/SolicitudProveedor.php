@@ -24,7 +24,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'decision_gerente',
     'limite_credito_asignado',
     'fecha_decision',
-    'nombre',
     'rfc',
     'datos_familiares',
     'datos_vehiculos',
@@ -61,6 +60,22 @@ final class SolicitudProveedor extends Model
     public function datosPersonales(): BelongsTo
     {
         return $this->belongsTo(DatosPersonales::class, 'datos_id');
+    }
+
+    /**
+     * Es persona física, no persona moral: no existe un "nombre de negocio" propio, guardado
+     * aparte -- es su nombre de siempre. Calculado aquí en vez de duplicado en columna para
+     * que nunca pueda desincronizarse de una corrección hecha directo sobre datos_personales.
+     */
+    public function getNombreAttribute(): ?string
+    {
+        $datos = $this->datosPersonales;
+
+        if (! $datos) {
+            return null;
+        }
+
+        return trim($datos->nombre.' '.$datos->apellido_paterno.' '.($datos->apellido_materno ?? ''));
     }
 
     /**

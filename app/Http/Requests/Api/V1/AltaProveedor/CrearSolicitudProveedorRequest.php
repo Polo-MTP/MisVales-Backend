@@ -22,9 +22,9 @@ final class CrearSolicitudProveedorRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // Datos del negocio (distribuidora) -- nombre distinto al de la persona (abajo)
-            // porque ambos comparten este mismo payload plano.
-            'nombre_negocio' => ['required', 'string', 'max:255'],
+            // El RFC es directamente de la persona (distribuidora persona física) -- no existe
+            // un "nombre de negocio"/razón social separado; el nombre para mostrar se calcula
+            // de los Datos Personales de abajo (ver SolicitudProveedor::getNombreAttribute()).
             'rfc' => ['required', 'string', 'size:13', 'unique:distribuidoras,rfc', 'unique:solicitudes_proveedor,rfc'],
 
             // Datos Personales
