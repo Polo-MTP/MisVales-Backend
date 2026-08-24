@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             MorosidadDemoSeeder::class,        // Distribuidoras/vales/relaciones vencidas para probar reportes/morosos
             EquipoDemoSeeder::class,           // Cuentas reales del equipo, roles intercalados
             QaUsersSeeder::class,               // Usuarios de prueba (uno por rol) para entregar a infra/QA
+            GerenteGeneralUttSeeder::class,      // Gerente General adicional (correo UTT)
         ]);
     }
 }
