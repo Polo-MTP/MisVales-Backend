@@ -28,7 +28,7 @@ it('un coordinador sube el archivo real de una evidencia y queda con URL públic
 
     $solicitud = SolicitudProveedor::create([
         'datos_id' => $datos->id, 'sucursal_id' => $sucursal->id, 'coordinador_id' => $coordinador->id,
-        'estado' => 'pendiente_verificacion', 'nombre' => 'Negocio Test', 'rfc' => 'ABCD010101ABC',
+        'estado' => 'pendiente_verificacion', 'rfc' => 'ABCD010101ABC',
     ]);
 
     Sanctum::actingAs($coordinador);

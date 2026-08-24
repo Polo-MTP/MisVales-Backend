@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Models\CategoriaDistribuidora;
+use App\Models\DatosPersonales;
+use App\Models\Direccion;
 use App\Models\Distribuidora;
 use App\Models\Role;
 use App\Models\Sucursal;
@@ -89,6 +91,8 @@ final class EquipoDemoSeeder extends Seeder
             ]
         );
 
+        $this->vincularDatosPersonales($distribuidoraUser, 'Wilbert', 'Acosta', 'AOWX980101HDGZLA01', $sucursalGomez);
+
         Distribuidora::query()->updateOrCreate(
             ['usuario_id' => $distribuidoraUser->id],
             [
@@ -98,7 +102,6 @@ final class EquipoDemoSeeder extends Seeder
                 'estado' => 'ACTIVO',
                 'sucursal_id' => $sucursalGomez?->id,
                 'coordinador_id' => $coordinadorExistente?->id,
-                'nombre' => 'Wilbert Acosta (Distribuidora de Prueba)',
                 'rfc' => 'AOWX980101EQ1',
                 'categoria_id' => $categoriaPlata?->id,
                 'comentarios_verificador' => 'Verificado correctamente',
@@ -195,6 +198,8 @@ final class EquipoDemoSeeder extends Seeder
             ]
         );
 
+        $this->vincularDatosPersonales($distribuidoraDurangoUser, 'Saldivar', 'Félix', 'SAFE040101HDGZLA02', $sucursalDurango);
+
         Distribuidora::query()->updateOrCreate(
             ['usuario_id' => $distribuidoraDurangoUser->id],
             [
@@ -204,7 +209,6 @@ final class EquipoDemoSeeder extends Seeder
                 'estado' => 'ACTIVO',
                 'sucursal_id' => $sucursalDurango?->id,
                 'coordinador_id' => $coordinadorDurango->id,
-                'nombre' => 'Saldivar (Distribuidora de Prueba)',
                 'rfc' => 'SALD040101EQ2',
                 'categoria_id' => $categoriaPlata?->id,
                 'comentarios_verificador' => 'Verificado correctamente',
@@ -212,5 +216,29 @@ final class EquipoDemoSeeder extends Seeder
                 'aprobado_por' => $coordinadorDurango->id,
             ]
         );
+    }
+
+    /**
+     * Una distribuidora es persona física: su "nombre" se calcula de sus propios datos
+     * personales (ver Distribuidora::getNombreAttribute()), no se guarda aparte. Sin esto el
+     * usuario se queda sin datos_id y la distribuidora aparece sin nombre en toda la app.
+     */
+    private function vincularDatosPersonales(User $usuario, string $nombre, string $apellidoPaterno, string $curp, ?Sucursal $sucursal): void
+    {
+        if ($usuario->datos_id) {
+            return;
+        }
+
+        $direccion = Direccion::query()->create([
+            'calle' => 'Sin especificar', 'colonia' => 'Sin especificar', 'numero_ext' => 'S/N',
+            'codigo_postal' => '00000', 'estado' => $sucursal?->nombre ?? 'N/D', 'ciudad' => $sucursal?->nombre ?? 'N/D',
+        ]);
+
+        $datos = DatosPersonales::query()->create([
+            'nombre' => $nombre, 'apellido_paterno' => $apellidoPaterno, 'curp' => $curp, 'direccion_id' => $direccion->id,
+        ]);
+
+        $usuario->datos_id = $datos->id;
+        $usuario->save();
     }
 }

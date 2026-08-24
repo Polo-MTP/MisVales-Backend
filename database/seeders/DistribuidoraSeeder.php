@@ -17,7 +17,9 @@ class DistribuidoraSeeder extends Seeder
             'numero_distribuidora' => 'DIST-2026-0001',
             'sucursal_id' => $sucursalId,
             'coordinador_id' => $coordinadorId,
-            'nombre' => 'Distribuidora Ejemplo SA de CV',
+            // Nota: sin 'usuario_id' esta distribuidora no tiene datos_personales que vincular,
+            // así que Distribuidora::getNombreAttribute() no tendrá de dónde calcular el nombre.
+            // Este seeder no está enganchado en DatabaseSeeder (ver comentario "Opcional").
             'rfc' => 'XAXX010101000',
             'limite_credito' => 10000.00,
             'categoria_id' => 1, // BRONCE

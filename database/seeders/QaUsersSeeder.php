@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Models\CategoriaDistribuidora;
+use App\Models\DatosPersonales;
+use App\Models\Direccion;
 use App\Models\Distribuidora;
 use App\Models\Role;
 use App\Models\Sucursal;
@@ -123,6 +125,20 @@ final class QaUsersSeeder extends Seeder
             ]
         );
 
+        // Persona física: sin datos_id el usuario no tiene de dónde calcular su nombre
+        // (ver Distribuidora::getNombreAttribute()).
+        if (! $distribuidoraUser->datos_id) {
+            $direccion = Direccion::query()->create([
+                'calle' => 'Sin especificar', 'colonia' => 'Sin especificar', 'numero_ext' => 'S/N',
+                'codigo_postal' => '00000', 'estado' => 'Durango', 'ciudad' => 'Gómez Palacio',
+            ]);
+            $datos = DatosPersonales::query()->create([
+                'nombre' => 'QA', 'apellido_paterno' => 'Distribuidora', 'curp' => 'QATE250101HDGZLA01', 'direccion_id' => $direccion->id,
+            ]);
+            $distribuidoraUser->datos_id = $datos->id;
+            $distribuidoraUser->save();
+        }
+
         Distribuidora::query()->updateOrCreate(
             ['usuario_id' => $distribuidoraUser->id],
             [
@@ -132,7 +148,6 @@ final class QaUsersSeeder extends Seeder
                 'estado' => 'ACTIVO',
                 'sucursal_id' => $sucursalGomez?->id,
                 'coordinador_id' => $coordinadorQa->id,
-                'nombre' => 'QA Distribuidora de Prueba',
                 'rfc' => 'QATE250101QA1',
                 'categoria_id' => $categoriaBronce?->id,
                 'comentarios_verificador' => 'Verificado correctamente',

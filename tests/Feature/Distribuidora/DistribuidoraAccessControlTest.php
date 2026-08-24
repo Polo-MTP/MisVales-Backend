@@ -60,7 +60,7 @@ it('un coordinador dueño ya no puede editar su distribuidora una vez que está 
 
     Sanctum::actingAs($coordinador);
 
-    $this->putJson("/api/v1/distribuidoras/{$distribuidora->id}", ['nombre' => 'Nuevo Nombre SA'])
+    $this->putJson("/api/v1/distribuidoras/{$distribuidora->id}", ['rfc' => 'NVOX010101AB1'])
         ->assertStatus(403);
 });
 
@@ -76,7 +76,7 @@ it('un gerente de sucursal no puede editar una distribuidora de otra sucursal', 
 
     Sanctum::actingAs($gerenteB);
 
-    $this->putJson("/api/v1/distribuidoras/{$distribuidora->id}", ['nombre' => 'Nuevo Nombre SA'])
+    $this->putJson("/api/v1/distribuidoras/{$distribuidora->id}", ['rfc' => 'NVOX010101AB1'])
         ->assertStatus(403);
 });
 
@@ -91,7 +91,7 @@ it('el gerente general si puede editar y eliminar (desactivar) cualquier distrib
 
     Sanctum::actingAs($gerenteGeneral);
 
-    $this->putJson("/api/v1/distribuidoras/{$distribuidora->id}", ['nombre' => 'Nuevo Nombre SA'])
+    $this->putJson("/api/v1/distribuidoras/{$distribuidora->id}", ['rfc' => 'NVOX010101AB1'])
         ->assertStatus(200);
 
     $this->deleteJson("/api/v1/distribuidoras/{$distribuidora->id}")->assertStatus(200);

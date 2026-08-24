@@ -283,7 +283,7 @@
             "header": [{ "key": "Accept", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre_negocio\": \"Abarrotes El Sol SA de CV\",\n  \"rfc\": \"AES010101AB1\",\n  \"nombre\": \"Juan\",\n  \"apellido_paterno\": \"Pérez\",\n  \"apellido_materno\": \"Gómez\",\n  \"curp\": \"PEGJ800101HDFRRN01\",\n  \"fecha_nacimiento\": \"1980-01-01\",\n  \"lugar_nacimiento\": \"CDMX\",\n  \"calle\": \"Av. Reforma 123\",\n  \"colonia\": \"Centro\",\n  \"numero_ext\": \"123\",\n  \"numero_int\": null,\n  \"codigo_postal\": \"06000\",\n  \"estado\": \"CDMX\",\n  \"ciudad\": \"Ciudad de México\",\n  \"datos_familiares\": [],\n  \"datos_vehiculos\": [],\n  \"datos_vivienda\": [],\n  \"referencia_laboral\": \"Comercio propio, 5 años\",\n  \"verificador_id\": null,\n  \"evidencias\": []\n}",
+              "raw": "{\n  \"rfc\": \"AES010101AB1\",\n  \"nombre\": \"Juan\",\n  \"apellido_paterno\": \"Pérez\",\n  \"apellido_materno\": \"Gómez\",\n  \"curp\": \"PEGJ800101HDFRRN01\",\n  \"fecha_nacimiento\": \"1980-01-01\",\n  \"lugar_nacimiento\": \"CDMX\",\n  \"calle\": \"Av. Reforma 123\",\n  \"colonia\": \"Centro\",\n  \"numero_ext\": \"123\",\n  \"numero_int\": null,\n  \"codigo_postal\": \"06000\",\n  \"estado\": \"CDMX\",\n  \"ciudad\": \"Ciudad de México\",\n  \"datos_familiares\": [],\n  \"datos_vehiculos\": [],\n  \"datos_vivienda\": [],\n  \"referencia_laboral\": \"Comercio propio, 5 años\",\n  \"verificador_id\": null,\n  \"evidencias\": []\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": { "raw": "{{base_url}}/alta-proveedor/solicitudes", "host": ["{{base_url}}"], "path": ["alta-proveedor", "solicitudes"] },

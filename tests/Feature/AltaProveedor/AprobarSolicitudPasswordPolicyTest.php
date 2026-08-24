@@ -33,7 +33,6 @@ function crearSolicitudProveedorPendiente(Sucursal $sucursal): SolicitudProveedo
     return SolicitudProveedor::create([
         'datos_id' => $datos->id,
         'sucursal_id' => $sucursal->id,
-        'nombre' => 'Proveedor de Prueba SA de CV',
         'rfc' => 'RFC'.uniqid(),
         'estado' => 'verificado',
         'decision_gerente' => 'pendiente',

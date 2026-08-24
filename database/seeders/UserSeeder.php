@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Models\DatosPersonales;
+use App\Models\Direccion;
 use App\Models\Distribuidora;
 use App\Models\Role;
 use App\Models\Sucursal;
@@ -153,6 +155,22 @@ final class UserSeeder extends Seeder
             ]
         );
 
+        // Es persona física: su "nombre" ya no se guarda aparte (ver
+        // Distribuidora::getNombreAttribute()), se calcula de sus propios datos personales --
+        // sin esto el usuario queda sin datos_id y la distribuidora aparece sin nombre.
+        if (! $distribuidoraUser->datos_id) {
+            $direccionDist = Direccion::query()->create([
+                'calle' => 'Sin especificar', 'colonia' => 'Sin especificar', 'numero_ext' => 'S/N',
+                'codigo_postal' => '35070', 'estado' => 'Durango', 'ciudad' => 'Gómez Palacio',
+            ]);
+            $datosDist = DatosPersonales::query()->create([
+                'nombre' => 'Distribuidora', 'apellido_paterno' => 'Gómez Palacio',
+                'curp' => 'DIST000101HDGZLA01', 'direccion_id' => $direccionDist->id,
+            ]);
+            $distribuidoraUser->datos_id = $datosDist->id;
+            $distribuidoraUser->save();
+        }
+
         // Crear/actualizar la distribuidora con los nuevos campos
         Distribuidora::query()->updateOrCreate(
             ['usuario_id' => $distribuidoraUser->id],
@@ -161,11 +179,10 @@ final class UserSeeder extends Seeder
                 'limite_credito' => 50000.00,
                 // ELIMINADO: 'credito_disponible' (se calcula automáticamente)
                 'puntos_acumulados' => 120,
-                'estado' => 'ACTIVO',  
+                'estado' => 'ACTIVO',
 
                 'sucursal_id' => $sucursalGomez?->id,
                 'coordinador_id' => $coordinador?->id, // Asignar un coordinador existente
-                'nombre' => 'Distribuidora Gómez Palacio S.A.',
                 'rfc' => 'DGP123456789',
                 'categoria_id' => 1, // Si tienes categorías, descomenta y asigna un ID válido
                 'usuario_acceso' => 'distribuidora01',

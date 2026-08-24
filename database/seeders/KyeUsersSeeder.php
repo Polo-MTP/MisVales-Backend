@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Models\CategoriaDistribuidora;
+use App\Models\DatosPersonales;
+use App\Models\Direccion;
 use App\Models\Distribuidora;
 use App\Models\Role;
 use App\Models\Sucursal;
@@ -65,6 +67,21 @@ final class KyeUsersSeeder extends Seeder
                 );
 
                 if ($roleName === 'Distribuidora') {
+                    // Persona física: sin datos_id el usuario no tiene de dónde calcular su
+                    // nombre (ver Distribuidora::getNombreAttribute()).
+                    if (! $user->datos_id) {
+                        $direccion = Direccion::query()->create([
+                            'calle' => 'Sin especificar', 'colonia' => 'Sin especificar', 'numero_ext' => 'S/N',
+                            'codigo_postal' => '00000', 'estado' => 'Durango', 'ciudad' => 'Gómez Palacio',
+                        ]);
+                        $datos = DatosPersonales::query()->create([
+                            'nombre' => 'Kye', 'apellido_paterno' => sprintf('Distribuidora %d', $i),
+                            'curp' => sprintf('KYE%02d250101HDGZLA0%d', $i, $i), 'direccion_id' => $direccion->id,
+                        ]);
+                        $user->datos_id = $datos->id;
+                        $user->save();
+                    }
+
                     Distribuidora::query()->updateOrCreate(
                         ['usuario_id' => $user->id],
                         [
@@ -74,7 +91,6 @@ final class KyeUsersSeeder extends Seeder
                             'estado' => 'ACTIVO',
                             'sucursal_id' => $sucursalGomez?->id,
                             'coordinador_id' => $coordinadorFallback?->id,
-                            'nombre' => sprintf('Kye Distribuidora de Prueba %d', $i),
                             'rfc' => sprintf('KYE%02d250101K%d', $i, $i),
                             'categoria_id' => $categoriaBronce?->id,
                             'comentarios_verificador' => 'Verificado correctamente',

@@ -171,7 +171,7 @@ Mismos roles; restringido a la sucursal del usuario salvo Gerente General/Admini
 
 ### `POST /alta-proveedor/solicitudes`
 Roles: Coordinador, Gerente de Sucursal, Gerente General. Ver `CrearSolicitudProveedorRequest`
-para la lista completa de campos (razón social, RFC, datos personales, dirección, datos extra,
+para la lista completa de campos (RFC, datos personales, dirección, datos extra,
 `verificador_id` opcional, `evidencias[]` opcional).
 
 ```bash
