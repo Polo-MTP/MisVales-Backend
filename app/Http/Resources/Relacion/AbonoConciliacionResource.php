@@ -31,6 +31,7 @@ final class AbonoConciliacionResource extends JsonResource
             'queja' => $this->queja_por ? [
                 'reportado_por' => $this->quejaPor?->name,
                 'motivo' => $this->queja_motivo,
+                'evidencia_url' => $this->queja_evidencia_url,
                 'fecha' => $this->queja_fecha?->toIso8601String(),
             ] : null,
             'created_at' => $this->created_at?->toIso8601String(),

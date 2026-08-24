@@ -12,6 +12,8 @@ use App\Models\Sucursal;
 use App\Models\User;
 use App\Services\Relacion\ConciliacionBancariaService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
@@ -85,4 +87,48 @@ it('una distribuidora no puede quejarse de un abono que no es de ella', function
 
     expect(fn () => app(ConciliacionBancariaService::class)->levantarQueja($abono, $usuarioB, 'No es mío'))
         ->toThrow(Symfony\Component\HttpKernel\Exception\HttpException::class, 'Este abono no pertenece a tu distribuidora.');
+});
+
+it('la distribuidora puede adjuntar una captura de la transferencia al levantar la queja', function (): void {
+    Storage::fake('public');
+
+    [$distribuidora, $abono, $usuario] = crearDistribuidoraConRelacionYAbono();
+
+    Sanctum::actingAs($usuario);
+
+    $response = $this->post("/api/v1/conciliaciones/{$abono->id}/queja", [
+        'motivo' => 'Yo pagué 2000, no 1500.',
+        'evidencia' => UploadedFile::fake()->image('transferencia.jpg'),
+    ]);
+
+    $response->assertStatus(200);
+
+    $urlEvidencia = $response->json('data.queja.evidencia_url');
+    expect($urlEvidencia)->not->toBeNull();
+
+    $ruta = str_replace('/storage/', '', (string) parse_url($urlEvidencia, PHP_URL_PATH));
+    Storage::disk('public')->assertExists($ruta);
+});
+
+it('la cajera de la sucursal ve la queja (con su evidencia) al listar los abonos', function (): void {
+    Storage::fake('public');
+
+    [$distribuidora, $abono, $usuario] = crearDistribuidoraConRelacionYAbono();
+
+    $rolCajera = Role::firstOrCreate(['name' => 'Cajera']);
+    $cajera = User::factory()->create(['role_id' => $rolCajera->id, 'sucursal_id' => $distribuidora->sucursal_id, 'is_active' => true]);
+
+    Sanctum::actingAs($usuario);
+    $this->post("/api/v1/conciliaciones/{$abono->id}/queja", [
+        'motivo' => 'Yo pagué 2000, no 1500.',
+        'evidencia' => UploadedFile::fake()->image('transferencia.jpg'),
+    ])->assertStatus(200);
+
+    Sanctum::actingAs($cajera);
+
+    $this->getJson('/api/v1/conciliaciones')
+        ->assertStatus(200)
+        ->assertJsonPath('data.data.0.queja.motivo', 'Yo pagué 2000, no 1500.')
+        ->assertJsonPath('data.data.0.queja.reportado_por', $usuario->name)
+        ->assertJsonFragment(['evidencia_url' => AbonoConciliacion::find($abono->id)->queja_evidencia_url]);
 });

@@ -147,7 +147,7 @@ final class ConciliacionController extends ApiController
         /** @var User $usuario */
         $usuario = $request->user();
 
-        $abono = $this->conciliacionService->levantarQueja($abono, $usuario, (string) $request->string('motivo'));
+        $abono = $this->conciliacionService->levantarQueja($abono, $usuario, (string) $request->string('motivo'), $request->file('evidencia'));
 
         return $this->success(
             data: new AbonoConciliacionResource($abono),

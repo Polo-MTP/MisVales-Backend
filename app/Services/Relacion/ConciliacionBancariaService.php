@@ -125,7 +125,7 @@ final class ConciliacionBancariaService
      * para corregirlo; esto no reemplaza ese flujo, solo deja constancia de quién y por qué
      * lo reportó, visible para la cajera en el listado de abonos.
      */
-    public function levantarQueja(AbonoConciliacion $abono, User $distribuidoraUsuario, string $motivo): AbonoConciliacion
+    public function levantarQueja(AbonoConciliacion $abono, User $distribuidoraUsuario, string $motivo, ?UploadedFile $evidencia = null): AbonoConciliacion
     {
         $distribuidoraId = $distribuidoraUsuario->distribuidora?->id;
 
@@ -136,6 +136,16 @@ final class ConciliacionBancariaService
         $abono->queja_por = $distribuidoraUsuario->id;
         $abono->queja_motivo = $motivo;
         $abono->queja_fecha = now();
+
+        if ($evidencia) {
+            $disk = (config('filesystems.default') === 's3' || ! empty(config('filesystems.disks.s3.bucket')))
+                ? 's3'
+                : 'public';
+
+            $ruta = Storage::disk($disk)->putFile('quejas-conciliacion', $evidencia, 'public');
+            $abono->queja_evidencia_url = Storage::disk($disk)->url($ruta);
+        }
+
         $abono->save();
 
         // Sin esto, una queja se queda invisible hasta que alguien entra a buscarla a mano en el
