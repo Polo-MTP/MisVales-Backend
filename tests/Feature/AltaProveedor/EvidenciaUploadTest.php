@@ -16,10 +16,22 @@ use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
 
+/**
+ * Mismo criterio que EvidenciaController::store(): 's3' solo si el bucket está configurado,
+ * si no 'public'. Fijar 's3' a fuerzas rompía este test en cualquier entorno sin bucket
+ * (como local) -- el código real ahí sube a 'public', así que Storage::fake('s3') fake-eaba
+ * un disco que la petición real nunca tocaba y el assertExists() fallaba.
+ */
+function discoEvidenciasReal(): string
+{
+    return (config('filesystems.default') === 's3' || ! empty(config('filesystems.disks.s3.bucket')))
+        ? 's3'
+        : 'public';
+}
+
 it('un coordinador sube el archivo real de una evidencia y queda con URL pública', function (): void {
-    // El disco real es 's3' cuando el bucket está configurado -- fake-ear 'public' dejaba
-    // pasar la subida real al bucket de producción sin que este test lo notara.
-    Storage::fake('s3');
+    $disco = discoEvidenciasReal();
+    Storage::fake($disco);
 
     $sucursal = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-001', 'es_matriz' => true, 'is_active' => true]);
     $role = Role::create(['name' => 'Coordinador']);
@@ -52,5 +64,5 @@ it('un coordinador sube el archivo real de una evidencia y queda con URL públic
         ->and($evidencia->url_archivo)->toContain('/evidencias/');
 
     $rutaRelativa = preg_replace('#^storage/#', '', ltrim((string) parse_url((string) $evidencia->url_archivo, PHP_URL_PATH), '/'));
-    Storage::disk('s3')->assertExists($rutaRelativa);
+    Storage::disk($disco)->assertExists($rutaRelativa);
 });

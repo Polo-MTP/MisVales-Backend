@@ -18,6 +18,19 @@ use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
 
+/**
+ * Mismo criterio que ConciliacionBancariaService::levantarQueja(): 's3' solo si el bucket
+ * está configurado, si no 'public'. Fijar 's3' a fuerzas rompía este test en cualquier
+ * entorno sin bucket (como local) -- el código real ahí sube a 'public', así que
+ * Storage::fake('s3') fake-eaba un disco que la petición real nunca tocaba.
+ */
+function discoConciliacionReal(): string
+{
+    return (config('filesystems.default') === 's3' || ! empty(config('filesystems.disks.s3.bucket')))
+        ? 's3'
+        : 'public';
+}
+
 function crearDistribuidoraConRelacionYAbono(): array
 {
     $sucursal = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-'.uniqid(), 'es_matriz' => true, 'is_active' => true]);
@@ -90,10 +103,8 @@ it('una distribuidora no puede quejarse de un abono que no es de ella', function
 });
 
 it('la distribuidora puede adjuntar una captura de la transferencia al levantar la queja', function (): void {
-    // El código real sube al disco 's3' cuando el bucket está configurado (ver
-    // ConciliacionBancariaService::levantarQueja) -- fake-ear 'public' dejaba pasar la subida
-    // real al bucket de producción sin que este test lo notara.
-    Storage::fake('s3');
+    $disco = discoConciliacionReal();
+    Storage::fake($disco);
 
     [$distribuidora, $abono, $usuario] = crearDistribuidoraConRelacionYAbono();
 
@@ -110,11 +121,11 @@ it('la distribuidora puede adjuntar una captura de la transferencia al levantar 
     expect($urlEvidencia)->not->toBeNull();
 
     $ruta = preg_replace('#^storage/#', '', ltrim((string) parse_url($urlEvidencia, PHP_URL_PATH), '/'));
-    Storage::disk('s3')->assertExists($ruta);
+    Storage::disk($disco)->assertExists($ruta);
 });
 
 it('la cajera de la sucursal ve la queja (con su evidencia) al listar los abonos', function (): void {
-    Storage::fake('s3');
+    Storage::fake(discoConciliacionReal());
 
     [$distribuidora, $abono, $usuario] = crearDistribuidoraConRelacionYAbono();
 
