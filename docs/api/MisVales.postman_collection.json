@@ -623,11 +623,11 @@
             "header": [{ "key": "Accept", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sucursal_id\": null,\n  \"dia_corte\": 15,\n  \"dia_limite_pago\": 20,\n  \"dias_pago_anticipado\": 5\n}",
+              "raw": "{\n  \"sucursal_id\": null,\n  \"dia_corte\": 15,\n  \"dia_corte_2\": 31,\n  \"dia_limite_pago\": 20,\n  \"dias_pago_anticipado\": 5\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": { "raw": "{{base_url}}/configuraciones/fechas", "host": ["{{base_url}}"], "path": ["configuraciones", "fechas"] },
-            "description": "Rol: Gerente General. sucursal_id null = regla global (fallback)."
+            "description": "Rol: Gerente General. sucursal_id null = regla global (fallback). dia_corte y dia_corte_2 son los dos dias de corte quincenales, siempre van juntos y deben ser distintos entre si."
           }
         },
         {

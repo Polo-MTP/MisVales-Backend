@@ -100,12 +100,14 @@ final class ConfiguracionController extends ApiController
 
         $sucursalId = $request->input('sucursal_id') !== null ? (int) $request->input('sucursal_id') : null;
         $diaCorte = (int) $request->input('dia_corte');
+        $diaCorte2 = (int) $request->input('dia_corte_2');
         $diaLimitePago = (int) $request->input('dia_limite_pago');
         $diasPagoAnticipado = (int) $request->input('dias_pago_anticipado');
 
         $nuevaFecha = $this->configuracionService->cambiarFechas(
             $sucursalId,
             $diaCorte,
+            $diaCorte2,
             $diaLimitePago,
             $diasPagoAnticipado,
             $usuario

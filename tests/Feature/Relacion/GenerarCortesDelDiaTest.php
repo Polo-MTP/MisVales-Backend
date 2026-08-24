@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\CategoriaDistribuidora;
 use App\Models\Cliente;
 use App\Models\Configuracion;
+use App\Models\ConfiguracionFechas;
 use App\Models\DatosPersonales;
 use App\Models\Direccion;
 use App\Models\Distribuidora;
@@ -59,6 +60,53 @@ function crearValeParaCorte(Distribuidora $distribuidora, float $monto, int $qui
 beforeEach(function (): void {
     seedConfiguracionBaseCortes();
     SeguroTabla::create(['monto_desde' => 0, 'monto_hasta' => null, 'seguro_monto' => 100, 'activo' => true]);
+});
+
+it('no genera nada si la fecha indicada no es día de corte (ni el 15 ni fin de mes)', function (): void {
+    $distribuidora = crearDistribuidoraParaCorte('DIST-NOCORTE');
+    crearValeParaCorte($distribuidora, 15000, 8);
+
+    $resultado = app(RelacionCalculoService::class)->generarCortesDelDia('2026-02-20');
+
+    expect($resultado['generadas'])->toBeEmpty()
+        ->and($resultado['errores'])->toBeEmpty()
+        ->and(Relacion::query()->count())->toBe(0);
+});
+
+it('genera el corte en el último día del mes, el segundo corte quincenal', function (): void {
+    $distribuidora = crearDistribuidoraParaCorte('DIST-FINMES');
+    crearValeParaCorte($distribuidora, 15000, 8);
+
+    // Febrero 2026 no es bisiesto: el último día del mes es el 28, no el 15.
+    $resultado = app(RelacionCalculoService::class)->generarCortesDelDia('2026-02-28');
+
+    expect($resultado['generadas'])->toHaveCount(1)
+        ->and($resultado['generadas'])->toHaveKey($distribuidora->id);
+});
+
+it('respeta los días de corte propios de la sucursal, no los globales por defecto', function (): void {
+    $distribuidora = crearDistribuidoraParaCorte('DIST-SUC-PROPIA');
+    crearValeParaCorte($distribuidora, 15000, 8);
+
+    $admin = User::factory()->create();
+    ConfiguracionFechas::create([
+        'sucursal_id' => $distribuidora->sucursal_id,
+        'dia_corte' => 10,
+        'dia_corte_2' => 25,
+        'dia_limite_pago' => 27,
+        'dias_pago_anticipado' => 2,
+        'vigente_desde' => '2025-01-01',
+        'modificado_por' => $admin->id,
+    ]);
+
+    // El 15 es día de corte por defecto (global), pero esta sucursal tiene sus propios días
+    // (10 y 25) -- no debe generar nada el 15.
+    $resultadoDia15 = app(RelacionCalculoService::class)->generarCortesDelDia('2026-02-15');
+    expect($resultadoDia15['generadas'])->toBeEmpty();
+
+    $resultadoDia10 = app(RelacionCalculoService::class)->generarCortesDelDia('2026-02-10');
+    expect($resultadoDia10['generadas'])->toHaveCount(1)
+        ->and($resultadoDia10['generadas'])->toHaveKey($distribuidora->id);
 });
 
 it('si una distribuidora falla al generar su corte, las demás igual se generan y el error queda reportado', function (): void {

@@ -55,8 +55,33 @@ it('calcula la próxima fecha de corte de este mes si el día de corte todavía 
         ->assertJsonPath('data.referencia_pago', sprintf('%09d%09d', $distribuidora->id, 20260215));
 });
 
-it('salta al corte del siguiente mes si el día de corte de este mes ya pasó', function (): void {
+it('salta al corte de fin de mes si el día 15 ya pasó -- el corte es quincenal, no mensual', function (): void {
     $this->travelTo('2026-02-20');
+    $distribuidora = crearDistribuidoraProximoPago();
+    crearValeProximoPago($distribuidora, 5000);
+    Sanctum::actingAs($distribuidora->usuario);
+
+    $response = $this->getJson('/api/v1/relaciones/proximo-pago');
+
+    // Febrero 2026 no es bisiesto: el último día del mes es el 28.
+    $response->assertStatus(200)->assertJsonPath('data.fecha_corte', '2026-02-28');
+});
+
+it('salta al 15 del siguiente mes si ya pasó el corte de fin de mes', function (): void {
+    $this->travelTo('2026-02-28');
+    $distribuidora = crearDistribuidoraProximoPago();
+    crearValeProximoPago($distribuidora, 5000);
+    Sanctum::actingAs($distribuidora->usuario);
+
+    // El 28 de febrero también es el último día del mes: sigue contando como "todavía no
+    // pasó" el corte de hoy, igual que el caso del día 15 exacto.
+    $response = $this->getJson('/api/v1/relaciones/proximo-pago');
+
+    $response->assertStatus(200)->assertJsonPath('data.fecha_corte', '2026-02-28');
+});
+
+it('el 1 de marzo ya pasó el corte de fin de febrero -- salta al 15 de marzo', function (): void {
+    $this->travelTo('2026-03-01');
     $distribuidora = crearDistribuidoraProximoPago();
     crearValeProximoPago($distribuidora, 5000);
     Sanctum::actingAs($distribuidora->usuario);

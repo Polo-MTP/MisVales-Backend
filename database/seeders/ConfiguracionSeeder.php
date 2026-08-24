@@ -115,6 +115,9 @@ final class ConfiguracionSeeder extends Seeder
         }
 
         // 2. Configuración de Fechas por Defecto Global (sucursal_id = null)
+        // dia_corte/dia_corte_2: los dos días de corte quincenales -- 15 = primera quincena,
+        // 31 = segunda quincena ("fin de mes", se capa solo en meses de 28-30 días, ver
+        // RelacionCalculoService::diaDeCorteCapeado()).
         ConfiguracionFechas::query()->updateOrCreate(
             [
                 'sucursal_id' => null,
@@ -122,6 +125,7 @@ final class ConfiguracionSeeder extends Seeder
             ],
             [
                 'dia_corte' => 15,
+                'dia_corte_2' => 31,
                 'dia_limite_pago' => 16,
                 'dias_pago_anticipado' => 3,
                 'vigente_desde' => $fechaInicio,
@@ -138,7 +142,8 @@ final class ConfiguracionSeeder extends Seeder
                     'vigente_hasta' => null,
                 ],
                 [
-                    'dia_corte' => 20,
+                    'dia_corte' => 5,
+                    'dia_corte_2' => 20,
                     'dia_limite_pago' => 22,
                     'dias_pago_anticipado' => 2,
                     'vigente_desde' => $fechaInicio,

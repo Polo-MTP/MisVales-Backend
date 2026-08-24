@@ -306,8 +306,9 @@ Roles: Gerente General, Gerente de Sucursal. Sin `sucursal_id` devuelve todas la
 regla global si no tiene una propia).
 
 ### `POST /configuraciones/fechas`
-Rol: Gerente General. Body: `sucursal_id` (null = regla global), `dia_corte`, `dia_limite_pago`,
-`dias_pago_anticipado`.
+Rol: Gerente General. Body: `sucursal_id` (null = regla global), `dia_corte` y `dia_corte_2`
+(los dos días de corte quincenales — siempre van juntos, deben ser distintos entre sí),
+`dia_limite_pago`, `dias_pago_anticipado`.
 
 ### `GET /configuraciones/fechas/historial?sucursal_id=`
 Rol: Gerente General.

@@ -38,7 +38,8 @@ it('una regla de fechas de corte marcada vigente desde hoy ya aplica hoy mismo p
     $gerente = crearGerenteGeneralParaVigencia();
     $servicio = app(ConfiguracionService::class);
 
-    $servicio->cambiarFechas($sucursal->id, 24, 26, 2, $gerente);
+    $servicio->cambiarFechas($sucursal->id, 24, 9, 26, 2, $gerente);
 
-    expect($servicio->obtenerFechasVigentes($sucursal->id)->dia_corte)->toBe(24);
+    expect($servicio->obtenerFechasVigentes($sucursal->id)->dia_corte)->toBe(24)
+        ->and($servicio->obtenerFechasVigentes($sucursal->id)->dia_corte_2)->toBe(9);
 });

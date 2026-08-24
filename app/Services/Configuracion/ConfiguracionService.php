@@ -158,6 +158,7 @@ final class ConfiguracionService
         $fallback = new ConfiguracionFechas([
             'sucursal_id' => null,
             'dia_corte' => 15,
+            'dia_corte_2' => 31, // 31 se capa al último día del mes -- ver esDiaDeCorte().
             'dia_limite_pago' => 16,
             'dias_pago_anticipado' => 3,
             'vigente_desde' => $fechaConsulta,
@@ -183,18 +184,22 @@ final class ConfiguracionService
 
     /**
      * Cambia la regla de fechas para una sucursal (o global) cerrando la vigencia anterior.
+     *
+     * $diaCorte y $diaCorte2 son los dos días de corte quincenales -- siempre se guardan
+     * juntos, nunca uno sin el otro (ver UpdateConfiguracionFechasRequest).
      */
-    public function cambiarFechas(?int $sucursalId, int $diaCorte, int $diaLimitePago, int $diasPagoAnticipado, User $usuario): ConfiguracionFechas
+    public function cambiarFechas(?int $sucursalId, int $diaCorte, int $diaCorte2, int $diaLimitePago, int $diasPagoAnticipado, User $usuario): ConfiguracionFechas
     {
         Log::debug('ConfiguracionService: Cambiando regla de fechas', [
             'sucursal_id' => $sucursalId,
             'dia_corte' => $diaCorte,
+            'dia_corte_2' => $diaCorte2,
             'dia_limite_pago' => $diaLimitePago,
             'dias_pago_anticipado' => $diasPagoAnticipado,
             'usuario_id' => $usuario->id,
         ]);
 
-        return DB::transaction(function () use ($sucursalId, $diaCorte, $diaLimitePago, $diasPagoAnticipado, $usuario): ConfiguracionFechas {
+        return DB::transaction(function () use ($sucursalId, $diaCorte, $diaCorte2, $diaLimitePago, $diasPagoAnticipado, $usuario): ConfiguracionFechas {
             $hoy = now()->toDateString();
 
             // 1. Cerrar la fila vigente actual para esa sucursal (o global)
@@ -211,6 +216,7 @@ final class ConfiguracionService
             $nuevaFecha = ConfiguracionFechas::query()->create([
                 'sucursal_id' => $sucursalId,
                 'dia_corte' => $diaCorte,
+                'dia_corte_2' => $diaCorte2,
                 'dia_limite_pago' => $diaLimitePago,
                 'dias_pago_anticipado' => $diasPagoAnticipado,
                 'vigente_desde' => $hoy,

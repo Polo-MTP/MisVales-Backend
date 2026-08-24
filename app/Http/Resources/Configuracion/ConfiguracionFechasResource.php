@@ -28,6 +28,7 @@ final class ConfiguracionFechasResource extends JsonResource
             ] : null,
             'es_default_global' => $this->sucursal_id === null,
             'dia_corte' => $this->dia_corte,
+            'dia_corte_2' => $this->dia_corte_2,
             'dia_limite_pago' => $this->dia_limite_pago,
             'dias_pago_anticipado' => $this->dias_pago_anticipado,
             'vigente_desde' => $this->vigente_desde?->toDateString(),

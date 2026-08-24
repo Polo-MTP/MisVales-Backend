@@ -9,9 +9,16 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * dia_corte y dia_corte_2 son los dos días de corte quincenales (primera y segunda quincena)
+ * -- siempre van en pareja, nunca uno sin el otro (ver UpdateConfiguracionFechasRequest y
+ * RelacionCalculoService::esDiaDeCorte()). Un valor mayor a los días reales del mes se capa
+ * al último día calendario (31 = "fin de mes" incluso en meses de 28-30 días).
+ */
 #[Fillable([
     'sucursal_id',
     'dia_corte',
+    'dia_corte_2',
     'dia_limite_pago',
     'dias_pago_anticipado',
     'vigente_desde',
@@ -26,6 +33,7 @@ final class ConfiguracionFechas extends Model
 
     protected $casts = [
         'dia_corte' => 'integer',
+        'dia_corte_2' => 'integer',
         'dia_limite_pago' => 'integer',
         'dias_pago_anticipado' => 'integer',
         'vigente_desde' => 'date',

@@ -11,7 +11,7 @@ final class GenerarCortesRelaciones extends Command
 {
     protected $signature = 'relaciones:generar-cortes {--fecha= : Fecha de corte a evaluar (YYYY-MM-DD), por defecto hoy}';
 
-    protected $description = 'Genera la relación (corte) de todas las distribuidoras cuya sucursal tiene hoy su día de corte configurado.';
+    protected $description = 'Genera la relación (corte) de todas las distribuidoras cuya sucursal tiene hoy uno de sus dos días de corte quincenales configurados.';
 
     /**
      * Genera el corte del día (o de la fecha indicada) para las distribuidoras que correspondan.

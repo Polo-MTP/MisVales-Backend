@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Relacion;
 
+use App\Models\ConfiguracionFechas;
 use App\Models\Distribuidora;
 use App\Models\Relacion;
 use App\Models\RelacionDetalle;
@@ -23,6 +24,11 @@ use Throwable;
  * de "Analisis de calculo de relacion": capital + comisión + interés + seguro (+ recargo si aplica),
  * prorrateados entre las quincenas del vale.
  *
+ * El corte corre 2 veces al mes (quincenal): en dia_corte y dia_corte_2, configurables por
+ * sucursal en ConfiguracionFechas y siempre en pareja (ver esDiaDeCorte()). Cada corte cobra
+ * una cuota ("quincena") de cada vale pendiente, así que un vale a N quincenas tarda N/2
+ * meses en liquidarse.
+ *
  * Los puntos de fidelidad NO se calculan aquí: solo aplican sobre pagos anticipados, y eso
  * se determina hasta la conciliación bancaria (fuera del alcance de este service).
  */
@@ -34,9 +40,9 @@ final class RelacionCalculoService
     ) {}
 
     /**
-     * Genera el corte del día para todas las distribuidoras activas cuya sucursal tiene
-     * hoy su día de corte configurado (o el de la fecha indicada). Las distribuidoras sin
-     * vales pendientes se omiten silenciosamente.
+     * Genera el corte del día para todas las distribuidoras activas cuya sucursal tiene hoy
+     * (o la fecha indicada) uno de sus dos días de corte quincenales configurados. Las
+     * distribuidoras sin vales pendientes se omiten silenciosamente.
      *
      * Cada distribuidora se procesa aislada: si una truena (ej. ya existe relación para esa
      * fecha), las demás siguen generándose normal — antes, una sola excepción dentro del
@@ -63,7 +69,7 @@ final class RelacionCalculoService
                             $fechaCorte->toDateString()
                         );
 
-                        if ((int) $fechasConfig->dia_corte !== (int) $fechaCorte->day) {
+                        if (! $this->esDiaDeCorte($fechasConfig, $fechaCorte)) {
                             continue;
                         }
 
@@ -84,6 +90,55 @@ final class RelacionCalculoService
             });
 
         return ['generadas' => $generadas, 'errores' => $errores];
+    }
+
+    /**
+     * Traduce dia_corte/dia_corte_2 (día del mes 1-31, puede exceder los días reales del mes)
+     * a un día real para $fecha: se capa al último día calendario, mismo criterio que ya usa
+     * dia_limite_pago (ver calcularFechas()) -- así 31 funciona como "fin de mes" incluso en
+     * meses de 28-30 días.
+     */
+    private function diaDeCorteCapeado(int $diaConfigurado, CarbonInterface $fecha): int
+    {
+        return min($diaConfigurado, $fecha->daysInMonth);
+    }
+
+    /**
+     * Es día de corte si coincide con dia_corte o dia_corte_2 (ya capados al mes de $fecha).
+     */
+    private function esDiaDeCorte(ConfiguracionFechas $fechasConfig, CarbonInterface $fecha): bool
+    {
+        return $fecha->day === $this->diaDeCorteCapeado((int) $fechasConfig->dia_corte, $fecha)
+            || $fecha->day === $this->diaDeCorteCapeado((int) $fechasConfig->dia_corte_2, $fecha);
+    }
+
+    /**
+     * Próximo día de corte a partir de $hoy, inclusive -- si hoy mismo es uno de los dos días
+     * de corte, ese es el "próximo" (ver ProximoPagoTest: "el mismo día del corte cuenta como
+     * todavía no pasó").
+     */
+    private function proximaFechaDeCorte(ConfiguracionFechas $fechasConfig, CarbonInterface $hoy): CarbonInterface
+    {
+        $fechasEsteMes = [
+            $hoy->copy()->day($this->diaDeCorteCapeado((int) $fechasConfig->dia_corte, $hoy)),
+            $hoy->copy()->day($this->diaDeCorteCapeado((int) $fechasConfig->dia_corte_2, $hoy)),
+        ];
+        usort($fechasEsteMes, static fn (CarbonInterface $a, CarbonInterface $b): int => $a->getTimestamp() <=> $b->getTimestamp());
+
+        foreach ($fechasEsteMes as $fecha) {
+            if ($fecha->gte($hoy)) {
+                return $fecha;
+            }
+        }
+
+        $siguienteMes = $hoy->copy()->addMonthNoOverflow()->startOfMonth();
+        $fechasSiguienteMes = [
+            $siguienteMes->copy()->day($this->diaDeCorteCapeado((int) $fechasConfig->dia_corte, $siguienteMes)),
+            $siguienteMes->copy()->day($this->diaDeCorteCapeado((int) $fechasConfig->dia_corte_2, $siguienteMes)),
+        ];
+        usort($fechasSiguienteMes, static fn (CarbonInterface $a, CarbonInterface $b): int => $a->getTimestamp() <=> $b->getTimestamp());
+
+        return $fechasSiguienteMes[0];
     }
 
     /**
@@ -240,16 +295,7 @@ final class RelacionCalculoService
         $hoy = $desde ? Carbon::parse($desde)->startOfDay() : now()->startOfDay();
 
         $fechasConfig = $this->configuracionService->obtenerFechasVigentes($distribuidora->sucursal_id, $hoy->toDateString());
-        $diaCorte = (int) $fechasConfig->dia_corte;
-
-        $fechaCorteEsteMes = $hoy->copy()->day(min($diaCorte, $hoy->daysInMonth));
-
-        if ($fechaCorteEsteMes->lt($hoy)) {
-            $siguienteMes = $hoy->copy()->addMonthNoOverflow();
-            $proximaFechaCorte = $siguienteMes->copy()->day(min($diaCorte, $siguienteMes->daysInMonth));
-        } else {
-            $proximaFechaCorte = $fechaCorteEsteMes;
-        }
+        $proximaFechaCorte = $this->proximaFechaDeCorte($fechasConfig, $hoy);
 
         [$fechaLimitePago] = $this->calcularFechas($distribuidora->sucursal_id, $proximaFechaCorte);
 
