@@ -14,10 +14,12 @@ use App\Models\LogNuevoProveedor;
 use App\Models\Role;
 use App\Models\SolicitudProveedor;
 use App\Models\User;
+use App\Mail\PersonalCredencialesMail;
 use App\Services\Notificacion\NotificacionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 final class SolicitudProveedorService
 {
@@ -300,6 +302,16 @@ final class SolicitudProveedorService
                 $distribuidoraUser->email_verified_at = now();
                 $distribuidoraUser->save();
 
+                // El Gerente ve/genera la contraseña una sola vez en este formulario -- sin este
+                // correo no queda registrada en ningún lado y la distribuidora no tiene forma de
+                // saberla (mismo patrón que ya se usa al dar de alta personal interno).
+                Mail::to((string) $distribuidoraUser->email)->send(new PersonalCredencialesMail(
+                    (string) $distribuidoraUser->name,
+                    (string) $distribuidoraUser->email,
+                    (string) $data['password'],
+                    'Distribuidora',
+                ));
+
                 $limiteCredito = (float) $data['limite_credito_asignado'];
                 /** @var Distribuidora $distribuidora */
                 $distribuidora = Distribuidora::query()->create([
@@ -379,6 +391,18 @@ final class SolicitudProveedorService
             $solicitud->comentario_gerente = $data['comentario_gerente'] ?? null;
             $solicitud->fecha_decision = now();
             $solicitud->save();
+
+            // El Coordinador solo se enteraba de que su solicitud pasó a verificación -- nunca
+            // del resultado final de Gerencia, ni aprobado ni rechazado. Tenía que entrar a
+            // revisar "Mis Solicitudes" a ciegas para saberlo.
+            if ($solicitud->coordinador) {
+                $this->notificacionService->crear(
+                    $solicitud->coordinador,
+                    $solicitud->estado === 'aprobado' ? 'solicitud_aprobada_gerente' : 'solicitud_rechazada_gerente',
+                    'Solicitud '.$solicitud->nombre,
+                    $gerente
+                );
+            }
 
             Log::debug('SolicitudProveedorService: Decisión de Gerencia procesada exitosamente', [
                 'solicitud_id' => $solicitud->id,

@@ -149,12 +149,20 @@ final class ClienteService
         }
 
         if (! empty($filters['search'])) {
-            $search = (string) $filters['search'];
-            $query->whereHas('datosPersonales', function ($q) use ($search): void {
-                $q->where('nombre', 'like', "%{$search}%")
-                    ->orWhere('apellido_paterno', 'like', "%{$search}%")
-                    ->orWhere('apellido_materno', 'like', "%{$search}%")
-                    ->orWhere('curp', 'like', "%{$search}%");
+            // Cada palabra del término debe coincidir en algún campo, pero no necesariamente en
+            // el mismo -- si no, buscar "Juana Reyes" (nombre="Juana", apellido="Reyes") no
+            // encontraba nada porque ninguna columna por separado contiene las dos palabras.
+            $palabras = preg_split('/\s+/', trim((string) $filters['search']), -1, PREG_SPLIT_NO_EMPTY);
+
+            $query->whereHas('datosPersonales', function ($q) use ($palabras): void {
+                foreach ($palabras as $palabra) {
+                    $q->where(function ($sub) use ($palabra): void {
+                        $sub->where('nombre', 'like', "%{$palabra}%")
+                            ->orWhere('apellido_paterno', 'like', "%{$palabra}%")
+                            ->orWhere('apellido_materno', 'like', "%{$palabra}%")
+                            ->orWhere('curp', 'like', "%{$palabra}%");
+                    });
+                }
             });
         }
 

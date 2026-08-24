@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Mail\PersonalCredencialesMail;
 use App\Models\AuditLog;
 use App\Models\DatosPersonales;
 use App\Models\Direccion;
@@ -10,9 +11,14 @@ use App\Models\SolicitudProveedor;
 use App\Models\Sucursal;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    Mail::fake();
+});
 
 /**
  * AprobarSolicitudProveedorRequest solo exigía password 'min:8' — cualquier cosa de 8+
@@ -84,4 +90,20 @@ it('acepta un password fuerte, crea la cuenta y deja un solo rastro de auditorí
     $auditDistribuidora = AuditLog::where('action', 'Distribuidora.creado')->latest()->first();
     expect($auditDistribuidora)->not->toBeNull()
         ->and($auditDistribuidora->ip_address)->not->toBeNull();
+});
+
+it('le envía la contraseña por correo a la distribuidora aprobada -- si no, no tiene forma de saberla', function (): void {
+    $sucursal = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-'.uniqid(), 'es_matriz' => true, 'is_active' => true]);
+    $solicitud = crearSolicitudProveedorPendiente($sucursal);
+    $gerente = crearGerenteGeneralActivo();
+    Sanctum::actingAs($gerente);
+
+    $this->postJson("/api/v1/alta-proveedor/solicitudes/{$solicitud->id}/aprobar", [
+        'decision' => 'aprobado',
+        'limite_credito_asignado' => 20000,
+        'email' => 'nuevo.proveedor@correo.com',
+        'password' => 'Passw0rd1',
+    ])->assertStatus(200);
+
+    Mail::assertSent(PersonalCredencialesMail::class, fn ($mail) => $mail->hasTo('nuevo.proveedor@correo.com') && $mail->password === 'Passw0rd1');
 });

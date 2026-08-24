@@ -84,6 +84,26 @@ it('la cajera puede ver el detalle de un cliente de su sucursal pero no de otra'
     $this->getJson("/api/v1/distribuidora/clientes/{$clienteB->id}")->assertStatus(403);
 });
 
+it('busca por nombre completo (nombre + apellido en un solo término), no solo por una palabra', function (): void {
+    $sucursal = crearSucursalTest();
+    $distribuidora = crearDistribuidoraEnSucursal($sucursal);
+
+    $direccion = Direccion::create(['calle' => 'Test', 'colonia' => 'Test', 'numero_ext' => '1', 'codigo_postal' => '00000', 'estado' => 'Coahuila', 'ciudad' => 'Torreón']);
+    $datos = DatosPersonales::create(['nombre' => 'Juana', 'apellido_paterno' => 'Reyes', 'apellido_materno' => 'Ibarra', 'curp' => 'CUPD'.uniqid(), 'direccion_id' => $direccion->id]);
+    $cliente = Cliente::create(['datos_id' => $datos->id, 'estado' => true]);
+    HistorialClienteDistr::create(['distribuidor_id' => $distribuidora->id, 'cliente_id' => $cliente->id, 'fecha_inicio' => now(), 'fecha_fin' => null]);
+
+    $cajera = crearCajeraEnSucursal($sucursal);
+    Sanctum::actingAs($cajera);
+
+    // Antes: buscar solo "Juana" encontraba (coincide en una sola columna), pero "Juana Reyes"
+    // no encontraba nada -- ninguna columna por separado contiene las dos palabras juntas.
+    $this->getJson('/api/v1/distribuidora/clientes?search=Juana')->assertJsonCount(1, 'data.data');
+    $this->getJson('/api/v1/distribuidora/clientes?search=Juana+Reyes')->assertJsonCount(1, 'data.data');
+    $this->getJson('/api/v1/distribuidora/clientes?search=Reyes+Ibarra')->assertJsonCount(1, 'data.data');
+    $this->getJson('/api/v1/distribuidora/clientes?search=Juana+Perez')->assertJsonCount(0, 'data.data');
+});
+
 it('listar o ver clientes como cajera no crea una distribuidora fantasma para su usuario', function (): void {
     $sucursal = crearSucursalTest();
     $distribuidora = crearDistribuidoraEnSucursal($sucursal);
