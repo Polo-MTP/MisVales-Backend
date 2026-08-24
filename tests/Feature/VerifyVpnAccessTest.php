@@ -117,6 +117,18 @@ it('la alta de Gerente de Sucursal tiene el middleware vpn adjunto', function ()
 });
 
 /**
+ * Un Administrador ve todo -- si esta ruta se quedara sin 'vpn' por accidente, cualquiera con
+ * rol Gerente General/Gerente de Sucursal podría crear una cuenta de máximo privilegio desde
+ * la red pública.
+ */
+it('la alta de Administrador tiene el middleware vpn adjunto', function (): void {
+    $ruta = Route::getRoutes()->getByName('api.v1.usuarios.crear_administrador');
+
+    expect($ruta)->not->toBeNull()
+        ->and($ruta->middleware())->toContain('vpn');
+});
+
+/**
  * Cambiar los parámetros de la fórmula (comisión, %quincena, multa, categoría, seguro, fechas
  * de corte) afecta a TODOS los vales que se generen de ahí en adelante — mayor radio de
  * impacto que una decisión puntual sobre un solo caso, así que también exige VPN.

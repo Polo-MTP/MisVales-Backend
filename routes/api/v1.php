@@ -80,6 +80,14 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
         ->middleware(['role:Gerente General', 'vpn'])
         ->name('api.v1.usuarios.crear_gerente_sucursal');
 
+    // Da de alta Administrador -- Gerente General y Gerente de Sucursal, pero SOLO desde la
+    // red interna: 'vpn' aquí es la única barrera real, no una capa extra como en el resto de
+    // altas de staff (que además viven dentro de la sucursal de quien las crea). Un
+    // Administrador ve todo, así que no hay forma de acotar esto por sucursal.
+    Route::post('usuarios/administrador', [UsuarioController::class, 'crearAdministrador'])
+        ->middleware(['role:Gerente General,Gerente de Sucursal', 'vpn'])
+        ->name('api.v1.usuarios.crear_administrador');
+
     // Da de alta Coordinador, Verificador o Cajera -- el rol viene restringido a esas 3
     // opciones desde CrearPersonalSucursalRequest. Gerente de Sucursal solo puede darlos de
     // alta en su propia sucursal, relacionados a sí mismo; Gerente General puede asignar

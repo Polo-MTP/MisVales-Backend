@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Api\ApiController;
+use App\Http\Requests\Api\V1\Usuario\CrearAdministradorRequest;
 use App\Http\Requests\Api\V1\Usuario\CrearGerenteSucursalRequest;
 use App\Http\Requests\Api\V1\Usuario\CrearPersonalSucursalRequest;
 use App\Http\Requests\Api\V1\Usuario\ReasignarPersonalRequest;
@@ -120,6 +121,44 @@ final class UsuarioController extends ApiController
             (string) $usuario->email,
             (string) $passwordGenerada,
             (string) $rolGerenteSucursal->name,
+        ));
+
+        return $this->created(new UserResource($usuario->load(['role', 'sucursal'])));
+    }
+
+    /**
+     * Da de alta un Administrador. El rol queda fijo aquí igual que en crearGerenteSucursal --
+     * quien manda la petición nunca elige el rol. La única barrera es la ruta: exige 'vpn' de
+     * verdad (VerifyVpnAccess la exige para Gerente General y Gerente de Sucursal, los dos
+     * roles que pueden llegar aquí), a diferencia de las demás altas de staff que además viven
+     * dentro de la sucursal de quien las crea. Un Administrador no está atado a ninguna
+     * sucursal en particular (ve todo, igual que Gerente General), así que se asigna a la
+     * matriz en vez de pedir sucursal_id en el request.
+     */
+    public function crearAdministrador(CrearAdministradorRequest $request): JsonResponse
+    {
+        $rolAdministrador = Role::query()->where('name', 'Administrador')->firstOrFail();
+        $matriz = Sucursal::query()->where('es_matriz', true)->first();
+
+        $passwordGenerada = Str::password(16);
+
+        $usuario = User::query()->create([
+            'name' => $request->string('name'),
+            'email' => $request->string('email'),
+            'password' => Hash::make($passwordGenerada),
+            'role_id' => $rolAdministrador->id,
+            'sucursal_id' => $matriz?->id,
+            'is_active' => true,
+        ]);
+
+        $usuario->email_verified_at = now();
+        $usuario->save();
+
+        Mail::to((string) $usuario->email)->send(new PersonalCredencialesMail(
+            (string) $usuario->name,
+            (string) $usuario->email,
+            (string) $passwordGenerada,
+            (string) $rolAdministrador->name,
         ));
 
         return $this->created(new UserResource($usuario->load(['role', 'sucursal'])));
