@@ -9,6 +9,7 @@ use App\Models\Distribuidora;
 use App\Models\HistorialClienteDistr;
 use App\Models\SolicitudTransferenciaCliente;
 use App\Models\User;
+use App\Services\Notificacion\NotificacionService;
 use DomainException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +25,10 @@ use Illuminate\Support\Facades\DB;
  */
 final class SolicitudTransferenciaClienteService
 {
+    public function __construct(
+        private readonly NotificacionService $notificacionService,
+    ) {}
+
     public function solicitar(Cliente $cliente, User $usuario, string $motivo): SolicitudTransferenciaCliente
     {
         if ($usuario->role?->name !== 'Distribuidora' || ! $usuario->distribuidora) {
@@ -63,7 +68,22 @@ final class SolicitudTransferenciaClienteService
             'motivo' => $motivo,
         ]);
 
-        return $solicitud->fresh(['cliente.datosPersonales', 'distribuidoraOrigen', 'distribuidoraDestino', 'solicitante']);
+        $solicitud = $solicitud->fresh(['cliente.datosPersonales', 'distribuidoraOrigen.usuario.datosPersonales', 'distribuidoraOrigen.coordinador', 'distribuidoraDestino.usuario.datosPersonales', 'solicitante']);
+
+        // Sin esto la transferencia era invisible para los dos que más la necesitan saber: la
+        // distribuidora que va a PERDER al cliente (se le desaparecía de su cartera sin aviso)
+        // y quien tiene que autorizarla (tenía que descubrirla entrando a la pantalla a ciegas).
+        $nombreCliente = $solicitud->cliente?->datosPersonales?->nombre ?? 'Cliente #'.$solicitud->cliente_id;
+
+        if ($origenUsuario = $solicitud->distribuidoraOrigen?->usuario) {
+            $this->notificacionService->crear($origenUsuario, 'transferencia_cliente_solicitada', $nombreCliente, $usuario);
+        }
+
+        if ($autorizador = $solicitud->distribuidoraOrigen?->coordinador) {
+            $this->notificacionService->crear($autorizador, 'transferencia_cliente_por_autorizar', $nombreCliente, $usuario);
+        }
+
+        return $solicitud;
     }
 
     public function decidir(SolicitudTransferenciaCliente $solicitud, string $decision, ?string $comentario, User $usuario): SolicitudTransferenciaCliente
@@ -81,7 +101,22 @@ final class SolicitudTransferenciaClienteService
             'fecha_autorizacion' => now(),
         ]);
 
-        return $solicitud->fresh(['cliente.datosPersonales', 'distribuidoraOrigen', 'distribuidoraDestino', 'solicitante', 'autorizador']);
+        $solicitud = $solicitud->fresh(['cliente.datosPersonales', 'distribuidoraOrigen.usuario.datosPersonales', 'distribuidoraDestino.usuario.datosPersonales', 'solicitante', 'autorizador']);
+
+        // La destino no tenía forma de enterarse de que ya puede confirmar más que entrando a
+        // revisar la pantalla cada tanto; la origen, de que su cliente está por irse.
+        $nombreCliente = $solicitud->cliente?->datosPersonales?->nombre ?? 'Cliente #'.$solicitud->cliente_id;
+        $accion = $solicitud->estado === 'autorizada' ? 'transferencia_cliente_autorizada' : 'transferencia_cliente_rechazada';
+
+        if ($destinoUsuario = $solicitud->distribuidoraDestino?->usuario) {
+            $this->notificacionService->crear($destinoUsuario, $accion, $nombreCliente, $usuario);
+        }
+
+        if ($solicitud->estado === 'autorizada' && ($origenUsuario = $solicitud->distribuidoraOrigen?->usuario)) {
+            $this->notificacionService->crear($origenUsuario, $accion, $nombreCliente, $usuario);
+        }
+
+        return $solicitud;
     }
 
     public function decidirAceptacion(SolicitudTransferenciaCliente $solicitud, string $decision, User $usuario): SolicitudTransferenciaCliente
@@ -97,7 +132,7 @@ final class SolicitudTransferenciaClienteService
         if ($decision !== 'aceptada') {
             $solicitud->update(['estado' => 'rechazada']);
 
-            return $solicitud->fresh(['cliente.datosPersonales', 'distribuidoraOrigen', 'distribuidoraDestino']);
+            return $solicitud->fresh(['cliente.datosPersonales', 'distribuidoraOrigen.usuario.datosPersonales', 'distribuidoraDestino.usuario.datosPersonales']);
         }
 
         return DB::transaction(function () use ($solicitud): SolicitudTransferenciaCliente {
@@ -128,7 +163,16 @@ final class SolicitudTransferenciaClienteService
 
             $solicitud->update(['estado' => 'aceptada', 'fecha_aceptacion' => now()]);
 
-            return $solicitud->fresh(['cliente.datosPersonales', 'distribuidoraOrigen', 'distribuidoraDestino']);
+            $solicitud = $solicitud->fresh(['cliente.datosPersonales', 'distribuidoraOrigen.usuario.datosPersonales', 'distribuidoraDestino.usuario.datosPersonales']);
+
+            // Este es el momento en que el cliente REALMENTE sale de la cartera de la origen --
+            // antes simplemente desaparecía de "Mis Clientes" sin ningún aviso.
+            if ($origenUsuario = $solicitud->distribuidoraOrigen?->usuario) {
+                $nombreCliente = $solicitud->cliente?->datosPersonales?->nombre ?? 'Cliente #'.$solicitud->cliente_id;
+                $this->notificacionService->crear($origenUsuario, 'transferencia_cliente_aceptada', $nombreCliente);
+            }
+
+            return $solicitud;
         });
     }
 
@@ -142,12 +186,19 @@ final class SolicitudTransferenciaClienteService
     public function listar(User $usuario, array $filters = []): LengthAwarePaginator
     {
         $query = SolicitudTransferenciaCliente::query()
-            ->with(['cliente.datosPersonales', 'distribuidoraOrigen', 'distribuidoraDestino', 'solicitante', 'autorizador']);
+            ->with(['cliente.datosPersonales', 'distribuidoraOrigen.usuario.datosPersonales', 'distribuidoraDestino.usuario.datosPersonales', 'solicitante', 'autorizador']);
 
         $role = $usuario->role?->name;
 
         if ($role === 'Distribuidora') {
-            $query->where('distribuidora_destino_id', $usuario->distribuidora?->id);
+            // Origen TAMBIÉN, no solo destino: la distribuidora que va a perder al cliente es
+            // parte interesada en la transferencia -- antes solo la veía quien lo pedía, así
+            // que al dueño actual el cliente se le esfumaba de la cartera sin explicación.
+            $miId = $usuario->distribuidora?->id;
+            $query->where(function ($q) use ($miId): void {
+                $q->where('distribuidora_destino_id', $miId)
+                    ->orWhere('distribuidora_origen_id', $miId);
+            });
         } elseif ($role === 'Coordinador') {
             $query->whereHas('distribuidoraOrigen', fn ($q) => $q->where('coordinador_id', $usuario->id));
         } elseif ($role !== 'Gerente General') {

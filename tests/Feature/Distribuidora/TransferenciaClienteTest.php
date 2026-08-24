@@ -125,3 +125,45 @@ it('el listado por HTTP de clientes/transferencias no lo tapa el wildcard client
         ->assertJsonCount(1, 'data.data')
         ->assertJsonPath('data.data.0.estado', 'pendiente_autorizacion');
 });
+
+/**
+ * La distribuidora ORIGEN solo veía la solicitud si ella la había pedido: al dueño actual del
+ * cliente la transferencia le era invisible de principio a fin y el cliente simplemente
+ * desaparecía de su cartera, sin listado ni notificación que lo explicara.
+ */
+it('la distribuidora origen ve la transferencia de su propio cliente y queda marcada como no-destino', function (): void {
+    $e = crearEscenarioTransferencia();
+
+    Sanctum::actingAs($e['usuarioDestino']);
+    $this->postJson("/api/v1/distribuidora/clientes/{$e['cliente']->id}/solicitar-transferencia", [
+        'motivo' => 'El cliente ahora compra conmigo.',
+    ])->assertStatus(201);
+
+    Sanctum::actingAs($e['usuarioOrigen']);
+    $this->getJson('/api/v1/distribuidora/clientes/transferencias')
+        ->assertStatus(200)
+        ->assertJsonCount(1, 'data.data')
+        ->assertJsonPath('data.data.0.soy_destino', false);
+
+    Sanctum::actingAs($e['usuarioDestino']);
+    $this->getJson('/api/v1/distribuidora/clientes/transferencias')
+        ->assertJsonPath('data.data.0.soy_destino', true);
+});
+
+it('avisa por notificación a la distribuidora origen y a quien debe autorizar', function (): void {
+    $e = crearEscenarioTransferencia();
+
+    Sanctum::actingAs($e['usuarioDestino']);
+    $this->postJson("/api/v1/distribuidora/clientes/{$e['cliente']->id}/solicitar-transferencia", [
+        'motivo' => 'El cliente ahora compra conmigo.',
+    ])->assertStatus(201);
+
+    $this->assertDatabaseHas('notificaciones', [
+        'destinatario_id' => $e['usuarioOrigen']->id,
+        'accion' => 'transferencia_cliente_solicitada',
+    ]);
+    $this->assertDatabaseHas('notificaciones', [
+        'destinatario_id' => $e['coordinador']->id,
+        'accion' => 'transferencia_cliente_por_autorizar',
+    ]);
+});
