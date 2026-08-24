@@ -21,7 +21,7 @@ final class SolicitudProveedorResource extends JsonResource
         return [
             'id' => $this->id,
             'estado' => $this->estado,
-            'razon_social' => $this->razon_social,
+            'nombre' => $this->nombre,
             'rfc' => $this->rfc,
             'datos_familiares' => $this->datos_familiares,
             'datos_vehiculos' => $this->datos_vehiculos,

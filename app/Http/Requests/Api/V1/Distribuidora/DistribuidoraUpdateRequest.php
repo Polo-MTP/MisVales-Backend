@@ -27,7 +27,7 @@ final class DistribuidoraUpdateRequest extends FormRequest
         $id = $this->route('distribuidora')?->id;
 
         return [
-            'razon_social' => 'sometimes|string|max:255',
+            'nombre' => 'sometimes|string|max:255',
             'rfc' => ['sometimes', 'string', 'size:13', Rule::unique('distribuidoras', 'rfc')->ignore($id)],
             'sucursal_id' => 'sometimes|exists:sucursales,id',
             'coordinador_id' => 'sometimes|exists:users,id',

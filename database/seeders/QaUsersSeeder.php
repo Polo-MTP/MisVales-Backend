@@ -132,7 +132,7 @@ final class QaUsersSeeder extends Seeder
                 'estado' => 'ACTIVO',
                 'sucursal_id' => $sucursalGomez?->id,
                 'coordinador_id' => $coordinadorQa->id,
-                'razon_social' => 'QA Distribuidora de Prueba',
+                'nombre' => 'QA Distribuidora de Prueba',
                 'rfc' => 'QATE250101QA1',
                 'categoria_id' => $categoriaBronce?->id,
                 'comentarios_verificador' => 'Verificado correctamente',

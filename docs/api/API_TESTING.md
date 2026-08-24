@@ -177,7 +177,7 @@ para la lista completa de campos (razón social, RFC, datos personales, direcci�
 ```bash
 curl -X POST "$BASE_URL/alta-proveedor/solicitudes" -H "Authorization: Bearer $TOKEN" \
   -H "Accept: application/json" -H "Content-Type: application/json" \
-  -d '{"razon_social":"Abarrotes El Sol SA de CV","rfc":"AES010101AB1","nombre":"Juan","apellido_paterno":"Pérez","apellido_materno":"Gómez","curp":"PEGJ800101HDFRRN01","calle":"Av. Reforma 123","colonia":"Centro","numero_ext":"123","codigo_postal":"06000","estado":"CDMX","ciudad":"Ciudad de México"}'
+  -d '{"nombre_negocio":"Abarrotes El Sol SA de CV","rfc":"AES010101AB1","nombre":"Juan","apellido_paterno":"Pérez","apellido_materno":"Gómez","curp":"PEGJ800101HDFRRN01","calle":"Av. Reforma 123","colonia":"Centro","numero_ext":"123","codigo_postal":"06000","estado":"CDMX","ciudad":"Ciudad de México"}'
 ```
 `201` con `SolicitudProveedorResource`.
 

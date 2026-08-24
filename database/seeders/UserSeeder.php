@@ -165,7 +165,7 @@ final class UserSeeder extends Seeder
 
                 'sucursal_id' => $sucursalGomez?->id,
                 'coordinador_id' => $coordinador?->id, // Asignar un coordinador existente
-                'razon_social' => 'Distribuidora Gómez Palacio S.A.',
+                'nombre' => 'Distribuidora Gómez Palacio S.A.',
                 'rfc' => 'DGP123456789',
                 'categoria_id' => 1, // Si tienes categorías, descomenta y asigna un ID válido
                 'usuario_acceso' => 'distribuidora01',

@@ -24,7 +24,7 @@ final class ValeResource extends JsonResource
             'distribuidora_id' => $this->distribuidora_id,
             'distribuidora' => $this->distribuidora ? [
                 'id' => $this->distribuidora->id,
-                'razon_social' => $this->distribuidora->razon_social,
+                'nombre' => $this->distribuidora->nombre,
                 'numero_distribuidora' => $this->distribuidora->numero_distribuidora,
             ] : null,
             // La cajera necesita ver estos datos para compararlos contra la INE y el

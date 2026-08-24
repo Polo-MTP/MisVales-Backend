@@ -74,7 +74,7 @@ final class KyeUsersSeeder extends Seeder
                             'estado' => 'ACTIVO',
                             'sucursal_id' => $sucursalGomez?->id,
                             'coordinador_id' => $coordinadorFallback?->id,
-                            'razon_social' => sprintf('Kye Distribuidora de Prueba %d', $i),
+                            'nombre' => sprintf('Kye Distribuidora de Prueba %d', $i),
                             'rfc' => sprintf('KYE%02d250101K%d', $i, $i),
                             'categoria_id' => $categoriaBronce?->id,
                             'comentarios_verificador' => 'Verificado correctamente',

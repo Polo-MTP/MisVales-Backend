@@ -20,7 +20,7 @@ final class RelacionResource extends JsonResource
             'distribuidora_id' => $this->distribuidora_id,
             'distribuidora' => [
                 'numero_distribuidora' => $this->distribuidora?->numero_distribuidora,
-                'razon_social' => $this->distribuidora?->razon_social,
+                'nombre' => $this->distribuidora?->nombre,
             ],
             'sucursal' => $this->sucursal?->nombre,
             'referencia_pago' => $this->referencia_pago,

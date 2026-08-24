@@ -44,7 +44,7 @@ it('el JSON de una relación incluye el número y la razón social de la distrib
     $roleDist = Role::create(['name' => 'Distribuidora', 'factor_count' => 1]);
     $userDist = User::factory()->create(['role_id' => $roleDist->id, 'sucursal_id' => $sucursal->id]);
     $distribuidora = Distribuidora::create([
-        'usuario_id' => $userDist->id, 'numero_distribuidora' => 'DIST-90099', 'razon_social' => 'Distribuidora de Prueba SA de CV',
+        'usuario_id' => $userDist->id, 'numero_distribuidora' => 'DIST-90099', 'nombre' => 'Distribuidora de Prueba SA de CV',
         'limite_credito' => 20000, 'categoria_id' => $categoria->id, 'puntos_acumulados' => 0, 'estado' => 'ACTIVO', 'sucursal_id' => $sucursal->id,
     ]);
 
@@ -65,5 +65,5 @@ it('el JSON de una relación incluye el número y la razón social de la distrib
     $this->getJson('/api/v1/relaciones')
         ->assertStatus(200)
         ->assertJsonPath('data.data.0.distribuidora.numero_distribuidora', 'DIST-90099')
-        ->assertJsonPath('data.data.0.distribuidora.razon_social', 'Distribuidora de Prueba SA de CV');
+        ->assertJsonPath('data.data.0.distribuidora.nombre', 'Distribuidora de Prueba SA de CV');
 });

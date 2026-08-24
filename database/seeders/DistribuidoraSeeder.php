@@ -17,7 +17,7 @@ class DistribuidoraSeeder extends Seeder
             'numero_distribuidora' => 'DIST-2026-0001',
             'sucursal_id' => $sucursalId,
             'coordinador_id' => $coordinadorId,
-            'razon_social' => 'Distribuidora Ejemplo SA de CV',
+            'nombre' => 'Distribuidora Ejemplo SA de CV',
             'rfc' => 'XAXX010101000',
             'limite_credito' => 10000.00,
             'categoria_id' => 1, // BRONCE

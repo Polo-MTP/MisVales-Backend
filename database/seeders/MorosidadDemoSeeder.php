@@ -206,7 +206,7 @@ final class MorosidadDemoSeeder extends Seeder
                 'estado' => 'MOROSO',
                 'sucursal_id' => $sucursalId,
                 'coordinador_id' => $coordinadorId,
-                'razon_social' => $nombre,
+                'nombre' => $nombre,
                 'rfc' => $rfc,
                 'categoria_id' => $categoriaId,
                 'comentarios_verificador' => 'Verificado correctamente',

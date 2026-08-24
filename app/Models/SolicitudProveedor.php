@@ -24,7 +24,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'decision_gerente',
     'limite_credito_asignado',
     'fecha_decision',
-    'razon_social',
+    'nombre',
     'rfc',
     'datos_familiares',
     'datos_vehiculos',

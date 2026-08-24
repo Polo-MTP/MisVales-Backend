@@ -19,7 +19,7 @@ final class DistribuidoraResource extends JsonResource
             'id' => $this->id,
             'usuario_id' => $this->usuario_id,
             'numero_distribuidora' => $this->numero_distribuidora,
-            'razon_social' => $this->razon_social,
+            'nombre' => $this->nombre,
             'rfc' => $this->rfc,
             'limite_credito' => $this->limite_credito,
             'credito_disponible' => $this->credito_disponible,

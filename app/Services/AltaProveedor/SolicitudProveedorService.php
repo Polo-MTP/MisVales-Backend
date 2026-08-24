@@ -69,7 +69,7 @@ final class SolicitudProveedorService
                 'coordinador_id' => $coordinador->id,
                 'verificador_id' => $data['verificador_id'] ?? null,
                 'estado' => isset($data['verificador_id']) ? 'en_verificacion' : 'pendiente_verificacion',
-                'razon_social' => $data['razon_social'],
+                'nombre' => $data['nombre_negocio'],
                 'rfc' => $data['rfc'],
                 'datos_familiares' => $data['datos_familiares'] ?? null,
                 'datos_vehiculos' => $data['datos_vehiculos'] ?? null,
@@ -227,7 +227,7 @@ final class SolicitudProveedorService
                 $this->notificacionService->crear(
                     $solicitud->coordinador,
                     $solicitud->cumple ? 'solicitud_verificada' : 'solicitud_rechazada_verificador',
-                    'Solicitud '.$solicitud->razon_social,
+                    'Solicitud '.$solicitud->nombre,
                     $verificador
                 );
             }
@@ -239,7 +239,7 @@ final class SolicitudProveedorService
                     'Gerente de Sucursal',
                     $solicitud->sucursal_id,
                     'solicitud_lista_para_autorizar',
-                    'Solicitud '.$solicitud->razon_social,
+                    'Solicitud '.$solicitud->nombre,
                     $verificador
                 );
             }
@@ -305,7 +305,7 @@ final class SolicitudProveedorService
                 $distribuidora = Distribuidora::query()->create([
                     'usuario_id' => $distribuidoraUser->id,
                     'numero_distribuidora' => 'DIST-'.mb_str_pad((string) $distribuidoraUser->id, 5, '0', STR_PAD_LEFT),
-                    'razon_social' => $solicitud->razon_social,
+                    'nombre' => $solicitud->nombre,
                     'rfc' => $solicitud->rfc,
                     'sucursal_id' => $solicitud->sucursal_id,
                     'coordinador_id' => $solicitud->coordinador_id,

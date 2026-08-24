@@ -29,7 +29,7 @@ final class Distribuidora extends Model
         'sucursal_id',
         'coordinador_id',
         'verificador_id',
-        'razon_social',
+        'nombre',
         'rfc',
         'usuario_acceso',
         'password_hash',

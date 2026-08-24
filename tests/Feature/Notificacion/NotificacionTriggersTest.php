@@ -225,7 +225,7 @@ it('el gerente de sucursal solo es notificado cuando el verificador marca cumple
     $data = [
         'calle' => 'Test', 'colonia' => 'Test', 'numero_ext' => '1', 'codigo_postal' => '00000', 'estado' => 'Coahuila', 'ciudad' => 'Torreón',
         'nombre' => 'Juan', 'apellido_paterno' => 'Pérez', 'curp' => 'CURP'.uniqid(),
-        'razon_social' => 'Juan Pérez', 'rfc' => 'RFC'.uniqid(),
+        'nombre_negocio' => 'Juan Pérez', 'rfc' => 'RFC'.uniqid(),
     ];
 
     $solicitudRechazada = $service->crearSolicitud($data, $coordinador);
