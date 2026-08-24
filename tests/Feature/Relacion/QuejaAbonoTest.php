@@ -90,7 +90,10 @@ it('una distribuidora no puede quejarse de un abono que no es de ella', function
 });
 
 it('la distribuidora puede adjuntar una captura de la transferencia al levantar la queja', function (): void {
-    Storage::fake('public');
+    // El código real sube al disco 's3' cuando el bucket está configurado (ver
+    // ConciliacionBancariaService::levantarQueja) -- fake-ear 'public' dejaba pasar la subida
+    // real al bucket de producción sin que este test lo notara.
+    Storage::fake('s3');
 
     [$distribuidora, $abono, $usuario] = crearDistribuidoraConRelacionYAbono();
 
@@ -106,12 +109,12 @@ it('la distribuidora puede adjuntar una captura de la transferencia al levantar 
     $urlEvidencia = $response->json('data.queja.evidencia_url');
     expect($urlEvidencia)->not->toBeNull();
 
-    $ruta = str_replace('/storage/', '', (string) parse_url($urlEvidencia, PHP_URL_PATH));
-    Storage::disk('public')->assertExists($ruta);
+    $ruta = preg_replace('#^storage/#', '', ltrim((string) parse_url($urlEvidencia, PHP_URL_PATH), '/'));
+    Storage::disk('s3')->assertExists($ruta);
 });
 
 it('la cajera de la sucursal ve la queja (con su evidencia) al listar los abonos', function (): void {
-    Storage::fake('public');
+    Storage::fake('s3');
 
     [$distribuidora, $abono, $usuario] = crearDistribuidoraConRelacionYAbono();
 
