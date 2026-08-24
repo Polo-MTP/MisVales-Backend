@@ -17,7 +17,9 @@ use Laravel\Sanctum\Sanctum;
 uses(RefreshDatabase::class);
 
 it('un coordinador sube el archivo real de una evidencia y queda con URL pública', function (): void {
-    Storage::fake('public');
+    // El disco real es 's3' cuando el bucket está configurado -- fake-ear 'public' dejaba
+    // pasar la subida real al bucket de producción sin que este test lo notara.
+    Storage::fake('s3');
 
     $sucursal = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-001', 'es_matriz' => true, 'is_active' => true]);
     $role = Role::create(['name' => 'Coordinador']);
@@ -47,8 +49,8 @@ it('un coordinador sube el archivo real de una evidencia y queda con URL públic
     expect($evidencia)->not->toBeNull()
         ->and($evidencia->solicitud_id)->toBe($solicitud->id)
         ->and($evidencia->tipo_documento)->toBe('foto_fachada')
-        ->and($evidencia->url_archivo)->toContain('/storage/evidencias/');
+        ->and($evidencia->url_archivo)->toContain('/evidencias/');
 
-    $rutaRelativa = preg_replace('#^.*/storage/#', '', (string) $evidencia->url_archivo);
-    Storage::disk('public')->assertExists($rutaRelativa);
+    $rutaRelativa = preg_replace('#^storage/#', '', ltrim((string) parse_url((string) $evidencia->url_archivo, PHP_URL_PATH), '/'));
+    Storage::disk('s3')->assertExists($rutaRelativa);
 });
