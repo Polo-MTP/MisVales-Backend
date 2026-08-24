@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             EquipoDemoSeeder::class,           // Cuentas reales del equipo, roles intercalados
             QaUsersSeeder::class,               // Usuarios de prueba (uno por rol) para entregar a infra/QA
             GerenteGeneralUttSeeder::class,      // Gerente General adicional (correo UTT)
+            KyeUsersSeeder::class,               // 5 usuarios de prueba por rol (correo Kye)
         ]);
     }
 }
