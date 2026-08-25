@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 final class SolicitudProveedorService
 {
@@ -283,12 +284,18 @@ final class SolicitudProveedorService
                 /** @var Role|null $distribuidoraRole */
                 $distribuidoraRole = Role::query()->where('name', 'Distribuidora')->first();
 
+                // La contraseña la genera el sistema (no la elige quien aprueba) y se manda por
+                // correo al nuevo usuario -- mismo patrón que crearAdministrador/
+                // crearGerenteSucursal/crearPersonalSucursal en UsuarioController, para que nadie
+                // más que la distribuidora llegue a conocerla.
+                $passwordGenerada = Str::password(16);
+
                 // Crear la cuenta de usuario para la distribuidora asignada a la sucursal de la solicitud
                 /** @var User $distribuidoraUser */
                 $distribuidoraUser = User::query()->create([
                     'name' => $solicitud->datosPersonales->nombre.' '.$solicitud->datosPersonales->apellido_paterno,
                     'email' => $data['email'],
-                    'password' => Hash::make($data['password']),
+                    'password' => Hash::make($passwordGenerada),
                     'role_id' => $distribuidoraRole?->id,
                     'datos_id' => $solicitud->datos_id,
                     'sucursal_id' => $solicitud->sucursal_id,
@@ -301,13 +308,10 @@ final class SolicitudProveedorService
                 $distribuidoraUser->email_verified_at = now();
                 $distribuidoraUser->save();
 
-                // El Gerente ve/genera la contraseña una sola vez en este formulario -- sin este
-                // correo no queda registrada en ningún lado y la distribuidora no tiene forma de
-                // saberla (mismo patrón que ya se usa al dar de alta personal interno).
                 Mail::to((string) $distribuidoraUser->email)->send(new PersonalCredencialesMail(
                     (string) $distribuidoraUser->name,
                     (string) $distribuidoraUser->email,
-                    (string) $data['password'],
+                    (string) $passwordGenerada,
                     'Distribuidora',
                 ));
 

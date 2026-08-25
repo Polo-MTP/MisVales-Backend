@@ -21,9 +21,10 @@ beforeEach(function (): void {
 });
 
 /**
- * AprobarSolicitudProveedorRequest solo exigía password 'min:8' — cualquier cosa de 8+
- * caracteres pasaba, incluida una palabra de diccionario en minúsculas. Ahora usa la
- * misma política central (Password::defaults(), ver AppServiceProvider) que el reset.
+ * AprobarSolicitudProveedorRequest solía dejar que quien aprobaba escribiera la contraseña de
+ * la nueva distribuidora a mano -- inconsistente con crearAdministrador/crearGerenteSucursal/
+ * crearPersonalSucursal, que siempre la generan internamente y la mandan por correo. Ahora sigue
+ * el mismo patrón: nadie más que la distribuidora llega a conocer su contraseña.
  */
 function crearSolicitudProveedorPendiente(Sucursal $sucursal): SolicitudProveedor
 {
@@ -46,7 +47,7 @@ function crearGerenteGeneralActivo(): User
     return User::factory()->create(['role_id' => $role->id, 'is_active' => true]);
 }
 
-it('rechaza aprobar una solicitud con un password débil (sin mayúscula/número)', function (): void {
+it('un password enviado en el request se ignora -- el sistema genera el suyo propio', function (): void {
     $sucursal = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-'.uniqid(), 'es_matriz' => true, 'is_active' => true]);
     $solicitud = crearSolicitudProveedorPendiente($sucursal);
     $gerente = crearGerenteGeneralActivo();
@@ -56,16 +57,16 @@ it('rechaza aprobar una solicitud con un password débil (sin mayúscula/número
         'decision' => 'aprobado',
         'limite_credito_asignado' => 20000,
         'email' => 'nuevo.proveedor@correo.com',
-        'password' => 'contrasena',
-    ])
-        ->assertStatus(422)
-        ->assertJsonPath('success', false)
-        ->assertJsonValidationErrors(['password']);
+        'password' => 'esto-se-ignora',
+    ])->assertStatus(200);
 
-    expect(User::where('email', 'nuevo.proveedor@correo.com')->exists())->toBeFalse();
+    $nuevoUsuario = User::where('email', 'nuevo.proveedor@correo.com')->first();
+    expect($nuevoUsuario)->not->toBeNull();
+
+    Mail::assertSent(PersonalCredencialesMail::class, fn ($mail) => $mail->hasTo('nuevo.proveedor@correo.com') && $mail->password !== 'esto-se-ignora' && strlen($mail->password) >= 16);
 });
 
-it('acepta un password fuerte, crea la cuenta y deja un solo rastro de auditoría del alta', function (): void {
+it('aprueba sin necesidad de mandar password, crea la cuenta y deja un solo rastro de auditoría del alta', function (): void {
     $sucursal = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-'.uniqid(), 'es_matriz' => true, 'is_active' => true]);
     $solicitud = crearSolicitudProveedorPendiente($sucursal);
     $gerente = crearGerenteGeneralActivo();
@@ -75,7 +76,6 @@ it('acepta un password fuerte, crea la cuenta y deja un solo rastro de auditorí
         'decision' => 'aprobado',
         'limite_credito_asignado' => 20000,
         'email' => 'nuevo.proveedor@correo.com',
-        'password' => 'Passw0rd1',
     ])->assertStatus(200);
 
     $nuevoUsuario = User::where('email', 'nuevo.proveedor@correo.com')->first();
@@ -91,7 +91,7 @@ it('acepta un password fuerte, crea la cuenta y deja un solo rastro de auditorí
         ->and($auditDistribuidora->ip_address)->not->toBeNull();
 });
 
-it('le envía la contraseña por correo a la distribuidora aprobada -- si no, no tiene forma de saberla', function (): void {
+it('le envía la contraseña generada por correo a la distribuidora aprobada -- si no, no tiene forma de saberla', function (): void {
     $sucursal = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-'.uniqid(), 'es_matriz' => true, 'is_active' => true]);
     $solicitud = crearSolicitudProveedorPendiente($sucursal);
     $gerente = crearGerenteGeneralActivo();
@@ -101,8 +101,7 @@ it('le envía la contraseña por correo a la distribuidora aprobada -- si no, no
         'decision' => 'aprobado',
         'limite_credito_asignado' => 20000,
         'email' => 'nuevo.proveedor@correo.com',
-        'password' => 'Passw0rd1',
     ])->assertStatus(200);
 
-    Mail::assertSent(PersonalCredencialesMail::class, fn ($mail) => $mail->hasTo('nuevo.proveedor@correo.com') && $mail->password === 'Passw0rd1');
+    Mail::assertSent(PersonalCredencialesMail::class, fn ($mail) => $mail->hasTo('nuevo.proveedor@correo.com') && strlen($mail->password) >= 16);
 });
