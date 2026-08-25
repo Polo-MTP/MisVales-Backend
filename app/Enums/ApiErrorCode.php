@@ -21,7 +21,6 @@ enum ApiErrorCode: string
     case UNAUTHENTICATED = 'UNAUTHENTICATED';
     case SESSION_IDLE_TIMEOUT = 'SESSION_IDLE_TIMEOUT';
     case ACCOUNT_INACTIVE = 'ACCOUNT_INACTIVE';
-    case EMAIL_NOT_VERIFIED = 'EMAIL_NOT_VERIFIED';
 
     // Autorización
     case FORBIDDEN = 'FORBIDDEN';
@@ -76,7 +75,6 @@ enum ApiErrorCode: string
             self::UNAUTHENTICATED => 'MV-101',
             self::SESSION_IDLE_TIMEOUT => 'MV-102',
             self::ACCOUNT_INACTIVE => 'MV-103',
-            self::EMAIL_NOT_VERIFIED => 'MV-104',
             self::FORBIDDEN => 'MV-201',
             self::VPN_REQUIRED => 'MV-202',
             self::VALIDATION_ERROR => 'MV-301',

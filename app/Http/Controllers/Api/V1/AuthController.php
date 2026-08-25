@@ -8,15 +8,12 @@ use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Api\V1\ChangePasswordRequest;
 use App\Http\Requests\Api\V1\ForgotPasswordRequest;
 use App\Http\Requests\Api\V1\LoginRequest;
-use App\Http\Requests\Api\V1\ResendVerificationRequest;
 use App\Http\Requests\Api\V1\ResetPasswordRequest;
-use App\Http\Requests\Api\V1\VerifyEmailRequest;
 use App\Http\Resources\UserResource;
 use App\Models\AuditLog;
 use App\Models\User;
 use App\Services\Auth\LoginService;
 use Illuminate\Auth\Events\PasswordReset;
-use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -145,46 +142,6 @@ final class AuthController extends ApiController
         ]);
 
         return $this->success(message: 'Contraseña actualizada exitosamente.');
-    }
-
-    /**
-     * Marca el email del usuario autenticado como verificado.
-     */
-    public function verifyEmail(VerifyEmailRequest $request): JsonResponse
-    {
-        /** @var User $user */
-        $user = $request->user();
-
-        if ($user->hasVerifiedEmail()) {
-            return $this->success(message: 'Email ya verificado.');
-        }
-
-        if ($user->markEmailAsVerified()) {
-            event(new Verified($user));
-        }
-
-        return $this->success(message: 'Email verificado exitosamente.');
-    }
-
-    /**
-     * Reenvía el correo de verificación de email al usuario indicado.
-     */
-    public function resendVerificationEmail(ResendVerificationRequest $request): JsonResponse
-    {
-        /** @var User|null $user */
-        $user = User::query()->where('email', $request->email)->first();
-
-        if (! $user) {
-            return $this->notFound('Usuario no encontrado.');
-        }
-
-        if ($user->hasVerifiedEmail()) {
-            return $this->error('Email ya verificado.', 400);
-        }
-
-        $user->sendEmailVerificationNotification();
-
-        return $this->success(message: 'Correo de verificación reenviado exitosamente.');
     }
 
     /**

@@ -19,7 +19,7 @@ A production-ready, API-only Laravel 13 starter kit following the 2025-2026 REST
 - **Modern Testing** - Pest PHP with Laravel HTTP testing
 - **Code Quality** - PHPStan (max level), Rector, and Pint with strict rules
 - **Rate Limiting** - Configurable per-route rate limiters
-- **Reusable Middleware** - ForceJsonResponse, LogApiRequests, EnsureEmailVerified
+- **Reusable Middleware** - ForceJsonResponse, LogApiRequests
 - **Standardized Responses** - Consistent JSON response format
 - **Optional: API Idempotency** - RFC-compliant idempotency via [grazulex/laravel-api-idempotency](https://github.com/Grazulex/laravel-api-idempotency)
 - **Optional: Smart Rate Limiting** - Plan-aware throttling with quotas via [grazulex/laravel-api-throttle-smart](https://github.com/Grazulex/laravel-api-throttle-smart)
@@ -153,35 +153,6 @@ curl -X POST http://localhost:8080/api/v1/logout \
   -H "Accept: application/json"
 ```
 
-### Email Verification
-
-After registration, users receive a verification email. The kit integrates with Laravel's `MustVerifyEmail` contract.
-
-**Verify Email (via signed URL from email):**
-```bash
-curl -X POST "http://localhost:8080/api/v1/email/verify/{id}/{hash}?signature=..." \
-  -H "Authorization: Bearer 1|abc123..." \
-  -H "Accept: application/json"
-```
-
-**Resend Verification Email:**
-```bash
-curl -X POST http://localhost:8080/api/v1/email/resend \
-  -H "Authorization: Bearer 1|abc123..." \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json" \
-  -d '{"email": "john@example.com"}'
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Verification email sent successfully",
-  "data": null
-}
-```
-
 ### Password Reset
 
 **Request Password Reset Link:**
@@ -235,8 +206,6 @@ curl -X POST http://localhost:8080/api/v1/reset-password \
 | POST   | /login                       | No   | Get authentication token      | 5/min      |
 | POST   | /logout                      | Yes  | Revoke current token          | 120/min    |
 | GET    | /me                          | Yes  | Get current user profile      | 120/min    |
-| POST   | /email/verify/{id}/{hash}    | Yes  | Verify email address          | 120/min    |
-| POST   | /email/resend                | Yes  | Resend verification email     | 6/min      |
 | POST   | /forgot-password             | No   | Request password reset link   | 6/min      |
 | POST   | /reset-password              | No   | Reset password with token     | 6/min      |
 
@@ -548,7 +517,7 @@ Route::middleware(['auth:sanctum', 'throttle.smart'])->group(function () {
 
 ## Middleware
 
-The kit includes three production-ready middleware patterns that you can apply to your routes as needed.
+The kit includes two production-ready middleware patterns that you can apply to your routes as needed.
 
 ### Available Middleware
 
@@ -556,7 +525,6 @@ The kit includes three production-ready middleware patterns that you can apply t
 |-------|-------|-------------|
 | `force.json` | `ForceJsonResponse` | Ensures all responses are JSON formatted |
 | `log.api` | `LogApiRequests` | Logs API requests with timing information |
-| `verified` | `EnsureEmailVerified` | Requires verified email to access route |
 
 ### ForceJsonResponse
 
@@ -583,24 +551,6 @@ APP_LOG_API_REQUESTS=true
 Route::middleware('log.api')->group(function () {
     // Requests will be logged
 });
-```
-
-### EnsureEmailVerified
-
-Protects routes that require a verified email address. Returns 403 if email is not verified.
-
-```php
-Route::middleware(['auth:sanctum', 'verified'])->group(function () {
-    // Only users with verified emails can access
-});
-```
-
-**Response when email not verified:**
-```json
-{
-  "success": false,
-  "message": "Your email address is not verified. Please verify your email to continue."
-}
 ```
 
 ## Testing

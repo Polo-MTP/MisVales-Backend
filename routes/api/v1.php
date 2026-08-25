@@ -54,14 +54,6 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
     Route::get('upload-url', [UploadController::class, 'getPresignedUrl'])->name('api.v1.upload_url');
     Route::get('read-url', [UploadController::class, 'getPresignedReadUrl'])->name('api.v1.read_url');
 
-    // Email verification
-    Route::post('email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
-        ->middleware('signed')
-        ->name('verification.verify');
-    Route::post('email/resend', [AuthController::class, 'resendVerificationEmail'])
-        ->middleware('throttle:6,1')
-        ->name('verification.send');
-
     // Listado de usuarios (ej. verificadores disponibles para asignar en alta-proveedor). El
     // controller ya contempla a Administrador ("ve todas las sucursales", igual que Gerente
     // General) pero el middleware no lo dejaba pasar -- lo necesita para poder filtrar la

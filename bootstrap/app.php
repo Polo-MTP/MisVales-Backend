@@ -6,7 +6,6 @@ use App\Enums\ApiErrorCode;
 use Illuminate\Auth\Middleware\Authenticate;
 use App\Http\Middleware\AppendSupportCode;
 use App\Http\Middleware\CheckRole;
-use App\Http\Middleware\EnsureEmailVerified;
 use App\Http\Middleware\EnsureTokenNotIdle;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\ForceJsonResponse;
@@ -41,7 +40,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'force.json' => ForceJsonResponse::class,
             'log.api' => LogApiRequests::class,
-            'verified' => EnsureEmailVerified::class,
             'active' => EnsureUserIsActive::class,
             'idle' => EnsureTokenNotIdle::class,
             'role' => CheckRole::class,
