@@ -106,26 +106,24 @@ it('las dos rutas de decisión confirmadas por infra tienen el middleware vpn ad
 });
 
 /**
- * Se había quedado sin 'vpn' -- a diferencia de usuarios/personal (mismo tipo de alta de
- * cuentas de staff, que sí lo tenía), nada lo cubría con un test.
+ * Confirmado con el equipo: dar de alta cuentas de staff (Gerente de Sucursal, Administrador,
+ * Coordinador/Verificador/Cajera) NO exige VPN -- a diferencia de las decisiones de
+ * autorización (aprobar/rechazar solicitudes, cambiar parámetros de negocio), que sí. Debe
+ * poder crearse personal también desde la red pública.
  */
-it('la alta de Gerente de Sucursal tiene el middleware vpn adjunto', function (): void {
-    $ruta = Route::getRoutes()->getByName('api.v1.usuarios.crear_gerente_sucursal');
+it('la alta de Gerente de Sucursal, Administrador y Personal de Sucursal NO exige VPN', function (): void {
+    $rutas = [
+        'api.v1.usuarios.crear_gerente_sucursal',
+        'api.v1.usuarios.crear_administrador',
+        'api.v1.usuarios.crear_personal_sucursal',
+    ];
 
-    expect($ruta)->not->toBeNull()
-        ->and($ruta->middleware())->toContain('vpn');
-});
+    foreach ($rutas as $nombre) {
+        $ruta = Route::getRoutes()->getByName($nombre);
 
-/**
- * Un Administrador ve todo -- si esta ruta se quedara sin 'vpn' por accidente, cualquiera con
- * rol Gerente General/Gerente de Sucursal podría crear una cuenta de máximo privilegio desde
- * la red pública.
- */
-it('la alta de Administrador tiene el middleware vpn adjunto', function (): void {
-    $ruta = Route::getRoutes()->getByName('api.v1.usuarios.crear_administrador');
-
-    expect($ruta)->not->toBeNull()
-        ->and($ruta->middleware())->toContain('vpn');
+        expect($ruta)->not->toBeNull("La ruta '{$nombre}' no existe.")
+            ->and($ruta->middleware())->not->toContain('vpn');
+    }
 });
 
 /**

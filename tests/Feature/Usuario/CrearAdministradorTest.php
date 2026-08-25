@@ -95,16 +95,15 @@ it('ningún otro rol puede dar de alta un Administrador', function (): void {
     expect(User::where('email', 'otro@example.com')->exists())->toBeFalse();
 });
 
-it('bloquea la alta de Administrador si no llega por la red VPN', function (): void {
+it('permite dar de alta un Administrador desde la red pública -- crear cuentas de staff no exige VPN', function (): void {
     config(['security.vpn_host' => 'vpn.misvales.test']);
     Sanctum::actingAs(crearGerenteGeneralAdmin());
 
     $response = $this->postJson('http://api.misvales.test/api/v1/usuarios/administrador', [
         'name' => 'Nuevo Admin',
-        'email' => 'bloqueado@example.com',
+        'email' => 'desde.publica@example.com',
     ]);
 
-    $response->assertStatus(403);
-    expect(User::where('email', 'bloqueado@example.com')->exists())->toBeFalse();
-    Mail::assertNothingSent();
+    $response->assertStatus(201);
+    expect(User::where('email', 'desde.publica@example.com')->exists())->toBeTrue();
 });
