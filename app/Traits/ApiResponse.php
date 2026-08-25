@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Traits;
 
+use App\Enums\ApiErrorCode;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -48,11 +49,16 @@ trait ApiResponse
     protected function error(
         string $message = 'Error',
         int $code = Response::HTTP_BAD_REQUEST,
-        array $errors = []
+        array $errors = [],
+        ?ApiErrorCode $errorCode = null
     ): JsonResponse {
         $response = [
             'success' => false,
             'message' => $message,
+            // Identificador estable en inglés para que un cliente distinga el TIPO de error
+            // sin parsear 'message' (texto en español, puede cambiar de redacción). Si quien
+            // llama no especifica uno, se infiere del status HTTP -- ver ApiErrorCode::fromHttpStatus().
+            'error_code' => ($errorCode ?? ApiErrorCode::fromHttpStatus($code))->value,
         ];
 
         if ($errors !== []) {
@@ -67,7 +73,7 @@ trait ApiResponse
      */
     protected function notFound(string $message = 'Resource not found'): JsonResponse
     {
-        return $this->error($message, Response::HTTP_NOT_FOUND);
+        return $this->error($message, Response::HTTP_NOT_FOUND, errorCode: ApiErrorCode::NOT_FOUND);
     }
 
     /**
@@ -75,7 +81,7 @@ trait ApiResponse
      */
     protected function unauthorized(string $message = 'Unauthorized'): JsonResponse
     {
-        return $this->error($message, Response::HTTP_UNAUTHORIZED);
+        return $this->error($message, Response::HTTP_UNAUTHORIZED, errorCode: ApiErrorCode::UNAUTHENTICATED);
     }
 
     /**
@@ -83,7 +89,7 @@ trait ApiResponse
      */
     protected function forbidden(string $message = 'Forbidden'): JsonResponse
     {
-        return $this->error($message, Response::HTTP_FORBIDDEN);
+        return $this->error($message, Response::HTTP_FORBIDDEN, errorCode: ApiErrorCode::FORBIDDEN);
     }
 
     /**
@@ -91,6 +97,6 @@ trait ApiResponse
      */
     protected function validationError(array $errors, string $message = 'Validation failed'): JsonResponse
     {
-        return $this->error($message, Response::HTTP_UNPROCESSABLE_ENTITY, $errors);
+        return $this->error($message, Response::HTTP_UNPROCESSABLE_ENTITY, $errors, ApiErrorCode::VALIDATION_ERROR);
     }
 }

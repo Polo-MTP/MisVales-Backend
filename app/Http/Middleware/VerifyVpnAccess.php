@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Enums\ApiErrorCode;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -60,6 +61,7 @@ final class VerifyVpnAccess
         return response()->json([
             'success' => false,
             'message' => 'Esta acción solo está disponible desde la red autorizada.',
+            'error_code' => ApiErrorCode::VPN_REQUIRED->value,
         ], 403);
     }
 }

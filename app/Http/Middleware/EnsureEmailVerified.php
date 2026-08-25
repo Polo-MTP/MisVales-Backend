@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Enums\ApiErrorCode;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -20,6 +21,7 @@ final class EnsureEmailVerified
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthenticated',
+                'error_code' => ApiErrorCode::UNAUTHENTICATED->value,
             ], 401);
         }
 
@@ -27,6 +29,7 @@ final class EnsureEmailVerified
             return response()->json([
                 'success' => false,
                 'message' => 'Your email address is not verified. Please verify your email to continue.',
+                'error_code' => ApiErrorCode::EMAIL_NOT_VERIFIED->value,
             ], 403);
         }
 

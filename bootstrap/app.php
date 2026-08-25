@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\ApiErrorCode;
 use App\Http\Middleware\CheckRole;
 use App\Http\Middleware\EnsureEmailVerified;
 use App\Http\Middleware\EnsureTokenNotIdle;
@@ -103,15 +104,21 @@ return Application::configure(basePath: dirname(__DIR__))
         // Con esto, el formato queda unificado y el detalle técnico nunca sale por la
         // API — sí se registra completo en storage/logs para quien lo necesite depurar.
 
+        // 'error_code' en cada respuesta de error: un identificador estable en inglés
+        // (ver App\Enums\ApiErrorCode) para que un cliente distinga el TIPO de error sin
+        // parsear 'message' (texto en español, puede cambiar de redacción sin previo aviso).
+
         $exceptions->render(fn (ValidationException $e, Request $request): JsonResponse => response()->json([
             'success' => false,
             'message' => 'Los datos enviados no son válidos.',
             'errors' => $e->errors(),
+            'error_code' => ApiErrorCode::VALIDATION_ERROR->value,
         ], 422));
 
         $exceptions->render(fn (AuthenticationException $e, Request $request): JsonResponse => response()->json([
             'success' => false,
             'message' => 'No autenticado. Inicia sesión para continuar.',
+            'error_code' => ApiErrorCode::UNAUTHENTICATED->value,
         ], 401));
 
         // NotFoundHttpException/MethodNotAllowedHttpException las lanza Laravel mismo
@@ -124,24 +131,30 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(fn (NotFoundHttpException $e, Request $request): JsonResponse => response()->json([
             'success' => false,
             'message' => 'El recurso solicitado no existe.',
+            'error_code' => ApiErrorCode::NOT_FOUND->value,
         ], 404));
 
         $exceptions->render(fn (MethodNotAllowedHttpException $e, Request $request): JsonResponse => response()->json([
             'success' => false,
             'message' => 'Método HTTP no permitido para esta ruta.',
+            'error_code' => ApiErrorCode::METHOD_NOT_ALLOWED->value,
         ], 405));
 
         // Cubre los abort($codigo, 'mensaje') usados en toda la app (403, 409, 422...).
         // El mensaje de un abort() sí es siempre texto que el propio desarrollador
         // escribió pensando en el usuario final, así que es seguro devolverlo tal cual.
+        // error_code se infiere del status -- no hay forma genérica de saber la intención
+        // fina de un abort() suelto, ver ApiErrorCode::fromHttpStatus().
         $exceptions->render(fn (HttpExceptionInterface $e, Request $request): JsonResponse => response()->json([
             'success' => false,
             'message' => $e->getMessage() !== '' ? $e->getMessage() : 'No se pudo procesar la solicitud.',
+            'error_code' => ApiErrorCode::fromHttpStatus($e->getStatusCode())->value,
         ], $e->getStatusCode()));
 
         $exceptions->render(fn (DomainException $e, Request $request): JsonResponse => response()->json([
             'success' => false,
             'message' => $e->getMessage(),
+            'error_code' => ApiErrorCode::DOMAIN_ERROR->value,
         ], 422));
 
         // Red de seguridad final: cualquier otra excepción (bug real, error de BD, etc.)
@@ -161,6 +174,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return response()->json([
                 'success' => false,
                 'message' => 'Ocurrió un error interno. Intenta de nuevo más tarde.',
+                'error_code' => ApiErrorCode::SERVER_ERROR->value,
             ], 500);
         });
     })->create();

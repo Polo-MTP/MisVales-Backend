@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Enums\ApiErrorCode;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -21,6 +22,7 @@ final class CheckRole
             return response()->json([
                 'success' => false,
                 'message' => 'No autorizado. Se requiere iniciar sesión.',
+                'error_code' => ApiErrorCode::UNAUTHENTICATED->value,
             ], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -28,6 +30,7 @@ final class CheckRole
             return response()->json([
                 'success' => false,
                 'message' => 'Acceso Denegado. Tu rol ('.$user->role->name.') no tiene privilegios para esta acción.',
+                'error_code' => ApiErrorCode::FORBIDDEN->value,
             ], Response::HTTP_FORBIDDEN);
         }
 
