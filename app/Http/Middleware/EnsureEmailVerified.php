@@ -20,7 +20,7 @@ final class EnsureEmailVerified
         if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated',
+                'message' => 'No autenticado. Inicia sesión para continuar.',
                 'error_code' => ApiErrorCode::UNAUTHENTICATED->value,
             ], 401);
         }
@@ -28,7 +28,7 @@ final class EnsureEmailVerified
         if (! $user->hasVerifiedEmail()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Your email address is not verified. Please verify your email to continue.',
+                'message' => 'Tu correo electrónico no está verificado. Verifícalo para continuar.',
                 'error_code' => ApiErrorCode::EMAIL_NOT_VERIFIED->value,
             ], 403);
         }
