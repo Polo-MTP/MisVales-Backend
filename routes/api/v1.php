@@ -105,18 +105,22 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
         ->middleware(['role:Gerente General', 'vpn'])
         ->name('api.v1.usuarios.reasignar_personal');
 
-    // MÓDULO: SUCURSALES. Alta/edición solo Gerente General; listar/ver es de cualquier
-    // usuario autenticado (lo necesitan varios selectores: crear Gerente de Sucursal, etc.).
+    // MÓDULO: SUCURSALES. Alta/edición de sucursales normales es de Gerente General; la
+    // sucursal matriz (alta, o volver matriz a una existente) es solo de Administrador -- el
+    // control fino de cuál caso aplica vive en SucursalStoreRequest/SucursalUpdateRequest, el
+    // middleware solo deja pasar a los dos roles que pueden llegar a algo aquí. Listar/ver es
+    // de cualquier usuario autenticado (lo necesitan varios selectores: crear Gerente de
+    // Sucursal, etc.).
     Route::prefix('sucursales')->group(function (): void {
         Route::get('/', [SucursalController::class, 'index'])
             ->name('api.v1.sucursales.index');
         Route::get('{sucursal}', [SucursalController::class, 'show'])
             ->name('api.v1.sucursales.show');
         Route::post('/', [SucursalController::class, 'store'])
-            ->middleware('role:Gerente General')
+            ->middleware('role:Gerente General,Administrador')
             ->name('api.v1.sucursales.store');
         Route::put('{sucursal}', [SucursalController::class, 'update'])
-            ->middleware('role:Gerente General')
+            ->middleware('role:Gerente General,Administrador')
             ->name('api.v1.sucursales.update');
     });
 

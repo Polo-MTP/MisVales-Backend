@@ -151,6 +151,12 @@ final class UsuarioController extends ApiController
         $rolGerenteGeneral = Role::query()->where('name', 'Gerente General')->firstOrFail();
         $matriz = Sucursal::query()->where('es_matriz', true)->first();
 
+        if (! $matriz) {
+            throw ValidationException::withMessages([
+                'sucursal_id' => 'No existe ninguna sucursal matriz. Crea una en Sucursales antes de dar de alta un Gerente General.',
+            ]);
+        }
+
         $data = $request->validated();
         $passwordGenerada = Str::password(22);
 

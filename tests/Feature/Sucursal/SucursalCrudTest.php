@@ -17,7 +17,14 @@ function crearGerenteGeneralSuc(): User
     return User::factory()->create(['role_id' => $role->id, 'is_active' => true]);
 }
 
-it('el Gerente General puede dar de alta una sucursal', function (): void {
+function crearAdministradorSuc(): User
+{
+    $role = Role::firstOrCreate(['name' => 'Administrador'], ['factor_count' => 3]);
+
+    return User::factory()->create(['role_id' => $role->id, 'is_active' => true]);
+}
+
+it('el Gerente General puede dar de alta una sucursal normal', function (): void {
     Sanctum::actingAs(crearGerenteGeneralSuc());
 
     $response = $this->postJson('/api/v1/sucursales', [
@@ -30,17 +37,17 @@ it('el Gerente General puede dar de alta una sucursal', function (): void {
 });
 
 it('un Gerente de Sucursal no puede dar de alta ni editar sucursales', function (): void {
-    $sucursal = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-001', 'es_matriz' => true, 'is_active' => true]);
+    $sucursal = Sucursal::create(['nombre' => 'Otra', 'codigo' => 'SUC-002', 'es_matriz' => false, 'is_active' => true]);
     $role = Role::firstOrCreate(['name' => 'Gerente de Sucursal']);
     $gerente = User::factory()->create(['role_id' => $role->id, 'sucursal_id' => $sucursal->id, 'is_active' => true]);
     Sanctum::actingAs($gerente);
 
     $this->postJson('/api/v1/sucursales', ['nombre' => 'Otra', 'codigo' => 'SUC-OTRA'])->assertStatus(403);
-    $this->putJson('/api/v1/sucursales/'.$sucursal->id, ['nombre' => 'Cambiada', 'codigo' => 'SUC-001'])->assertStatus(403);
+    $this->putJson('/api/v1/sucursales/'.$sucursal->id, ['nombre' => 'Cambiada', 'codigo' => 'SUC-002'])->assertStatus(403);
 });
 
 it('no permite dos sucursales con el mismo código', function (): void {
-    Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-001', 'es_matriz' => true, 'is_active' => true]);
+    Sucursal::create(['nombre' => 'Otra', 'codigo' => 'SUC-001', 'es_matriz' => false, 'is_active' => true]);
     Sanctum::actingAs(crearGerenteGeneralSuc());
 
     $response = $this->postJson('/api/v1/sucursales', ['nombre' => 'Otra', 'codigo' => 'SUC-001']);
@@ -60,24 +67,24 @@ it('cualquier usuario autenticado puede listar sucursales activas', function ():
     $response->assertStatus(200)->assertJsonCount(1, 'data');
 });
 
-it('el Gerente General puede editar y desactivar una sucursal', function (): void {
-    $sucursal = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-001', 'es_matriz' => true, 'is_active' => true]);
+it('el Gerente General puede editar y desactivar una sucursal normal', function (): void {
+    $sucursal = Sucursal::create(['nombre' => 'Otra', 'codigo' => 'SUC-002', 'es_matriz' => false, 'is_active' => true]);
     Sanctum::actingAs(crearGerenteGeneralSuc());
 
     $response = $this->putJson('/api/v1/sucursales/'.$sucursal->id, [
-        'nombre' => 'Matriz Renombrada',
-        'codigo' => 'SUC-001',
+        'nombre' => 'Otra Renombrada',
+        'codigo' => 'SUC-002',
         'is_active' => false,
     ]);
 
     $response->assertStatus(200);
     expect($sucursal->fresh())
-        ->nombre->toBe('Matriz Renombrada')
+        ->nombre->toBe('Otra Renombrada')
         ->is_active->toBeFalse();
 });
 
 it('desactivar una sucursal desactiva en cascada a todo su personal', function (): void {
-    $sucursal = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-001', 'es_matriz' => true, 'is_active' => true]);
+    $sucursal = Sucursal::create(['nombre' => 'Norte', 'codigo' => 'SUC-001', 'es_matriz' => false, 'is_active' => true]);
     $otraSucursal = Sucursal::create(['nombre' => 'Otra', 'codigo' => 'SUC-002', 'es_matriz' => false, 'is_active' => true]);
 
     $rolGS = Role::firstOrCreate(['name' => 'Gerente de Sucursal']);
@@ -91,7 +98,7 @@ it('desactivar una sucursal desactiva en cascada a todo su personal', function (
     Sanctum::actingAs(crearGerenteGeneralSuc());
 
     $this->putJson('/api/v1/sucursales/'.$sucursal->id, [
-        'nombre' => 'Matriz',
+        'nombre' => 'Norte',
         'codigo' => 'SUC-001',
         'is_active' => false,
     ])->assertStatus(200);
@@ -102,17 +109,118 @@ it('desactivar una sucursal desactiva en cascada a todo su personal', function (
 });
 
 it('reactivar una sucursal NO reactiva automáticamente al personal que ya estaba desactivado', function (): void {
-    $sucursal = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-001', 'es_matriz' => true, 'is_active' => false]);
+    $sucursal = Sucursal::create(['nombre' => 'Norte', 'codigo' => 'SUC-001', 'es_matriz' => false, 'is_active' => false]);
     $rolCajera = Role::firstOrCreate(['name' => 'Cajera']);
     $cajera = User::factory()->create(['role_id' => $rolCajera->id, 'sucursal_id' => $sucursal->id, 'is_active' => false]);
 
     Sanctum::actingAs(crearGerenteGeneralSuc());
 
     $this->putJson('/api/v1/sucursales/'.$sucursal->id, [
-        'nombre' => 'Matriz',
+        'nombre' => 'Norte',
         'codigo' => 'SUC-001',
         'is_active' => true,
     ])->assertStatus(200);
 
     expect($cajera->fresh()->is_active)->toBeFalse();
+});
+
+/**
+ * La sucursal matriz determina a dónde se asigna automáticamente cualquier Gerente General
+ * nuevo (ver UsuarioController::crearGerenteGeneral()) -- solo Administrador la controla, y
+ * solo puede haber una a la vez.
+ */
+it('el Gerente General NO puede dar de alta una sucursal matriz', function (): void {
+    Sanctum::actingAs(crearGerenteGeneralSuc());
+
+    $response = $this->postJson('/api/v1/sucursales', [
+        'nombre' => 'Matriz',
+        'codigo' => 'SUC-MATRIZ',
+        'es_matriz' => true,
+    ]);
+
+    $response->assertStatus(403);
+    expect(Sucursal::where('codigo', 'SUC-MATRIZ')->exists())->toBeFalse();
+});
+
+it('el Administrador puede dar de alta la sucursal matriz cuando no existe ninguna', function (): void {
+    Sanctum::actingAs(crearAdministradorSuc());
+
+    $response = $this->postJson('/api/v1/sucursales', [
+        'nombre' => 'Matriz',
+        'codigo' => 'SUC-MATRIZ',
+        'es_matriz' => true,
+    ]);
+
+    $response->assertStatus(201)->assertJsonPath('data.es_matriz', true);
+    expect(Sucursal::where('codigo', 'SUC-MATRIZ')->where('es_matriz', true)->exists())->toBeTrue();
+});
+
+it('el Administrador NO puede dar de alta una segunda sucursal matriz', function (): void {
+    Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-MATRIZ', 'es_matriz' => true, 'is_active' => true]);
+    Sanctum::actingAs(crearAdministradorSuc());
+
+    $response = $this->postJson('/api/v1/sucursales', [
+        'nombre' => 'Otra Matriz',
+        'codigo' => 'SUC-MATRIZ-2',
+        'es_matriz' => true,
+    ]);
+
+    $response->assertStatus(422);
+    expect(Sucursal::where('codigo', 'SUC-MATRIZ-2')->exists())->toBeFalse();
+});
+
+it('el Gerente General NO puede editar la sucursal matriz', function (): void {
+    $matriz = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-MATRIZ', 'es_matriz' => true, 'is_active' => true]);
+    Sanctum::actingAs(crearGerenteGeneralSuc());
+
+    $response = $this->putJson('/api/v1/sucursales/'.$matriz->id, [
+        'nombre' => 'Matriz Renombrada',
+        'codigo' => 'SUC-MATRIZ',
+        'es_matriz' => true,
+    ]);
+
+    $response->assertStatus(403);
+});
+
+it('el Administrador puede editar la sucursal matriz', function (): void {
+    $matriz = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-MATRIZ', 'es_matriz' => true, 'is_active' => true]);
+    Sanctum::actingAs(crearAdministradorSuc());
+
+    $response = $this->putJson('/api/v1/sucursales/'.$matriz->id, [
+        'nombre' => 'Matriz Renombrada',
+        'codigo' => 'SUC-MATRIZ',
+        'es_matriz' => true,
+    ]);
+
+    $response->assertStatus(200);
+    expect($matriz->fresh()->nombre)->toBe('Matriz Renombrada');
+});
+
+it('no se le puede quitar el estatus de matriz a la sucursal matriz actual', function (): void {
+    $matriz = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-MATRIZ', 'es_matriz' => true, 'is_active' => true]);
+    Sanctum::actingAs(crearAdministradorSuc());
+
+    $response = $this->putJson('/api/v1/sucursales/'.$matriz->id, [
+        'nombre' => 'Matriz',
+        'codigo' => 'SUC-MATRIZ',
+        'es_matriz' => false,
+    ]);
+
+    $response->assertStatus(422);
+    expect($matriz->fresh()->es_matriz)->toBeTrue();
+});
+
+it('no se puede deshabilitar la sucursal matriz', function (): void {
+    $matriz = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-MATRIZ', 'es_matriz' => true, 'is_active' => true]);
+    Sanctum::actingAs(crearAdministradorSuc());
+
+    $response = $this->putJson('/api/v1/sucursales/'.$matriz->id, [
+        'nombre' => 'Matriz',
+        'codigo' => 'SUC-MATRIZ',
+        'es_matriz' => true,
+        'is_active' => false,
+    ]);
+
+    $response->assertStatus(422);
+    expect($matriz->fresh()->is_active)->toBeTrue();
 });

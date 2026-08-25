@@ -146,3 +146,16 @@ it('permite dar de alta un Gerente General desde la red pública -- crear cuenta
     $response->assertStatus(201);
     expect(User::where('email', 'desde.publica@example.com')->exists())->toBeTrue();
 });
+
+it('no permite dar de alta un Gerente General si no existe ninguna sucursal matriz', function (): void {
+    Sucursal::query()->where('es_matriz', true)->delete();
+    Sanctum::actingAs(crearAdministradorActor());
+
+    $response = $this->postJson('/api/v1/usuarios/gerente-general', datosPersonalesValidosGG([
+        'nombre' => 'Nuevo', 'apellido_paterno' => 'GG', 'apellido_materno' => null,
+        'email' => 'sin.matriz@example.com',
+    ]));
+
+    $response->assertStatus(422)->assertJsonValidationErrors('sucursal_id');
+    expect(User::where('email', 'sin.matriz@example.com')->exists())->toBeFalse();
+});
