@@ -82,18 +82,12 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
         ->middleware('role:Gerente General')
         ->name('api.v1.usuarios.crear_gerente_sucursal');
 
-    // Da de alta Administrador -- solo Gerente General. Un Administrador ve todo el sistema
-    // sin acotar por sucursal (igual que Gerente General), así que dejar que un Gerente de
-    // Sucursal lo diera de alta sería escalar su propio alcance más allá de su sucursal.
-    Route::post('usuarios/administrador', [UsuarioController::class, 'crearAdministrador'])
-        ->middleware('role:Gerente General')
-        ->name('api.v1.usuarios.crear_administrador');
-
-    // Da de alta Gerente General -- Administrador (para poder arrancar/reponer la cadena de
-    // mando) y Gerente General (para poder dar de alta cualquier rol de staff, incluido el
-    // suyo propio). Gerente de Sucursal NO puede: sería escalar su propio alcance.
+    // Da de alta Gerente General -- solo Administrador, para poder arrancar/reponer la cadena
+    // de mando. No existe ningún flujo para dar de alta cuentas de Administrador (se
+    // provisionan fuera de la app); Gerente General tampoco puede crear otro Gerente General,
+    // para que la cadena de mando no se auto-perpetúe sin que Administrador se entere.
     Route::post('usuarios/gerente-general', [UsuarioController::class, 'crearGerenteGeneral'])
-        ->middleware('role:Administrador,Gerente General')
+        ->middleware('role:Administrador')
         ->name('api.v1.usuarios.crear_gerente_general');
 
     // Da de alta Coordinador, Verificador o Cajera -- el rol viene restringido a esas 3

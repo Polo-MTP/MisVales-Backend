@@ -41,6 +41,30 @@ function crearGerenteDeSucursalPersonal(Sucursal $sucursal): User
     ]);
 }
 
+/** Ver nota en CrearAdministradorTest.php -- RFC/CURP exactos porque estos tests SÍ pegan por HTTP. */
+function datosPersonalesValidosPersonal(array $overrides = []): array
+{
+    static $contador = 0;
+    $contador++;
+
+    return array_merge([
+        'rfc' => 'RFC'.str_pad((string) (400000000 + $contador), 10, '0', STR_PAD_LEFT),
+        'nombre' => 'Nuevo',
+        'apellido_paterno' => 'Personal',
+        'apellido_materno' => null,
+        'curp' => 'CURP'.str_pad((string) (40000000000000 + $contador), 14, '0', STR_PAD_LEFT),
+        'fecha_nacimiento' => '1990-01-01',
+        'lugar_nacimiento' => 'Torreón',
+        'calle' => 'Calle de Prueba',
+        'colonia' => 'Centro',
+        'numero_ext' => '100',
+        'codigo_postal' => '35000',
+        'estado' => 'Durango',
+        'ciudad' => 'Gómez Palacio',
+        'referencia_laboral' => 'Referencia de prueba',
+    ], $overrides);
+}
+
 it('el Gerente General puede dar de alta Coordinador, Verificador o Cajera indicando sucursal y gerente', function (string $rol): void {
     $sucursal = crearSucursalPersonal();
     $gerente = crearGerenteDeSucursalPersonal($sucursal);
@@ -48,13 +72,12 @@ it('el Gerente General puede dar de alta Coordinador, Verificador o Cajera indic
 
     $email = 'nuevo.personal.'.strtolower($rol).'@example.com';
 
-    $response = $this->postJson('/api/v1/usuarios/personal', [
+    $response = $this->postJson('/api/v1/usuarios/personal', datosPersonalesValidosPersonal([
         'rol' => $rol,
-        'name' => 'Nuevo Personal',
         'email' => $email,
         'sucursal_id' => $sucursal->id,
         'gerente_id' => $gerente->id,
-    ]);
+    ]));
 
     $response->assertStatus(201)
         ->assertJsonPath('data.role.name', $rol)
@@ -75,13 +98,12 @@ it('el Gerente General no puede asignar un gerente que no es Gerente de Sucursal
     $gerenteDeOtraSucursal = crearGerenteDeSucursalPersonal($otraSucursal);
     Sanctum::actingAs(crearGerenteGeneralPersonal());
 
-    $response = $this->postJson('/api/v1/usuarios/personal', [
+    $response = $this->postJson('/api/v1/usuarios/personal', datosPersonalesValidosPersonal([
         'rol' => 'Cajera',
-        'name' => 'Nueva Cajera',
         'email' => 'cajera.mismatch@example.com',
         'sucursal_id' => $sucursal->id,
         'gerente_id' => $gerenteDeOtraSucursal->id,
-    ]);
+    ]));
 
     $response->assertStatus(422)->assertJsonValidationErrors('gerente_id');
     expect(User::where('email', 'cajera.mismatch@example.com')->exists())->toBeFalse();
@@ -95,13 +117,12 @@ it('el Gerente de Sucursal da de alta personal relacionado automáticamente a s�
     $otroGerente = crearGerenteDeSucursalPersonal($otraSucursal);
     Sanctum::actingAs($gerente);
 
-    $response = $this->postJson('/api/v1/usuarios/personal', [
+    $response = $this->postJson('/api/v1/usuarios/personal', datosPersonalesValidosPersonal([
         'rol' => 'Verificador',
-        'name' => 'Nuevo Verificador',
         'email' => 'verificador.auto@example.com',
         'sucursal_id' => $otraSucursal->id,
         'gerente_id' => $otroGerente->id,
-    ]);
+    ]));
 
     $response->assertStatus(201)
         ->assertJsonPath('data.sucursal_id', $sucursal->id)
@@ -118,13 +139,12 @@ it('rechaza un rol distinto a Coordinador, Verificador o Cajera', function (): v
     $gerente = crearGerenteDeSucursalPersonal($sucursal);
     Sanctum::actingAs(crearGerenteGeneralPersonal());
 
-    $response = $this->postJson('/api/v1/usuarios/personal', [
+    $response = $this->postJson('/api/v1/usuarios/personal', datosPersonalesValidosPersonal([
         'rol' => 'Administrador',
-        'name' => 'Intento Admin',
         'email' => 'intento.admin@example.com',
         'sucursal_id' => $sucursal->id,
         'gerente_id' => $gerente->id,
-    ]);
+    ]));
 
     $response->assertStatus(422)->assertJsonValidationErrors('rol');
 });
@@ -134,13 +154,12 @@ it('rechaza dar de alta personal en una sucursal deshabilitada', function (): vo
     $gerente = crearGerenteDeSucursalPersonal($sucursalInactiva);
     Sanctum::actingAs(crearGerenteGeneralPersonal());
 
-    $response = $this->postJson('/api/v1/usuarios/personal', [
+    $response = $this->postJson('/api/v1/usuarios/personal', datosPersonalesValidosPersonal([
         'rol' => 'Cajera',
-        'name' => 'Cajera Sucursal Cerrada',
         'email' => 'sucursal.cerrada@example.com',
         'sucursal_id' => $sucursalInactiva->id,
         'gerente_id' => $gerente->id,
-    ]);
+    ]));
 
     $response->assertStatus(422)->assertJsonValidationErrors('sucursal_id');
     expect(User::where('email', 'sucursal.cerrada@example.com')->exists())->toBeFalse();
@@ -155,13 +174,12 @@ it('rechaza asignar personal a un Gerente de Sucursal deshabilitado', function (
     ]);
     Sanctum::actingAs(crearGerenteGeneralPersonal());
 
-    $response = $this->postJson('/api/v1/usuarios/personal', [
+    $response = $this->postJson('/api/v1/usuarios/personal', datosPersonalesValidosPersonal([
         'rol' => 'Cajera',
-        'name' => 'Cajera Gerente Inactivo',
         'email' => 'gerente.inactivo@example.com',
         'sucursal_id' => $sucursal->id,
         'gerente_id' => $gerenteInactivo->id,
-    ]);
+    ]));
 
     $response->assertStatus(422)->assertJsonValidationErrors('gerente_id');
     expect(User::where('email', 'gerente.inactivo@example.com')->exists())->toBeFalse();
@@ -175,12 +193,11 @@ it('ningún otro rol puede dar de alta personal de sucursal', function (): void 
         'is_active' => true,
     ]));
 
-    $response = $this->postJson('/api/v1/usuarios/personal', [
+    $response = $this->postJson('/api/v1/usuarios/personal', datosPersonalesValidosPersonal([
         'rol' => 'Cajera',
-        'name' => 'Nueva Cajera',
         'email' => 'no.autorizado@example.com',
         'sucursal_id' => $sucursal->id,
-    ]);
+    ]));
 
     $response->assertStatus(403);
 });

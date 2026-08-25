@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1\Usuario;
 
+use App\Http\Requests\Api\V1\Usuario\Concerns\ValidaDatosPersonales;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 final class CrearPersonalSucursalRequest extends FormRequest
 {
+    use ValidaDatosPersonales;
+
     /**
      * Da de alta Coordinador, Verificador o Cajera. Gerente General y Gerente de Sucursal
      * pueden usar este endpoint; la diferencia de a qué sucursal/gerente quedan asignados
@@ -37,8 +40,8 @@ final class CrearPersonalSucursalRequest extends FormRequest
         $esGerenteGeneral = $this->user()?->role?->name === 'Gerente General';
 
         return [
+            ...$this->reglasDatosPersonales(),
             'rol' => ['required', 'string', Rule::in(['Coordinador', 'Verificador', 'Cajera'])],
-            'name' => 'required|string|max:255',
             'email' => 'required|email|max:255|unique:users,email',
             'sucursal_id' => [$esGerenteGeneral ? 'required' : 'nullable', 'integer', 'exists:sucursales,id'],
             'gerente_id' => [$esGerenteGeneral ? 'required' : 'nullable', 'integer', 'exists:users,id'],

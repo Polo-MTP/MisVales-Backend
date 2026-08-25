@@ -43,7 +43,7 @@ it('un rol sin permiso para la ruta trae error_code FORBIDDEN', function (): voi
     $role = Role::firstOrCreate(['name' => 'Cajera']);
     Sanctum::actingAs(User::factory()->create(['role_id' => $role->id, 'is_active' => true]));
 
-    $this->postJson('/api/v1/usuarios/administrador', ['name' => 'X', 'email' => 'x@example.com'])
+    $this->postJson('/api/v1/usuarios/gerente-sucursal', ['name' => 'X', 'email' => 'x@example.com'])
         ->assertStatus(403)
         ->assertJsonPath('error_code', ApiErrorCode::FORBIDDEN->value);
 });
@@ -58,7 +58,7 @@ it('datos inválidos en una solicitud traen error_code VALIDATION_ERROR', functi
     $role = Role::firstOrCreate(['name' => 'Gerente General']);
     Sanctum::actingAs(User::factory()->create(['role_id' => $role->id, 'is_active' => true]));
 
-    $this->postJson('/api/v1/usuarios/administrador', [])
+    $this->postJson('/api/v1/usuarios/gerente-sucursal', [])
         ->assertStatus(422)
         ->assertJsonPath('error_code', ApiErrorCode::VALIDATION_ERROR->value);
 });

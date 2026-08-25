@@ -285,8 +285,8 @@ final class SolicitudProveedorService
                 $distribuidoraRole = Role::query()->where('name', 'Distribuidora')->first();
 
                 // La contraseña la genera el sistema (no la elige quien aprueba) y se manda por
-                // correo al nuevo usuario -- mismo patrón que crearAdministrador/
-                // crearGerenteSucursal/crearPersonalSucursal en UsuarioController, para que nadie
+                // correo al nuevo usuario -- mismo patrón que crearGerenteSucursal/
+                // crearGerenteGeneral/crearPersonalSucursal en UsuarioController, para que nadie
                 // más que la distribuidora llegue a conocerla.
                 $passwordGenerada = Str::password(22);
 

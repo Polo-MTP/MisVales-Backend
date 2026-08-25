@@ -117,15 +117,15 @@ it('la decisión de reembolso de excedente tiene el middleware vpn adjunto', fun
 });
 
 /**
- * Confirmado con el equipo: dar de alta cuentas de staff (Gerente de Sucursal, Administrador,
+ * Confirmado con el equipo: dar de alta cuentas de staff (Gerente de Sucursal, Gerente General,
  * Coordinador/Verificador/Cajera) NO exige VPN -- a diferencia de las decisiones de
  * autorización (aprobar/rechazar solicitudes, cambiar parámetros de negocio), que sí. Debe
- * poder crearse personal también desde la red pública.
+ * poder crearse personal también desde la red pública. No hay ruta de alta de Administrador
+ * que probar aquí: se provisiona fuera de la app, no hay ningún flujo para crearlo.
  */
-it('la alta de Gerente de Sucursal, Administrador, Gerente General y Personal de Sucursal NO exige VPN', function (): void {
+it('la alta de Gerente de Sucursal, Gerente General y Personal de Sucursal NO exige VPN', function (): void {
     $rutas = [
         'api.v1.usuarios.crear_gerente_sucursal',
-        'api.v1.usuarios.crear_administrador',
         'api.v1.usuarios.crear_gerente_general',
         'api.v1.usuarios.crear_personal_sucursal',
     ];

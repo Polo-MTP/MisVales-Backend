@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Api\ApiController;
-use App\Http\Requests\Api\V1\Usuario\CrearAdministradorRequest;
 use App\Http\Requests\Api\V1\Usuario\CrearGerenteGeneralRequest;
 use App\Http\Requests\Api\V1\Usuario\CrearGerenteSucursalRequest;
 use App\Http\Requests\Api\V1\Usuario\CrearPersonalSucursalRequest;
 use App\Http\Requests\Api\V1\Usuario\ReasignarPersonalRequest;
 use App\Http\Resources\UserResource;
 use App\Mail\PersonalCredencialesMail;
+use App\Models\DatosPersonales;
+use App\Models\Direccion;
 use App\Models\Role;
 use App\Models\Sucursal;
 use App\Models\User;
@@ -100,22 +101,32 @@ final class UsuarioController extends ApiController
             ]);
         }
 
+        $data = $request->validated();
         $passwordGenerada = Str::password(22);
 
-        $usuario = User::query()->create([
-            'name' => $request->string('name'),
-            'email' => $request->string('email'),
-            'password' => Hash::make($passwordGenerada),
-            'role_id' => $rolGerenteSucursal->id,
-            'sucursal_id' => $sucursal->id,
-            'is_active' => true,
-        ]);
+        $usuario = DB::transaction(function () use ($data, $rolGerenteSucursal, $sucursal, $request, $passwordGenerada): User {
+            $datosId = $this->crearDatosPersonalesYDireccion($data);
 
-        // 'email_verified_at' no está en $fillable de User (a propósito, no se llena desde
-        // requests normales) -- se asigna aparte y se guarda, en vez de mandarlo en el
-        // create() de arriba, donde quedaría silenciosamente ignorado.
-        $usuario->email_verified_at = now();
-        $usuario->save();
+            $usuario = User::query()->create([
+                'name' => $this->nombreCompleto($data),
+                'email' => $request->string('email'),
+                'password' => Hash::make($passwordGenerada),
+                'role_id' => $rolGerenteSucursal->id,
+                'sucursal_id' => $sucursal->id,
+                'datos_id' => $datosId,
+                'rfc' => $data['rfc'],
+                'referencia_laboral' => $data['referencia_laboral'] ?? null,
+                'is_active' => true,
+            ]);
+
+            // 'email_verified_at' no está en $fillable de User (a propósito, no se llena desde
+            // requests normales) -- se asigna aparte y se guarda, en vez de mandarlo en el
+            // create() de arriba, donde quedaría silenciosamente ignorado.
+            $usuario->email_verified_at = now();
+            $usuario->save();
+
+            return $usuario;
+        });
 
         Mail::to((string) $usuario->email)->send(new PersonalCredencialesMail(
             (string) $usuario->name,
@@ -128,67 +139,41 @@ final class UsuarioController extends ApiController
     }
 
     /**
-     * Da de alta un Administrador. El rol queda fijo aquí igual que en crearGerenteSucursal --
-     * quien manda la petición nunca elige el rol. La única barrera es la ruta: exige 'vpn' de
-     * verdad (VerifyVpnAccess la exige para Gerente General y Gerente de Sucursal, los dos
-     * roles que pueden llegar aquí), a diferencia de las demás altas de staff que además viven
-     * dentro de la sucursal de quien las crea. Un Administrador no está atado a ninguna
-     * sucursal en particular (ve todo, igual que Gerente General), así que se asigna a la
-     * matriz en vez de pedir sucursal_id en el request.
-     */
-    public function crearAdministrador(CrearAdministradorRequest $request): JsonResponse
-    {
-        $rolAdministrador = Role::query()->where('name', 'Administrador')->firstOrFail();
-        $matriz = Sucursal::query()->where('es_matriz', true)->first();
-
-        $passwordGenerada = Str::password(22);
-
-        $usuario = User::query()->create([
-            'name' => $request->string('name'),
-            'email' => $request->string('email'),
-            'password' => Hash::make($passwordGenerada),
-            'role_id' => $rolAdministrador->id,
-            'sucursal_id' => $matriz?->id,
-            'is_active' => true,
-        ]);
-
-        $usuario->email_verified_at = now();
-        $usuario->save();
-
-        Mail::to((string) $usuario->email)->send(new PersonalCredencialesMail(
-            (string) $usuario->name,
-            (string) $usuario->email,
-            (string) $passwordGenerada,
-            (string) $rolAdministrador->name,
-        ));
-
-        return $this->created(new UserResource($usuario->load(['role', 'sucursal'])));
-    }
-
-    /**
-     * Da de alta un Gerente General. Administrador y Gerente General pueden llegar aquí -- el
-     * rol queda fijo en el controller igual que en crearAdministrador. Un Gerente General no
-     * está atado a ninguna sucursal en particular (ve todo), así que se asigna a la matriz en
-     * vez de pedir sucursal_id en el request, mismo patrón que crearAdministrador.
+     * Da de alta un Gerente General. Solo Administrador puede llegar aquí -- no hay ningún
+     * flujo para dar de alta cuentas de Administrador (se provisiona fuera de la app), y
+     * Gerente General no puede crear otro Gerente General (evita que la cadena de mando se
+     * auto-perpetúe sin que Administrador se entere). El rol queda fijo en el controller. Un
+     * Gerente General no está atado a ninguna sucursal en particular (ve todo), así que se
+     * asigna a la matriz en vez de pedir sucursal_id en el request.
      */
     public function crearGerenteGeneral(CrearGerenteGeneralRequest $request): JsonResponse
     {
         $rolGerenteGeneral = Role::query()->where('name', 'Gerente General')->firstOrFail();
         $matriz = Sucursal::query()->where('es_matriz', true)->first();
 
+        $data = $request->validated();
         $passwordGenerada = Str::password(22);
 
-        $usuario = User::query()->create([
-            'name' => $request->string('name'),
-            'email' => $request->string('email'),
-            'password' => Hash::make($passwordGenerada),
-            'role_id' => $rolGerenteGeneral->id,
-            'sucursal_id' => $matriz?->id,
-            'is_active' => true,
-        ]);
+        $usuario = DB::transaction(function () use ($data, $rolGerenteGeneral, $matriz, $request, $passwordGenerada): User {
+            $datosId = $this->crearDatosPersonalesYDireccion($data);
 
-        $usuario->email_verified_at = now();
-        $usuario->save();
+            $usuario = User::query()->create([
+                'name' => $this->nombreCompleto($data),
+                'email' => $request->string('email'),
+                'password' => Hash::make($passwordGenerada),
+                'role_id' => $rolGerenteGeneral->id,
+                'sucursal_id' => $matriz?->id,
+                'datos_id' => $datosId,
+                'rfc' => $data['rfc'],
+                'referencia_laboral' => $data['referencia_laboral'] ?? null,
+                'is_active' => true,
+            ]);
+
+            $usuario->email_verified_at = now();
+            $usuario->save();
+
+            return $usuario;
+        });
 
         Mail::to((string) $usuario->email)->send(new PersonalCredencialesMail(
             (string) $usuario->name,
@@ -251,25 +236,34 @@ final class UsuarioController extends ApiController
             ]);
         }
 
+        $data = $request->validated();
         $passwordGenerada = Str::password(22);
 
-        $usuario = User::query()->create([
-            'name' => $request->string('name'),
-            'email' => $request->string('email'),
-            'password' => Hash::make($passwordGenerada),
-            'role_id' => $rol->id,
-            'sucursal_id' => $sucursalId,
-            'gerente_id' => $gerente->id,
-            'is_active' => true,
-        ]);
+        $usuario = DB::transaction(function () use ($data, $rol, $sucursalId, $gerente, $request, $passwordGenerada): User {
+            $datosId = $this->crearDatosPersonalesYDireccion($data);
 
-        $usuario->email_verified_at = now();
-        $usuario->save();
+            $usuario = User::query()->create([
+                'name' => $this->nombreCompleto($data),
+                'email' => $request->string('email'),
+                'password' => Hash::make($passwordGenerada),
+                'role_id' => $rol->id,
+                'sucursal_id' => $sucursalId,
+                'gerente_id' => $gerente->id,
+                'datos_id' => $datosId,
+                'rfc' => $data['rfc'],
+                'referencia_laboral' => $data['referencia_laboral'] ?? null,
+                'is_active' => true,
+            ]);
 
-        // $usuario->name/->email siguen siendo el Stringable de $request->string(...) hasta que
-        // se recarga desde la BD (create() no los normaliza) -- Mail::to() necesita un string
-        // real, si no intenta leer ->name de ese objeto como si fuera un destinatario con
-        // nombre y truena con un BadMethodCallException.
+            $usuario->email_verified_at = now();
+            $usuario->save();
+
+            return $usuario;
+        });
+
+        // $usuario->name/->email ya son strings reales (vienen de $data, no de un Stringable de
+        // $request->string()) -- Mail::to() necesita un string real, si no intenta leer ->name
+        // de ese objeto como si fuera un destinatario con nombre y truena con un BadMethodCallException.
         Mail::to((string) $usuario->email)->send(new PersonalCredencialesMail(
             (string) $usuario->name,
             (string) $usuario->email,
@@ -340,5 +334,52 @@ final class UsuarioController extends ApiController
             data: ['personal_reasignado' => $total],
             message: "{$total} persona(s) reasignada(s) de {$gerenteOrigen->name} a {$gerenteDestino->name}."
         );
+    }
+
+    /**
+     * Crea Dirección + DatosPersonales para una alta de personal interno y regresa el id de
+     * DatosPersonales listo para 'users.datos_id' -- mismo patrón que
+     * SolicitudProveedorService::crearSolicitud() usa para una distribuidora, para que el
+     * expediente de cualquier cuenta (interna o externa) viva en el mismo lugar.
+     *
+     * @param  array<string, mixed>  $data  Validado por ValidaDatosPersonales.
+     */
+    private function crearDatosPersonalesYDireccion(array $data): int
+    {
+        /** @var Direccion $direccion */
+        $direccion = Direccion::query()->create([
+            'calle' => $data['calle'],
+            'colonia' => $data['colonia'],
+            'numero_ext' => $data['numero_ext'],
+            'numero_int' => $data['numero_int'] ?? null,
+            'codigo_postal' => $data['codigo_postal'],
+            'estado' => $data['estado'],
+            'ciudad' => $data['ciudad'],
+        ]);
+
+        /** @var DatosPersonales $datosPersonales */
+        $datosPersonales = DatosPersonales::query()->create([
+            'nombre' => $data['nombre'],
+            'apellido_paterno' => $data['apellido_paterno'],
+            'apellido_materno' => $data['apellido_materno'] ?? null,
+            'curp' => $data['curp'],
+            'direccion_id' => $direccion->id,
+            'fecha_nacimiento' => $data['fecha_nacimiento'] ?? null,
+            'lugar_nacimiento' => $data['lugar_nacimiento'] ?? null,
+        ]);
+
+        return $datosPersonales->id;
+    }
+
+    /**
+     * 'users.name' no se captura directo -- se calcula de nombre/apellidos, mismo criterio que
+     * Distribuidora::getNombreAttribute(), para no duplicar la misma información en dos lugares
+     * que podrían desincronizarse.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function nombreCompleto(array $data): string
+    {
+        return trim($data['nombre'].' '.$data['apellido_paterno'].' '.($data['apellido_materno'] ?? ''));
     }
 }

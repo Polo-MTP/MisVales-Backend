@@ -27,6 +27,8 @@ use Laravel\Sanctum\HasApiTokens;
  * @property int|null $datos_id
  * @property int|null $sucursal_id
  * @property int|null $gerente_id
+ * @property string|null $rfc
+ * @property string|null $referencia_laboral
  * @property bool $is_active
  * @property bool $is_locked
  * @property int $failed_attempts
@@ -42,6 +44,8 @@ use Laravel\Sanctum\HasApiTokens;
     'datos_id',
     'sucursal_id',
     'gerente_id',
+    'rfc',
+    'referencia_laboral',
     'is_active',
     'is_locked',
     'failed_attempts',

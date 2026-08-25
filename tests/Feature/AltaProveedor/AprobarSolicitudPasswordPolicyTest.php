@@ -22,7 +22,7 @@ beforeEach(function (): void {
 
 /**
  * AprobarSolicitudProveedorRequest solía dejar que quien aprobaba escribiera la contraseña de
- * la nueva distribuidora a mano -- inconsistente con crearAdministrador/crearGerenteSucursal/
+ * la nueva distribuidora a mano -- inconsistente con crearGerenteSucursal/crearGerenteGeneral/
  * crearPersonalSucursal, que siempre la generan internamente y la mandan por correo. Ahora sigue
  * el mismo patrón: nadie más que la distribuidora llega a conocer su contraseña.
  */
