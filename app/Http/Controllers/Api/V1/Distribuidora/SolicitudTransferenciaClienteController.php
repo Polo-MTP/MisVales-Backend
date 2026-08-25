@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Distribuidora;
 
+use App\Enums\ApiErrorCode;
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Api\V1\Distribuidora\AceptarTransferenciaClienteRequest;
 use App\Http\Requests\Api\V1\Distribuidora\DecidirTransferenciaClienteRequest;
@@ -76,7 +77,7 @@ final class SolicitudTransferenciaClienteController extends ApiController
                 message: 'Decisión registrada exitosamente.'
             );
         } catch (DomainException $e) {
-            return $this->error($e->getMessage());
+            return $this->error($e->getMessage(), 422, [], ApiErrorCode::DOMAIN_ERROR);
         }
     }
 
@@ -97,7 +98,7 @@ final class SolicitudTransferenciaClienteController extends ApiController
                 message: $solicitud->estado === 'aceptada' ? 'Transferencia completada exitosamente.' : 'Transferencia declinada.'
             );
         } catch (DomainException $e) {
-            return $this->error($e->getMessage());
+            return $this->error($e->getMessage(), 422, [], ApiErrorCode::DOMAIN_ERROR);
         }
     }
 }

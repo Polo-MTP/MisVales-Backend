@@ -65,7 +65,7 @@ it('el gerente no puede otorgar más de lo solicitado', function (): void {
     $solicitud = $service->solicitar($distribuidora, $usuarioDistribuidora, 15000, 'motivo');
 
     expect(fn () => $service->decidir($solicitud, 'aprobada', 20000, null, $gerente))
-        ->toThrow(Symfony\Component\HttpKernel\Exception\HttpException::class, 'El monto otorgado no puede ser mayor al monto solicitado.');
+        ->toThrow(DomainException::class, 'El monto otorgado no puede ser mayor al monto solicitado.');
 });
 
 it('no se puede solicitar un segundo aumento mientras hay uno pendiente', function (): void {
@@ -75,7 +75,7 @@ it('no se puede solicitar un segundo aumento mientras hay uno pendiente', functi
     $service->solicitar($distribuidora, $usuarioDistribuidora, 5000, 'motivo');
 
     expect(fn () => $service->solicitar($distribuidora, $usuarioDistribuidora, 2000, 'otro motivo'))
-        ->toThrow(Symfony\Component\HttpKernel\Exception\HttpException::class, 'Esta distribuidora ya tiene una solicitud de aumento de crédito pendiente.');
+        ->toThrow(DomainException::class, 'Esta distribuidora ya tiene una solicitud de aumento de crédito pendiente.');
 });
 
 it('una distribuidora no puede solicitar aumento de crédito para otra distribuidora', function (): void {

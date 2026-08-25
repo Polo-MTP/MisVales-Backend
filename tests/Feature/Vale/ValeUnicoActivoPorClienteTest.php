@@ -16,7 +16,6 @@ use App\Models\User;
 use App\Models\Vale;
 use App\Services\Vale\ValeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 
 uses(RefreshDatabase::class);
 
@@ -60,7 +59,7 @@ it('no permite solicitar un segundo vale para un cliente que ya tiene uno sin li
     expect(fn () => app(ValeService::class)->solicitar([
         'cliente_id' => $cliente->id,
         'producto_id' => $producto->id,
-    ], $distribuidora->usuario))->toThrow(HttpException::class, 'Este cliente ya tiene un vale activo o pendiente. Debe liquidarse antes de poder solicitar otro.');
+    ], $distribuidora->usuario))->toThrow(DomainException::class, 'Este cliente ya tiene un vale activo o pendiente. Debe liquidarse antes de poder solicitar otro.');
 });
 
 it('permite solicitar un vale nuevo una vez que el anterior del cliente ya fue liquidado (pagado)', function (): void {

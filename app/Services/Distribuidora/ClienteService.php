@@ -10,6 +10,7 @@ use App\Models\Direccion;
 use App\Models\Distribuidora;
 use App\Models\HistorialClienteDistr;
 use App\Models\User;
+use DomainException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -273,11 +274,11 @@ final class ClienteService
         }
 
         if ($origen->id === $destino->id) {
-            abort(422, 'La distribuidora destino debe ser diferente de la distribuidora de origen.');
+            throw new DomainException('La distribuidora destino debe ser diferente de la distribuidora de origen.');
         }
 
         if (! in_array($destino->estado, ['ACTIVO', 'EN_VERIFICACION'], true)) {
-            abort(422, 'La distribuidora destino no puede recibir clientes en su estado actual.');
+            throw new DomainException('La distribuidora destino no puede recibir clientes en su estado actual.');
         }
 
         return DB::transaction(function () use ($origen, $destino): int {

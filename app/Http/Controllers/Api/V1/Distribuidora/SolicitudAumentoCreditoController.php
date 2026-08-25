@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Distribuidora;
 
+use App\Enums\ApiErrorCode;
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Api\V1\Distribuidora\DecidirAumentoCreditoRequest;
 use App\Http\Requests\Api\V1\Distribuidora\SolicitarAumentoCreditoRequest;
@@ -82,7 +83,7 @@ final class SolicitudAumentoCreditoController extends ApiController
                 message: 'Decisión registrada exitosamente.'
             );
         } catch (DomainException $e) {
-            return $this->error($e->getMessage());
+            return $this->error($e->getMessage(), 422, [], ApiErrorCode::DOMAIN_ERROR);
         }
     }
 }

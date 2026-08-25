@@ -15,7 +15,6 @@ use App\Models\Sucursal;
 use App\Models\User;
 use App\Services\Vale\ValeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 
 uses(RefreshDatabase::class);
 
@@ -60,7 +59,7 @@ it('no permite autorizar un vale solicitado que aún no ha sido validado', funct
     ], $distribuidora->usuario);
 
     expect(fn () => app(ValeService::class)->autorizar($vale, $cajera))
-        ->toThrow(HttpException::class, 'Solo se pueden autorizar vales ya validados (actual: solicitado). Valida los datos del cliente primero.');
+        ->toThrow(DomainException::class, 'Solo se pueden autorizar vales ya validados (actual: solicitado). Valida los datos del cliente primero.');
 });
 
 it('valida un vale solicitado y registra quién y cuándo lo validó', function (): void {
@@ -107,7 +106,7 @@ it('no permite validar un vale que no está en estado solicitado', function (): 
     app(ValeService::class)->validar($vale, $cajera, '032180000118359719');
 
     expect(fn () => app(ValeService::class)->validar($vale->fresh(), $cajera))
-        ->toThrow(HttpException::class, "Solo se pueden validar vales en estado 'solicitado' (actual: validado).");
+        ->toThrow(DomainException::class, "Solo se pueden validar vales en estado 'solicitado' (actual: validado).");
 });
 
 it('exige CLABE interbancaria la primera vez que se valida un vale del cliente', function (): void {
@@ -120,7 +119,7 @@ it('exige CLABE interbancaria la primera vez que se valida un vale del cliente',
     ], $distribuidora->usuario);
 
     expect(fn () => app(ValeService::class)->validar($vale, $cajera))
-        ->toThrow(HttpException::class, 'Este cliente no tiene CLABE interbancaria registrada. Captúrala para poder validar y transferirle el pago.');
+        ->toThrow(DomainException::class, 'Este cliente no tiene CLABE interbancaria registrada. Captúrala para poder validar y transferirle el pago.');
 
     expect($cliente->fresh()->clabe)->toBeNull();
 });
@@ -135,7 +134,7 @@ it('no permite validar si la cajera marca que la INE o el comprobante no coincid
     ], $distribuidora->usuario);
 
     expect(fn () => app(ValeService::class)->validar($vale, $cajera, '032180000118359719', false, true))
-        ->toThrow(HttpException::class, 'No se puede validar el vale: la INE y el comprobante de domicilio del cliente deben coincidir. Corrige los datos o pide autorización para editarlos antes de continuar.');
+        ->toThrow(DomainException::class, 'No se puede validar el vale: la INE y el comprobante de domicilio del cliente deben coincidir. Corrige los datos o pide autorización para editarlos antes de continuar.');
 
     expect($vale->fresh()->estado)->toBe('solicitado');
 });
@@ -211,7 +210,7 @@ it('no permite autorizar un vale si ya no hay crédito disponible suficiente (el
 
     // El segundo ya no cabe: crédito disponible ahora es 1000 - 500 = 500, y el vale es de 600.
     expect(fn () => app(ValeService::class)->autorizar($valeDos, $cajera))
-        ->toThrow(HttpException::class, 'La distribuidora ya no tiene crédito disponible suficiente para autorizar este vale.');
+        ->toThrow(DomainException::class, 'La distribuidora ya no tiene crédito disponible suficiente para autorizar este vale.');
 
     expect($valeDos->fresh()->estado)->toBe('validado');
 });

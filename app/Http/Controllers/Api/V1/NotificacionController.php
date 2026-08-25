@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\ApiErrorCode;
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Resources\Notificacion\NotificacionResource;
 use App\Models\Notificacion;
@@ -48,7 +49,7 @@ final class NotificacionController extends ApiController
 
             return $this->success(new NotificacionResource($notificacion), 'Notificación marcada como leída.');
         } catch (DomainException $e) {
-            return $this->error($e->getMessage(), 403);
+            return $this->error($e->getMessage(), 422, [], ApiErrorCode::DOMAIN_ERROR);
         }
     }
 }

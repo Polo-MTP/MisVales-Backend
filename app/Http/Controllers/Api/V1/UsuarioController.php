@@ -18,6 +18,7 @@ use App\Models\Sucursal;
 use App\Models\User;
 use App\Services\Notificacion\NotificacionService;
 use App\Services\Usuario\MovimientosAutorizadosService;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -298,19 +299,19 @@ final class UsuarioController extends ApiController
         $gerenteDestino = User::query()->with('role')->findOrFail($request->integer('gerente_destino_id'));
 
         if ($gerenteOrigen->role?->name !== 'Gerente de Sucursal' || $gerenteDestino->role?->name !== 'Gerente de Sucursal') {
-            abort(422, 'Ambos usuarios deben tener el rol Gerente de Sucursal.');
+            throw new DomainException('Ambos usuarios deben tener el rol Gerente de Sucursal.');
         }
 
         if ($gerenteOrigen->id === $gerenteDestino->id) {
-            abort(422, 'El gerente destino debe ser diferente del gerente de origen.');
+            throw new DomainException('El gerente destino debe ser diferente del gerente de origen.');
         }
 
         if ($gerenteDestino->sucursal_id !== $gerenteOrigen->sucursal_id) {
-            abort(422, 'El gerente destino debe pertenecer a la misma sucursal que el de origen.');
+            throw new DomainException('El gerente destino debe pertenecer a la misma sucursal que el de origen.');
         }
 
         if (! $gerenteDestino->is_active) {
-            abort(422, 'El gerente destino está deshabilitado y no puede recibir personal a su cargo.');
+            throw new DomainException('El gerente destino está deshabilitado y no puede recibir personal a su cargo.');
         }
 
         /** @var User $usuario */

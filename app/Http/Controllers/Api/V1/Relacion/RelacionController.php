@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Relacion;
 
+use App\Enums\ApiErrorCode;
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Resources\Relacion\RelacionResource;
 use App\Models\Distribuidora;
@@ -172,7 +173,7 @@ final class RelacionController extends ApiController
                 message: $mensaje
             );
         } catch (DomainException $e) {
-            return $this->error($e->getMessage());
+            return $this->error($e->getMessage(), 422, [], ApiErrorCode::DOMAIN_ERROR);
         }
     }
 
@@ -197,7 +198,7 @@ final class RelacionController extends ApiController
                 message: $relacion->estado === 'perdonada' ? 'Relación perdonada exitosamente.' : 'Límite de perdones alcanzado: la relación se marcó como pérdida.'
             );
         } catch (DomainException $e) {
-            return $this->error($e->getMessage());
+            return $this->error($e->getMessage(), 422, [], ApiErrorCode::DOMAIN_ERROR);
         }
     }
 }

@@ -36,6 +36,7 @@ enum ApiErrorCode: string
 
     // Servidor
     case SERVER_ERROR = 'SERVER_ERROR';
+    case SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE';
 
     /**
      * Respaldo por status HTTP para cualquier error que no traiga su propio código explícito
@@ -52,6 +53,7 @@ enum ApiErrorCode: string
             $status === 405 => self::METHOD_NOT_ALLOWED,
             $status === 422 => self::VALIDATION_ERROR,
             $status === 429 => self::RATE_LIMITED,
+            $status === 503 => self::SERVICE_UNAVAILABLE,
             $status >= 400 && $status < 500 => self::DOMAIN_ERROR,
             default => self::SERVER_ERROR,
         };

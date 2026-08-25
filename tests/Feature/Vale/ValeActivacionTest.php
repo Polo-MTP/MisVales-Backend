@@ -81,7 +81,7 @@ it('no permite desactivar un vale ya autorizado, para no poder liberar crédito 
     $usuarioDistribuidora = $distribuidora->usuario;
 
     expect(fn () => app(ValeService::class)->desactivar($vale, $usuarioDistribuidora))
-        ->toThrow(Symfony\Component\HttpKernel\Exception\HttpException::class);
+        ->toThrow(DomainException::class);
 
     expect($vale->fresh()->activo)->toBeTrue();
     expect((float) $distribuidora->fresh()->credito_disponible)->toBe(15000.0);

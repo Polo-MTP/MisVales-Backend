@@ -110,7 +110,7 @@ it('no se puede solicitar transferencia de un cliente que ya es tuyo', function 
     ['usuarioOrigen' => $usuarioOrigen, 'cliente' => $cliente] = crearEscenarioTransferencia();
 
     expect(fn () => app(SolicitudTransferenciaClienteService::class)->solicitar($cliente, $usuarioOrigen, 'motivo'))
-        ->toThrow(Symfony\Component\HttpKernel\Exception\HttpException::class, 'Este cliente ya pertenece a tu distribuidora.');
+        ->toThrow(DomainException::class, 'Este cliente ya pertenece a tu distribuidora.');
 });
 
 it('el listado por HTTP de clientes/transferencias no lo tapa el wildcard clientes/{id}', function (): void {

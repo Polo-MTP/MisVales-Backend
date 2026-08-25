@@ -16,7 +16,6 @@ use App\Models\Sucursal;
 use App\Models\User;
 use App\Services\Vale\ValeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 
 uses(RefreshDatabase::class);
 
@@ -87,7 +86,7 @@ it('bloquea el primer vale de una distribuidora nueva si excede el 50% del créd
     $producto = productoQA50(5501, $distribuidora->usuario_id);
 
     expect(fn () => app(ValeService::class)->solicitar(['cliente_id' => $cliente->id, 'producto_id' => $producto->id], usuarioFrescoQA50($distribuidora)))
-        ->toThrow(HttpException::class);
+        ->toThrow(DomainException::class);
 });
 
 it('permite el primer vale de una distribuidora nueva justo en el tope (50% + margen)', function (): void {
@@ -119,7 +118,7 @@ it('el segundo vale ya no respeta el tope del 50%, solo el credito disponible', 
     $cliente2 = crearClienteQA50($distribuidora);
     $producto2 = productoQA50(8001, $distribuidora->usuario_id);
     expect(fn () => $svc->solicitar(['cliente_id' => $cliente2->id, 'producto_id' => $producto2->id], usuarioFrescoQA50($distribuidora)))
-        ->toThrow(HttpException::class);
+        ->toThrow(DomainException::class);
 });
 
 it('el primer vale tras un aumento de credito respeta el 50% del disponible mas el margen', function (): void {
@@ -144,7 +143,7 @@ it('el primer vale tras un aumento de credito respeta el 50% del disponible mas 
     $cliente = crearClienteQA50($distribuidora);
     $producto = productoQA50(9501, $distribuidora->usuario_id);
     expect(fn () => $svc->solicitar(['cliente_id' => $cliente->id, 'producto_id' => $producto->id], usuarioFrescoQA50($distribuidora)))
-        ->toThrow(HttpException::class);
+        ->toThrow(DomainException::class);
 
     $cliente2 = crearClienteQA50($distribuidora);
     $producto2 = productoQA50(9500, $distribuidora->usuario_id);
@@ -211,5 +210,5 @@ it('REGRESION: un vale creado en el mismo segundo que un aumento aprobado no deb
     $cliente = crearClienteQA50($distribuidora);
     $producto = productoQA50(9501, $distribuidora->usuario_id);
     expect(fn () => $svc->solicitar(['cliente_id' => $cliente->id, 'producto_id' => $producto->id], usuarioFrescoQA50($distribuidora)))
-        ->toThrow(HttpException::class);
+        ->toThrow(DomainException::class);
 });

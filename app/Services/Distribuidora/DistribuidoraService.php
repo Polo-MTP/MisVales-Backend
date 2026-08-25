@@ -8,6 +8,7 @@ use App\Models\Distribuidora;
 use App\Models\HistorialCoordinador;
 use App\Models\User;
 use App\Services\Notificacion\NotificacionService;
+use DomainException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -147,15 +148,15 @@ final class DistribuidoraService
         }
 
         if ($coordinadorOrigen->role?->name !== 'Coordinador' || $coordinadorDestino->role?->name !== 'Coordinador') {
-            abort(422, 'Ambos usuarios deben tener el rol Coordinador.');
+            throw new DomainException('Ambos usuarios deben tener el rol Coordinador.');
         }
 
         if ($coordinadorOrigen->id === $coordinadorDestino->id) {
-            abort(422, 'El coordinador destino debe ser diferente del coordinador de origen.');
+            throw new DomainException('El coordinador destino debe ser diferente del coordinador de origen.');
         }
 
         if ($coordinadorDestino->sucursal_id !== $coordinadorOrigen->sucursal_id) {
-            abort(422, 'El coordinador destino debe pertenecer a la misma sucursal que el de origen.');
+            throw new DomainException('El coordinador destino debe pertenecer a la misma sucursal que el de origen.');
         }
 
         if ($rolUsuario === 'Gerente de Sucursal' && $coordinadorOrigen->sucursal_id !== $usuario->sucursal_id) {

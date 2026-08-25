@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Relacion;
 
+use App\Enums\ApiErrorCode;
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Api\V1\Relacion\DecidirSolicitudConciliacionRequest;
 use App\Http\Requests\Api\V1\Relacion\EjecutarConciliacionManualRequest;
@@ -134,7 +135,7 @@ final class ConciliacionController extends ApiController
                 message: 'Solicitud de conciliación manual enviada. Queda pendiente de autorización.'
             );
         } catch (DomainException $e) {
-            return $this->error($e->getMessage());
+            return $this->error($e->getMessage(), 422, [], ApiErrorCode::DOMAIN_ERROR);
         }
     }
 
@@ -176,7 +177,7 @@ final class ConciliacionController extends ApiController
                 message: 'Decisión registrada exitosamente.'
             );
         } catch (DomainException $e) {
-            return $this->error($e->getMessage());
+            return $this->error($e->getMessage(), 422, [], ApiErrorCode::DOMAIN_ERROR);
         }
     }
 
@@ -200,7 +201,7 @@ final class ConciliacionController extends ApiController
                 message: 'Abono conciliado manualmente.'
             );
         } catch (DomainException $e) {
-            return $this->error($e->getMessage());
+            return $this->error($e->getMessage(), 422, [], ApiErrorCode::DOMAIN_ERROR);
         }
     }
 }

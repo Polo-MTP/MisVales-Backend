@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Distribuidora;
 
+use App\Enums\ApiErrorCode;
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Api\V1\Distribuidora\DecidirSolicitudEdicionClienteRequest;
 use App\Http\Requests\Api\V1\Distribuidora\SolicitarEdicionClienteRequest;
@@ -84,7 +85,7 @@ final class SolicitudEdicionClienteController extends ApiController
                 message: 'Decisión registrada exitosamente.'
             );
         } catch (DomainException $e) {
-            return $this->error($e->getMessage());
+            return $this->error($e->getMessage(), 422, [], ApiErrorCode::DOMAIN_ERROR);
         }
     }
 
@@ -110,7 +111,7 @@ final class SolicitudEdicionClienteController extends ApiController
                 message: 'Datos del cliente actualizados exitosamente.'
             );
         } catch (DomainException $e) {
-            return $this->error($e->getMessage());
+            return $this->error($e->getMessage(), 422, [], ApiErrorCode::DOMAIN_ERROR);
         }
     }
 }

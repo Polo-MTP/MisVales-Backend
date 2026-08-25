@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\ApiErrorCode;
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Api\V1\ConfirmMfaSetupRequest;
 use App\Http\Requests\Api\V1\VerifyMfaRequest;
@@ -113,7 +114,7 @@ final class MfaController extends ApiController
         try {
             $setupData = $mfaService->generateSetupData($email);
         } catch (DomainException $e) {
-            return $this->error($e->getMessage(), 409);
+            return $this->error($e->getMessage(), 422, [], ApiErrorCode::DOMAIN_ERROR);
         }
 
         return $this->success(

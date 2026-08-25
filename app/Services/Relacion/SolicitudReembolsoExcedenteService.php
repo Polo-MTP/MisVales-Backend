@@ -36,11 +36,11 @@ final class SolicitudReembolsoExcedenteService
         }
 
         if ($vale->estado !== 'pagado') {
-            abort(422, 'Solo se puede solicitar el reembolso del saldo a favor de un vale ya liquidado por completo -- mientras tenga cuotas pendientes, el saldo se le sigue aplicando solo.');
+            throw new DomainException('Solo se puede solicitar el reembolso del saldo a favor de un vale ya liquidado por completo -- mientras tenga cuotas pendientes, el saldo se le sigue aplicando solo.');
         }
 
         if ((float) $vale->saldo_excedente <= 0) {
-            abort(422, 'Este vale no tiene saldo a favor pendiente de reembolsar.');
+            throw new DomainException('Este vale no tiene saldo a favor pendiente de reembolsar.');
         }
 
         $yaTienePendiente = SolicitudReembolsoExcedente::query()
@@ -49,7 +49,7 @@ final class SolicitudReembolsoExcedenteService
             ->exists();
 
         if ($yaTienePendiente) {
-            abort(422, 'Ya hay una solicitud de reembolso pendiente para este vale.');
+            throw new DomainException('Ya hay una solicitud de reembolso pendiente para este vale.');
         }
 
         /** @var SolicitudReembolsoExcedente $solicitud */
@@ -111,7 +111,7 @@ final class SolicitudReembolsoExcedenteService
             $montoReembolsado = (float) $vale->saldo_excedente;
 
             if ($montoReembolsado <= 0) {
-                abort(422, 'Este vale ya no tiene saldo a favor -- probablemente ya se consumió o reembolsó por otro lado. Rechaza esta solicitud.');
+                throw new DomainException('Este vale ya no tiene saldo a favor -- probablemente ya se consumió o reembolsó por otro lado. Rechaza esta solicitud.');
             }
 
             ExcedenteMovimiento::query()->create([

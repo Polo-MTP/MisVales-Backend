@@ -43,11 +43,11 @@ final class SolicitudTransferenciaClienteService
             ->first();
 
         if (! $historialActivo) {
-            abort(422, 'Este cliente no tiene una distribuidora activa asignada.');
+            throw new DomainException('Este cliente no tiene una distribuidora activa asignada.');
         }
 
         if ($historialActivo->distribuidor_id === $distribuidoraDestino->id) {
-            abort(422, 'Este cliente ya pertenece a tu distribuidora.');
+            throw new DomainException('Este cliente ya pertenece a tu distribuidora.');
         }
 
         $yaTienePendiente = SolicitudTransferenciaCliente::query()
@@ -56,7 +56,7 @@ final class SolicitudTransferenciaClienteService
             ->exists();
 
         if ($yaTienePendiente) {
-            abort(422, 'Ya existe una solicitud de transferencia en curso para este cliente.');
+            throw new DomainException('Ya existe una solicitud de transferencia en curso para este cliente.');
         }
 
         /** @var SolicitudTransferenciaCliente $solicitud */

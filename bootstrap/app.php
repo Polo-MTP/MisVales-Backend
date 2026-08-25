@@ -13,11 +13,14 @@ use App\Http\Middleware\LogApiRequests;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\VerifyVpnAccess;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Contracts\Database\LostConnectionDetector;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull;
 use Illuminate\Foundation\Http\Middleware\TrimStrings;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -153,6 +156,17 @@ return Application::configure(basePath: dirname(__DIR__))
             'error_code' => ApiErrorCode::METHOD_NOT_ALLOWED->value,
         ], 405));
 
+        // ThrottleRequestsException (rate limiting: throttle:auth, throttle:api -- ver
+        // AppServiceProvider) es subclase de HttpException, así que sin este renderer
+        // específico caía en el HttpExceptionInterface genérico de abajo con el mensaje
+        // default de Laravel ("Too Many Attempts."), el único texto que quedaba en inglés
+        // en toda la API. Va antes que el genérico para que lo atrape primero.
+        $exceptions->render(fn (ThrottleRequestsException $e, Request $request): JsonResponse => response()->json([
+            'success' => false,
+            'message' => 'Demasiados intentos. Intenta de nuevo más tarde.',
+            'error_code' => ApiErrorCode::RATE_LIMITED->value,
+        ], 429));
+
         // Cubre los abort($codigo, 'mensaje') usados en toda la app (403, 409, 422...).
         // El mensaje de un abort() sí es siempre texto que el propio desarrollador
         // escribió pensando en el usuario final, así que es seguro devolverlo tal cual.
@@ -170,11 +184,43 @@ return Application::configure(basePath: dirname(__DIR__))
             'error_code' => ApiErrorCode::DOMAIN_ERROR->value,
         ], 422));
 
-        // Red de seguridad final: cualquier otra excepción (bug real, error de BD, etc.)
-        // se registra completa en el log del servidor, pero el mensaje que sale por la
-        // API siempre es genérico — independientemente de APP_DEBUG. La verbosidad de
-        // depuración no debe depender de una variable de entorno que alguien puede
-        // dejar mal puesta en producción.
+        // Connection::runQueryCallback() envuelve CUALQUIER falla del driver PDO (conexión
+        // rechazada, timeout, servidor caído, "server has gone away"...) en QueryException --
+        // por eso basta con atrapar esta única clase para cubrir también una caída total de la
+        // BD, sin necesitar un handler aparte para PDOException. reconnectIfMissingConnection()
+        // y el reintento automático de Connection ya se intentaron y fallaron antes de que la
+        // excepción llegue hasta aquí.
+        //
+        // No toda QueryException es "la BD está caída" -- también cubre bugs reales (columna
+        // que no existe, sintaxis inválida, constraint violado). causedByLostConnection() es el
+        // mismo detector que usa el propio Connection::handleQueryException() para decidir si
+        // vale la pena reintentar, así que es la forma correcta de distinguir "problema de
+        // conectividad, reintentable" de "bug de query, reintentar no lo arregla". Si no es lo
+        // primero, se regresa null para que caiga en el catch-all genérico de abajo (500).
+        $exceptions->render(function (QueryException $e, Request $request): ?JsonResponse {
+            if (! app(LostConnectionDetector::class)->causedByLostConnection($e)) {
+                return null;
+            }
+
+            Log::error('Base de datos no disponible', [
+                'message' => $e->getMessage(),
+                'sql' => $e->getSql(),
+                'url' => $request->fullUrl(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'El servicio no está disponible en este momento. Intenta de nuevo en unos minutos.',
+                'error_code' => ApiErrorCode::SERVICE_UNAVAILABLE->value,
+            ], 503);
+        });
+
+        // Red de seguridad final: cualquier otra excepción (bug real, incluida una
+        // QueryException que NO fue por conectividad -- columna inexistente, sintaxis
+        // inválida, constraint violado...) se registra completa en el log del servidor,
+        // pero el mensaje que sale por la API siempre es genérico — independientemente
+        // de APP_DEBUG. La verbosidad de depuración no debe depender de una variable de
+        // entorno que alguien puede dejar mal puesta en producción.
         $exceptions->render(function (Throwable $e, Request $request): JsonResponse {
             Log::error('Excepción no controlada', [
                 'exception' => $e::class,

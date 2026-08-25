@@ -90,5 +90,5 @@ it('no se puede reasignar hacia una distribuidora que no está activa', function
     $destino->update(['estado' => 'RECHAZADO']);
 
     expect(fn () => app(ClienteService::class)->reasignarTodos($origen, $destino, $coordinador))
-        ->toThrow(Symfony\Component\HttpKernel\Exception\HttpException::class, 'La distribuidora destino no puede recibir clientes en su estado actual.');
+        ->toThrow(DomainException::class, 'La distribuidora destino no puede recibir clientes en su estado actual.');
 });

@@ -31,11 +31,11 @@ final class SolicitudAumentoCreditoService
         $this->verificarAutoridadSobreDistribuidora($distribuidora, $usuario);
 
         if ($distribuidora->estado !== 'ACTIVO') {
-            abort(422, 'Solo una distribuidora ACTIVA puede solicitar un aumento de crédito.');
+            throw new DomainException('Solo una distribuidora ACTIVA puede solicitar un aumento de crédito.');
         }
 
         if ($montoSolicitado <= 0) {
-            abort(422, 'El monto solicitado debe ser mayor a cero.');
+            throw new DomainException('El monto solicitado debe ser mayor a cero.');
         }
 
         $yaTienePendiente = SolicitudAumentoCredito::query()
@@ -44,7 +44,7 @@ final class SolicitudAumentoCreditoService
             ->exists();
 
         if ($yaTienePendiente) {
-            abort(422, 'Esta distribuidora ya tiene una solicitud de aumento de crédito pendiente.');
+            throw new DomainException('Esta distribuidora ya tiene una solicitud de aumento de crédito pendiente.');
         }
 
         /** @var SolicitudAumentoCredito $solicitud */
@@ -96,11 +96,11 @@ final class SolicitudAumentoCreditoService
         }
 
         if ($montoOtorgado === null || $montoOtorgado <= 0) {
-            abort(422, 'Debes indicar el monto otorgado para aprobar la solicitud.');
+            throw new DomainException('Debes indicar el monto otorgado para aprobar la solicitud.');
         }
 
         if ($montoOtorgado > (float) $solicitud->monto_solicitado) {
-            abort(422, 'El monto otorgado no puede ser mayor al monto solicitado.');
+            throw new DomainException('El monto otorgado no puede ser mayor al monto solicitado.');
         }
 
         return DB::transaction(function () use ($solicitud, $montoOtorgado, $comentario, $gerente, $distribuidora): SolicitudAumentoCredito {

@@ -114,9 +114,11 @@ it('un DomainException (regla de negocio) trae error_code DOMAIN_ERROR', functio
 
     Sanctum::actingAs($gerente);
 
-    // El controller atrapa el DomainException y responde vía $this->error() sin status
-    // explícito -- default 400 (Response::HTTP_BAD_REQUEST), no 422.
+    // Todo DomainException, se atrape localmente en un controller (como aquí) o llegue sin
+    // atrapar hasta el renderer central de bootstrap/app.php, responde siempre 422 con
+    // error_code DOMAIN_ERROR -- contrato fijo para el frontend, sin importar en qué
+    // controller se haya originado.
     $this->putJson("/api/v1/distribuidoras/aumento-credito/{$solicitud->id}/decidir", ['decision' => 'aprobada', 'monto_otorgado' => 100])
-        ->assertStatus(400)
+        ->assertStatus(422)
         ->assertJsonPath('error_code', ApiErrorCode::DOMAIN_ERROR->value);
 });

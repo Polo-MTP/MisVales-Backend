@@ -9,6 +9,7 @@ use App\Models\Distribuidora;
 use App\Models\Producto;
 use App\Models\User;
 use App\Models\Vale;
+use DomainException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
@@ -54,7 +55,7 @@ final class ValeService
             ->exists();
 
         if ($tieneValeSinLiquidar) {
-            abort(422, 'Este cliente ya tiene un vale activo o pendiente. Debe liquidarse antes de poder solicitar otro.');
+            throw new DomainException('Este cliente ya tiene un vale activo o pendiente. Debe liquidarse antes de poder solicitar otro.');
         }
 
         /** @var Producto $producto */
@@ -63,7 +64,7 @@ final class ValeService
         $esPrimerVale = ! $distribuidora->vales()->exists();
 
         if (! $distribuidora->puedeSolicitarVale((float) $producto->monto, $esPrimerVale)) {
-            abort(422, 'La distribuidora no cumple las condiciones para solicitar este vale (crédito disponible insuficiente o límite del primer vale excedido).');
+            throw new DomainException('La distribuidora no cumple las condiciones para solicitar este vale (crédito disponible insuficiente o límite del primer vale excedido).');
         }
 
         return DB::transaction(function () use ($distribuidora, $cliente, $producto, $data): Vale {
@@ -101,11 +102,11 @@ final class ValeService
         ?bool $comprobanteDomicilioVerificado = null,
     ): Vale {
         if ($vale->estado !== 'solicitado') {
-            abort(422, "Solo se pueden validar vales en estado 'solicitado' (actual: {$vale->estado}).");
+            throw new DomainException("Solo se pueden validar vales en estado 'solicitado' (actual: {$vale->estado}).");
         }
 
         if ($ineVerificada === false || $comprobanteDomicilioVerificado === false) {
-            abort(422, 'No se puede validar el vale: la INE y el comprobante de domicilio del cliente deben coincidir. Corrige los datos o pide autorización para editarlos antes de continuar.');
+            throw new DomainException('No se puede validar el vale: la INE y el comprobante de domicilio del cliente deben coincidir. Corrige los datos o pide autorización para editarlos antes de continuar.');
         }
 
         /** @var Cliente $cliente */
@@ -113,7 +114,7 @@ final class ValeService
 
         if (! $cliente->clabe) {
             if (! $clabe) {
-                abort(422, 'Este cliente no tiene CLABE interbancaria registrada. Captúrala para poder validar y transferirle el pago.');
+                throw new DomainException('Este cliente no tiene CLABE interbancaria registrada. Captúrala para poder validar y transferirle el pago.');
             }
 
             $cliente->clabe = $clabe;
@@ -144,7 +145,7 @@ final class ValeService
     public function autorizar(Vale $vale, User $usuario): Vale
     {
         if ($vale->estado !== 'validado') {
-            abort(422, "Solo se pueden autorizar vales ya validados (actual: {$vale->estado}). Valida los datos del cliente primero.");
+            throw new DomainException("Solo se pueden autorizar vales ya validados (actual: {$vale->estado}). Valida los datos del cliente primero.");
         }
 
         return DB::transaction(function () use ($vale): Vale {
@@ -152,7 +153,7 @@ final class ValeService
             $distribuidora = Distribuidora::query()->whereKey($vale->distribuidora_id)->lockForUpdate()->firstOrFail();
 
             if ((float) $vale->monto > $distribuidora->credito_disponible) {
-                abort(422, 'La distribuidora ya no tiene crédito disponible suficiente para autorizar este vale.');
+                throw new DomainException('La distribuidora ya no tiene crédito disponible suficiente para autorizar este vale.');
             }
 
             $vale->estado = 'autorizado';
@@ -174,7 +175,7 @@ final class ValeService
         $this->verificarPropiedad($vale, $usuario);
 
         if ($vale->estado !== 'solicitado') {
-            abort(422, "Solo se pueden desactivar vales en estado 'solicitado' (actual: {$vale->estado}). Un vale autorizado, pagado, vencido o parcial ya cuenta contra el crédito y no puede desactivarse desde aquí.");
+            throw new DomainException("Solo se pueden desactivar vales en estado 'solicitado' (actual: {$vale->estado}). Un vale autorizado, pagado, vencido o parcial ya cuenta contra el crédito y no puede desactivarse desde aquí.");
         }
 
         $vale->update(['activo' => false]);
@@ -191,7 +192,7 @@ final class ValeService
         $this->verificarPropiedad($vale, $usuario);
 
         if ($vale->estado !== 'solicitado') {
-            abort(422, "Solo se pueden reactivar vales en estado 'solicitado' (actual: {$vale->estado}).");
+            throw new DomainException("Solo se pueden reactivar vales en estado 'solicitado' (actual: {$vale->estado}).");
         }
 
         $vale->update(['activo' => true]);
