@@ -56,6 +56,15 @@ final class ConciliacionBancariaService
             array_shift($filas) ?? []
         );
 
+        // COLUMNAS_ESPERADAS existía pero nunca se usaba para validar nada -- si el banco
+        // renombraba/quitaba una columna, el archivo se "procesaba" igual, con esa columna
+        // leyéndose silenciosamente como vacía en cada fila (ver mapearFila()) en vez de
+        // avisar con un error claro por qué nada está conciliando.
+        $columnasFaltantes = array_diff(self::COLUMNAS_ESPERADAS, $encabezado);
+        if ($columnasFaltantes !== []) {
+            throw new DomainException('El archivo no tiene las columnas esperadas: '.implode(', ', $columnasFaltantes).'.');
+        }
+
         $resumen = ['procesadas' => 0, 'conciliadas' => 0, 'sin_coincidencia' => 0, 'duplicados' => 0, 'errores' => []];
 
         foreach ($filas as $numeroFila => $fila) {
@@ -176,7 +185,13 @@ final class ConciliacionBancariaService
             // Vacío/no-match: el abono se aplica al corte completo, igual que antes.
             'concepto' => trim((string) ($fila['concepto'] ?? '')),
             'monto' => (float) preg_replace('/[^0-9.\-]/', '', (string) ($fila['pago'] ?? 0)),
-            'folio_pago' => isset($fila['folio de pago']) ? trim((string) $fila['folio de pago']) : null,
+            // '' normalizado a null (no solo "sin la clave"): una celda vacía en el Excel debe
+            // guardarse como NULL, no como string vacío -- si no, el respaldo de deduplicación
+            // sin folio (ver procesarFila()) nunca encuentra el whereNull('folio_pago') que
+            // necesita para comparar contra abonos previos igual de "sin folio".
+            'folio_pago' => (isset($fila['folio de pago']) && trim((string) $fila['folio de pago']) !== '')
+                ? trim((string) $fila['folio de pago'])
+                : null,
             'fecha_pago' => $this->parsearFecha($fila['fecha de pago'] ?? null),
             'hora_pago' => $this->parsearHora($fila['hora'] ?? null),
             'tipo_pago' => $this->normalizarTipoPago((string) ($fila['tipo de pago'] ?? '')),
@@ -193,6 +208,17 @@ final class ConciliacionBancariaService
             throw new InvalidArgumentException('Referencia o monto inválido.');
         }
 
+        $relacion = Relacion::query()->where('referencia_pago', $datos['referencia'])->first();
+
+        // Si el corte tiene más de un vale y la distribuidora puso el concepto de uno en
+        // particular, el abono es de ESE vale, no del corte completo -- buscarlo solo dentro
+        // de los detalles de la relación ya encontrada (el concepto no es global, es por vale).
+        // Se calcula ANTES del chequeo de duplicados de abajo porque el respaldo sin folio lo
+        // necesita (ver comentario ahí).
+        $detalle = ($relacion && $datos['concepto'] !== '')
+            ? RelacionDetalle::query()->where('relacion_id', $relacion->id)->where('concepto', $datos['concepto'])->first()
+            : null;
+
         // El folio de pago es el identificador único que da el banco a esa transferencia --
         // si ya existe un abono con el mismo folio, es el mismo pago (Excel resubido, o el
         // banco exporta "últimos N días" y una fila se solapa con la importación anterior):
@@ -203,16 +229,32 @@ final class ConciliacionBancariaService
             if ($existente) {
                 return $existente;
             }
+        } else {
+            // Sin folio (el banco no siempre lo trae, ej. depósitos en ventanilla) no hay
+            // identificador único que comparar -- se arma uno compuesto con el resto de los
+            // datos EXACTOS de la fila, incluyendo relacion_detalle_id: sin esto, dos vales
+            // DISTINTOS del mismo corte multi-vale que coincidieran en monto+fecha+hora se
+            // habrían tratado como el mismo pago reimportado, perdiendo el segundo abono real.
+            // Que dos pagos reales distintos coincidan a la vez en los cinco es prácticamente
+            // imposible, así que si ya existe un abono (también sin folio) con todo igual, es
+            // el mismo movimiento reimportado, no uno nuevo.
+            $existente = AbonoConciliacion::query()
+                ->whereNull('folio_pago')
+                ->where('referencia_leida', $datos['referencia'])
+                ->where('monto', $datos['monto'])
+                // whereDate(), no where(): el cast 'date' de Eloquent guarda fecha_pago con hora
+                // en 00:00:00 ("2026-02-13 00:00:00"), no como el string plano "2026-02-13" que
+                // trae $datos -- mismo problema (y mismo fix) que ya se dio en otro lado de esta
+                // API con vigente_desde/vigente_hasta.
+                ->when($datos['fecha_pago'] === null, fn ($q) => $q->whereNull('fecha_pago'), fn ($q) => $q->whereDate('fecha_pago', $datos['fecha_pago']))
+                ->when($datos['hora_pago'] === null, fn ($q) => $q->whereNull('hora_pago'), fn ($q) => $q->where('hora_pago', $datos['hora_pago']))
+                ->when($detalle === null, fn ($q) => $q->whereNull('relacion_detalle_id'), fn ($q) => $q->where('relacion_detalle_id', $detalle->id))
+                ->first();
+
+            if ($existente) {
+                return $existente;
+            }
         }
-
-        $relacion = Relacion::query()->where('referencia_pago', $datos['referencia'])->first();
-
-        // Si el corte tiene más de un vale y la distribuidora puso el concepto de uno en
-        // particular, el abono es de ESE vale, no del corte completo -- buscarlo solo dentro
-        // de los detalles de la relación ya encontrada (el concepto no es global, es por vale).
-        $detalle = ($relacion && $datos['concepto'] !== '')
-            ? RelacionDetalle::query()->where('relacion_id', $relacion->id)->where('concepto', $datos['concepto'])->first()
-            : null;
 
         $abono = AbonoConciliacion::query()->create([
             'relacion_id' => $relacion?->id,

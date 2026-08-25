@@ -59,7 +59,13 @@ final class AuditService
         }
 
         if (! empty($filters['modulo'])) {
-            $query->where('modulo', $filters['modulo']);
+            if ($filters['modulo'] === 'General') {
+                $query->where(function ($q): void {
+                    $q->where('modulo', 'General')->orWhereNull('modulo');
+                });
+            } else {
+                $query->where('modulo', $filters['modulo']);
+            }
         }
 
         if (! empty($filters['nivel'])) {

@@ -91,11 +91,11 @@ function crearDistribuidora(): Distribuidora
     ]);
 }
 
-function crearExcelBanco(array $filas): UploadedFile
+function crearExcelBanco(array $filas, ?array $encabezado = null): UploadedFile
 {
     $spreadsheet = new Spreadsheet();
     $sheet = $spreadsheet->getActiveSheet();
-    $sheet->fromArray(['item', 'Concepto', 'Referencia', 'Pago', 'Folio de pago', 'Fecha de pago', 'Hora', 'tipo de pago'], null, 'A1');
+    $sheet->fromArray($encabezado ?? ['item', 'Concepto', 'Referencia', 'Pago', 'Folio de pago', 'Fecha de pago', 'Hora', 'tipo de pago'], null, 'A1');
     $sheet->fromArray($filas, null, 'A2');
 
     $ruta = sys_get_temp_dir().'/test_banco_'.uniqid().'.xlsx';
@@ -287,6 +287,78 @@ it('reimportar el mismo excel del banco no duplica el abono (mismo folio de pago
     expect(AbonoConciliacion::query()->where('folio_pago', 'F001')->count())->toBe(1);
 });
 
+it('reimportar el mismo excel SIN folio de pago tampoco duplica el abono (respaldo por referencia+monto+fecha+hora)', function (): void {
+    $distribuidora = crearDistribuidora();
+    crearVale($distribuidora, 15000, 8, '2026-02-01');
+
+    $relacion = app(RelacionCalculoService::class)->generarParaDistribuidora($distribuidora, '2026-02-15');
+    $cajera = User::factory()->create();
+
+    // Fila sin Folio de pago (celda vacía) -- pasa igual, ver mapearFila().
+    $archivo = crearExcelBanco([
+        [1, 'Pago de distribuidora', $relacion->referencia_pago, 2712, '', '13/2/2026', '14:00', 'Transferencia'],
+    ]);
+
+    $primerResumen = app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, $cajera);
+    expect($primerResumen['conciliadas'])->toBe(1)
+        ->and($primerResumen['duplicados'])->toBe(0);
+
+    $archivoRepetido = crearExcelBanco([
+        [1, 'Pago de distribuidora', $relacion->referencia_pago, 2712, '', '13/2/2026', '14:00', 'Transferencia'],
+    ]);
+    $segundoResumen = app(ConciliacionBancariaService::class)->importarArchivo($archivoRepetido, null, $cajera);
+
+    expect($segundoResumen['procesadas'])->toBe(0)
+        ->and($segundoResumen['duplicados'])->toBe(1);
+
+    expect((float) $relacion->fresh()->total_abonado)->toBe(2712.0)
+        ->and(AbonoConciliacion::query()->whereNull('folio_pago')->count())->toBe(1);
+});
+
+it('dos pagos reales distintos sin folio, con referencia/monto/fecha/hora distintos, NO se tratan como duplicados', function (): void {
+    $distribuidoraA = crearDistribuidora();
+    crearVale($distribuidoraA, 15000, 8, '2026-02-01');
+    $relacionA = app(RelacionCalculoService::class)->generarParaDistribuidora($distribuidoraA, '2026-02-15');
+
+    $sucursalB = Sucursal::create(['nombre' => 'Sucursal B', 'codigo' => 'SUC-B-'.uniqid(), 'es_matriz' => false, 'is_active' => true]);
+    $categoriaB = CategoriaDistribuidora::create(['nombre' => 'PLATA-'.uniqid(), 'porcentaje_comision' => 6, 'activo' => true]);
+    $roleDistribuidora = Role::query()->where('name', 'Distribuidora')->firstOrFail();
+    $userB = User::factory()->create(['role_id' => $roleDistribuidora->id, 'sucursal_id' => $sucursalB->id]);
+    $distribuidoraB = Distribuidora::create([
+        'usuario_id' => $userB->id, 'numero_distribuidora' => 'DIST-B-'.uniqid(), 'limite_credito' => 20000,
+        'categoria_id' => $categoriaB->id, 'puntos_acumulados' => 0, 'estado' => 'ACTIVO', 'sucursal_id' => $sucursalB->id,
+    ]);
+    crearVale($distribuidoraB, 15000, 8, '2026-02-01');
+    $relacionB = app(RelacionCalculoService::class)->generarParaDistribuidora($distribuidoraB, '2026-02-15');
+
+    $cajera = User::factory()->create();
+
+    $archivo = crearExcelBanco([
+        [1, 'Pago A', $relacionA->referencia_pago, 2712, '', '13/2/2026', '14:00', 'Transferencia'],
+        [2, 'Pago B', $relacionB->referencia_pago, 2712, '', '13/2/2026', '15:00', 'Transferencia'],
+    ]);
+
+    $resumen = app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, $cajera);
+
+    expect($resumen['conciliadas'])->toBe(2)
+        ->and($resumen['duplicados'])->toBe(0);
+    expect((float) $relacionA->fresh()->total_abonado)->toBe(2712.0)
+        ->and((float) $relacionB->fresh()->total_abonado)->toBe(2712.0);
+});
+
+it('rechaza el archivo si le falta alguna de las columnas esperadas', function (): void {
+    $cajera = User::factory()->create();
+
+    // Sin la columna "Folio de pago".
+    $archivo = crearExcelBanco(
+        [[1, 'Pago', '000000005020260215', 2712, '13/2/2026', '14:00', 'Transferencia']],
+        ['item', 'Concepto', 'Referencia', 'Pago', 'Fecha de pago', 'Hora', 'tipo de pago']
+    );
+
+    expect(fn () => app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, $cajera))
+        ->toThrow(DomainException::class, 'El archivo no tiene las columnas esperadas: folio de pago.');
+});
+
 it('no evalúa como fórmula una referencia del banco que por casualidad empiece con "="', function (): void {
     $cajera = User::factory()->create();
 
@@ -449,6 +521,39 @@ it('un corte con dos vales: cada uno se paga por separado usando su propio "Conc
 
     expect($detalleB->estado)->toBe('pagado')
         ->and($relacion->estado)->toBe('liquidada');
+});
+
+it('dos vales del mismo corte con igual monto, pagados sin folio a la misma fecha/hora, NO se confunden entre sí', function (): void {
+    // Caso borde del respaldo de deduplicación sin folio (ver procesarFila()): si no
+    // distinguiera por relacion_detalle_id, este segundo pago se leería como "duplicado" del
+    // primero (misma referencia+monto+fecha+hora) y se perdería en silencio.
+    $distribuidora = crearDistribuidora();
+    $valeA = crearVale($distribuidora, 15000, 8);
+    $valeB = crearVale($distribuidora, 15000, 8);
+
+    $relacion = app(RelacionCalculoService::class)->generarParaDistribuidora($distribuidora, '2026-02-15');
+    $relacion->loadMissing('detalles');
+
+    $detalleA = $relacion->detalles->firstWhere('vale_id', $valeA->id);
+    $detalleB = $relacion->detalles->firstWhere('vale_id', $valeB->id);
+
+    expect((float) $detalleA->total)->toBe((float) $detalleB->total);
+
+    $cajera = User::factory()->create();
+
+    $archivo = crearExcelBanco([
+        [1, $detalleA->concepto, $relacion->referencia_pago, (float) $detalleA->total, '', '13/2/2026', '10:00', 'Transferencia'],
+        [2, $detalleB->concepto, $relacion->referencia_pago, (float) $detalleB->total, '', '13/2/2026', '10:00', 'Transferencia'],
+    ]);
+
+    $resumen = app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, $cajera);
+
+    expect($resumen['conciliadas'])->toBe(2)
+        ->and($resumen['duplicados'])->toBe(0);
+
+    expect($detalleA->fresh()->estado)->toBe('pagado')
+        ->and($detalleB->fresh()->estado)->toBe('pagado')
+        ->and($relacion->fresh()->estado)->toBe('liquidada');
 });
 
 it('sin concepto (o corte de un solo vale) el abono se sigue aplicando al corte completo, como antes', function (): void {
