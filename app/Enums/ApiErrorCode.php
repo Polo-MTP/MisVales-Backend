@@ -57,33 +57,4 @@ enum ApiErrorCode: string
             default => self::SERVER_ERROR,
         };
     }
-
-    /**
-     * Código corto para mostrar al usuario junto al mensaje (ej. "Código: MV-301"). NO es lo
-     * mismo que $this->value -- ese es el identificador técnico en inglés para que el
-     * frontend distinga el tipo de error sin parsear 'message'; este es para que la persona
-     * lo lea, lo anote y lo reporte a soporte, sin exponer nada técnico (nombre de excepción,
-     * status HTTP crudo, stack trace). AppendSupportCode lo agrega solo, en cada respuesta de
-     * error -- no hace falta tocar cada controller/middleware que arma un error a mano.
-     *
-     * Agrupado por prefijo para que soporte pueda triar por familia con solo ver el número:
-     * 1xx sesión, 2xx permisos, 3xx solicitud/negocio, 5xx servidor.
-     */
-    public function supportCode(): string
-    {
-        return match ($this) {
-            self::UNAUTHENTICATED => 'MV-101',
-            self::SESSION_IDLE_TIMEOUT => 'MV-102',
-            self::ACCOUNT_INACTIVE => 'MV-103',
-            self::FORBIDDEN => 'MV-201',
-            self::VPN_REQUIRED => 'MV-202',
-            self::VALIDATION_ERROR => 'MV-301',
-            self::DOMAIN_ERROR => 'MV-302',
-            self::NOT_FOUND => 'MV-303',
-            self::METHOD_NOT_ALLOWED => 'MV-304',
-            self::RATE_LIMITED => 'MV-305',
-            self::SERVER_ERROR => 'MV-501',
-            self::SERVICE_UNAVAILABLE => 'MV-502',
-        };
-    }
 }

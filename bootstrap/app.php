@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Enums\ApiErrorCode;
 use Illuminate\Auth\Middleware\Authenticate;
-use App\Http\Middleware\AppendSupportCode;
 use App\Http\Middleware\CheckRole;
 use App\Http\Middleware\EnsureTokenNotIdle;
 use App\Http\Middleware\EnsureUserIsActive;
@@ -63,11 +62,6 @@ return Application::configure(basePath: dirname(__DIR__))
         // prepend() queda además como el middleware más externo posible, para que el header
         // sobreviva a cualquier otra cosa que truene después.
         $middleware->prepend(SecurityHeaders::class);
-
-        // Mismo criterio de "global y primero" que SecurityHeaders arriba -- ver
-        // AppendSupportCode: agrega un código corto reportable (ej. "MV-301") a cualquier
-        // respuesta de error, sin tener que tocar cada controller/middleware que arma una.
-        $middleware->prepend(AppendSupportCode::class);
 
         // Sin esto, una petición sin sesión que además NO manda "Accept: application/json"
         // (el frontend real siempre lo manda -- ver auth.interceptor.ts -- pero cualquier otro
