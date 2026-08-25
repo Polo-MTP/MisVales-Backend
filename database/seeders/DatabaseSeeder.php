@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             QaUsersSeeder::class,               // Usuarios de prueba (uno por rol) para entregar a infra/QA
             GerenteGeneralUttSeeder::class,      // Gerente General adicional (correo UTT)
             KyeUsersSeeder::class,               // 5 usuarios de prueba por rol (correo Kye)
+            JonathanUsersSeeder::class,          // 3 usuarios de prueba por rol (correo Jonathan)
         ]);
     }
 }
