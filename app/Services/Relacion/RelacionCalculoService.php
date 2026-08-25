@@ -29,14 +29,17 @@ use Throwable;
  * una cuota ("quincena") de cada vale pendiente, así que un vale a N quincenas tarda N/2
  * meses en liquidarse.
  *
- * Los puntos de fidelidad NO se calculan aquí: solo aplican sobre pagos anticipados, y eso
- * se determina hasta la conciliación bancaria (fuera del alcance de este service).
+ * Los puntos de fidelidad NO se calculan aquí como regla general: solo aplican sobre pagos
+ * anticipados, y eso se determina hasta la conciliación bancaria (fuera del alcance de este
+ * service) -- salvo el caso borde en que el saldo a favor de un excedente anterior alcance para
+ * liquidar el corte completo en el momento de generarlo (ver ExcedenteConciliacionService).
  */
 final class RelacionCalculoService
 {
     public function __construct(
         private readonly ConfiguracionService $configuracionService,
         private readonly NotificacionService $notificacionService,
+        private readonly ExcedenteConciliacionService $excedenteConciliacionService,
     ) {}
 
     /**
@@ -243,6 +246,12 @@ final class RelacionCalculoService
                 'total_recargos' => $totales['recargo'],
                 'total_a_pagar' => $totales['total'],
             ]);
+
+            // Si la distribuidora tiene saldo a favor de un excedente de un corte anterior
+            // (pagó de más y no se le aplicó todavía), se descuenta aquí mismo, antes de que
+            // nadie vea este corte -- así ni la distribuidora ni la cajera tienen que hacer
+            // nada para que se refleje.
+            $this->excedenteConciliacionService->aplicarAlNuevoCorte($relacion, $fechaCorte);
 
             $relacion = $relacion->fresh(['detalles.vale', 'detalles.cliente', 'detalles.producto', 'categoriaSnapshot']);
 

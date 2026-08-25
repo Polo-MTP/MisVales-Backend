@@ -118,9 +118,17 @@ final class DistribuidoraService
     /**
      * Obtiene el saldo disponible (crédito total - vales activos).
      */
-    public function obtenerSaldoDisponible(Distribuidora $distribuidora): float
+    /**
+     * @return array{credito_disponible: float, saldo_excedente: float}
+     */
+    public function obtenerSaldoDisponible(Distribuidora $distribuidora): array
     {
-        return $distribuidora->credito_disponible; // accesor del modelo
+        return [
+            'credito_disponible' => $distribuidora->credito_disponible, // accesor del modelo
+            // Saldo a favor por un pago de más en conciliación bancaria que todavía no se le
+            // ha aplicado a ningún corte (ver ExcedenteConciliacionService).
+            'saldo_excedente' => (float) $distribuidora->saldo_excedente,
+        ];
     }
 
     /**

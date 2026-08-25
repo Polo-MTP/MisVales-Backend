@@ -24,6 +24,7 @@ final class Distribuidora extends Model
         // 'credito_disponible' → lo calculamos, no lo guardamos
         'categoria_id',
         'puntos_acumulados',
+        'saldo_excedente',
         'estado',              // ahora es string (ACTIVO, INACTIVO, etc.)
         // Nuevos campos que agregaste en tu migración:
         'sucursal_id',
@@ -41,6 +42,7 @@ final class Distribuidora extends Model
     protected $casts = [
         'limite_credito' => 'decimal:2',
         'puntos_acumulados' => 'integer',
+        'saldo_excedente' => 'decimal:2',
         'estado' => 'string',
         'fecha_aprobacion' => 'datetime',
     ];
@@ -142,6 +144,14 @@ final class Distribuidora extends Model
     public function puntosMovimientos(): HasMany
     {
         return $this->hasMany(PuntoMovimiento::class);
+    }
+
+    /**
+     * Movimientos del saldo a favor generado por pagos de más en conciliación bancaria.
+     */
+    public function excedenteMovimientos(): HasMany
+    {
+        return $this->hasMany(ExcedenteMovimiento::class);
     }
 
     /**

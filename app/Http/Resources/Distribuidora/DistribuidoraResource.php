@@ -30,6 +30,10 @@ final class DistribuidoraResource extends JsonResource
             'puede_solicitar_vales' => in_array($this->estado, ['ACTIVO', 'EN_VERIFICACION'], true),
             'categoria' => new CategoriaDistribuidoraResource($this->whenLoaded('categoria')),
             'puntos_acumulados' => $this->puntos_acumulados,
+            // Saldo a favor por pagos de más en conciliación bancaria (ver
+            // ExcedenteConciliacionService) -- se descuenta solo del siguiente corte que se
+            // genere, así que mientras tanto se queda aquí, visible.
+            'saldo_excedente' => $this->saldo_excedente,
             'estado' => $this->estado,
             'sucursal' => [
                 'id' => $this->sucursal?->id,

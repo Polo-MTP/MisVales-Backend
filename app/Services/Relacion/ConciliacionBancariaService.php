@@ -5,11 +5,9 @@ declare(strict_types=1);
 namespace App\Services\Relacion;
 
 use App\Models\AbonoConciliacion;
-use App\Models\PuntoMovimiento;
 use App\Models\Relacion;
 use App\Models\RelacionDetalle;
 use App\Models\User;
-use App\Models\Vale;
 use App\Services\Configuracion\ConfiguracionService;
 use App\Services\Notificacion\NotificacionService;
 use Carbon\Carbon;
@@ -35,6 +33,8 @@ final class ConciliacionBancariaService
     public function __construct(
         private readonly ConfiguracionService $configuracionService,
         private readonly NotificacionService $notificacionService,
+        private readonly RelacionLiquidacionService $relacionLiquidacionService,
+        private readonly ExcedenteConciliacionService $excedenteConciliacionService,
     ) {}
 
     /**
@@ -265,11 +265,6 @@ final class ConciliacionBancariaService
         DB::transaction(function () use ($relacion, $monto, $fechaAbono, $detalle): void {
             $relacion->refresh();
 
-            // margen_tolerancia_conciliacion sigue vigente más abajo, pero solo para decidir
-            // si un EXCEDENTE (pagaron de más) amerita avisarle a alguien -- no para decidir
-            // si algo ya quedó pagado, ver EPSILON_LIQUIDACION arriba.
-            $margenTolerancia = (float) ($this->configuracionService->obtenerValorVigente('margen_tolerancia_conciliacion') ?? 0);
-
             if ($detalle) {
                 $detalle->refresh();
                 $detalle->pago = (float) $detalle->pago + $monto;
@@ -292,170 +287,15 @@ final class ConciliacionBancariaService
 
             $relacion->save();
 
-            if ($relacion->estado === 'liquidada') {
-                $this->procesarPuntos($relacion, $fechaAbono);
-                $this->marcarValesPagados($relacion);
-            }
+            $this->relacionLiquidacionService->procesarLiquidacion($relacion, $fechaAbono);
 
             // Si el banco reportó más de lo que se debía (o dos abonos distintos matchearon el
-            // mismo concepto por error), el excedente no se refleja en ningún lado más que aquí
-            // -- sin avisar, ese dinero de más queda invisible en vez de esperar a que alguien
-            // decida si se aplica al siguiente corte o se reembolsa a la distribuidora.
+            // mismo concepto por error), el excedente se registra en el saldo a favor de la
+            // distribuidora (ExcedenteConciliacionService) -- se descuenta solo del siguiente
+            // corte que se le genere, sin que nadie tenga que aplicarlo a mano.
             $excedente = (float) $relacion->total_abonado - (float) $relacion->total_a_pagar;
-            if ($excedente > $margenTolerancia) {
-                $recurso = 'Relación #'.$relacion->id.' — excedente $'.number_format($excedente, 2);
-                $this->notificacionService->notificarRolEnSucursal('Gerente de Sucursal', $relacion->sucursal_id, 'abono_excedente', $recurso);
-                $this->notificacionService->notificarRolEnSucursal('Coordinador', $relacion->sucursal_id, 'abono_excedente', $recurso);
-            }
+            $this->excedenteConciliacionService->registrar($relacion, $excedente);
         });
-    }
-
-    /**
-     * Al liquidarse el corte, cada cuota (RelacionDetalle) de ese corte queda 'pagado' — sin
-     * esto, RelacionCalculoService::calcularDetalleVale() nunca encuentra una cuota anterior en
-     * 'pagado' (se queda en 'pendiente' para siempre) y le cobra el recargo por atraso a TODO
-     * corte a partir del segundo, así se haya pagado puntual.
-     *
-     * Un vale además queda 'pagado' hasta que se liquida su última cuota (cuota_numero ===
-     * cuotas_totales); si nació como 'pre-vale' (primer vale de un cliente nuevo), se convierte
-     * en 'vale-digital' en ese mismo momento.
-     */
-    private function marcarValesPagados(Relacion $relacion): void
-    {
-        $relacion->loadMissing('detalles.vale');
-
-        foreach ($relacion->detalles as $detalle) {
-            if ($detalle->estado !== 'pagado') {
-                $detalle->update(['estado' => 'pagado']);
-            }
-
-            if ($detalle->cuota_numero !== $detalle->cuotas_totales) {
-                continue;
-            }
-
-            $vale = $detalle->vale;
-            if (! $vale || $vale->estado === 'pagado') {
-                continue;
-            }
-
-            $vale->estado = 'pagado';
-            if ($vale->tipo === 'pre-vale') {
-                $vale->tipo = 'vale-digital';
-            }
-            $vale->save();
-        }
-    }
-
-    /**
-     * Puntos solo en pago anticipado; penalización del 20% si fue fuera de tiempo. Pago puntual: sin efecto.
-     */
-    private function procesarPuntos(Relacion $relacion, Carbon $fechaAbono): void
-    {
-        if (PuntoMovimiento::query()->where('relacion_id', $relacion->id)->exists()) {
-            return; // Ya se procesó (evita doble conteo si llegan varios abonos tras liquidar).
-        }
-
-        $esAnticipado = $relacion->fecha_pago_anticipado_desde
-            && $relacion->fecha_pago_anticipado_hasta
-            && $fechaAbono->betweenIncluded($relacion->fecha_pago_anticipado_desde, $relacion->fecha_pago_anticipado_hasta);
-
-        $esTardio = $fechaAbono->greaterThan($relacion->fecha_limite_pago);
-
-        if ($esAnticipado) {
-            $this->generarPuntos($relacion);
-        } elseif ($esTardio) {
-            $this->penalizarPuntos($relacion);
-        }
-    }
-
-    /**
-     * Otorga puntos de fidelidad por pago anticipado, calculados sobre el total de productos
-     * otorgados en el corte según los divisores/multiplicadores configurables.
-     */
-    private function generarPuntos(Relacion $relacion): void
-    {
-        $divisor = (float) ($this->configuracionService->obtenerValorVigente('puntos_divisor') ?? 1200);
-        $multiplicador = (float) ($this->configuracionService->obtenerValorVigente('puntos_multiplicador') ?? 3);
-
-        $totalOtorgado = $this->totalProductosOtorgadosEnCorte($relacion);
-        $puntos = (int) (floor($totalOtorgado / max($divisor, 1)) * $multiplicador);
-
-        if ($puntos <= 0) {
-            return;
-        }
-
-        PuntoMovimiento::query()->create([
-            'distribuidora_id' => $relacion->distribuidora_id,
-            'relacion_id' => $relacion->id,
-            'tipo' => 'generado',
-            'cantidad' => $puntos,
-            'motivo' => 'Pago anticipado de la relación '.$relacion->referencia_pago,
-        ]);
-
-        $relacion->distribuidora?->increment('puntos_acumulados', $puntos);
-        $relacion->update(['puntos_generados' => $puntos]);
-
-        if ($relacion->distribuidora?->usuario) {
-            $this->notificacionService->crear(
-                $relacion->distribuidora->usuario,
-                'puntos_generados',
-                'Relación '.$relacion->referencia_pago.' (+'.$puntos.' pts)'
-            );
-        }
-    }
-
-    /**
-     * Descuenta un porcentaje configurable de los puntos acumulados por pago fuera de tiempo.
-     */
-    private function penalizarPuntos(Relacion $relacion): void
-    {
-        $pct = (float) ($this->configuracionService->obtenerValorVigente('puntos_penalizacion_pct') ?? 20);
-        $puntosActuales = (int) ($relacion->distribuidora?->puntos_acumulados ?? 0);
-        $penalizacion = (int) floor($puntosActuales * $pct / 100);
-
-        if ($penalizacion <= 0) {
-            return;
-        }
-
-        PuntoMovimiento::query()->create([
-            'distribuidora_id' => $relacion->distribuidora_id,
-            'relacion_id' => $relacion->id,
-            'tipo' => 'penalizado',
-            'cantidad' => -$penalizacion,
-            'motivo' => 'Pago fuera de tiempo de la relación '.$relacion->referencia_pago,
-        ]);
-
-        $relacion->distribuidora?->decrement('puntos_acumulados', $penalizacion);
-
-        if ($relacion->distribuidora?->usuario) {
-            $this->notificacionService->crear(
-                $relacion->distribuidora->usuario,
-                'puntos_penalizados',
-                'Relación '.$relacion->referencia_pago.' (-'.$penalizacion.' pts)'
-            );
-        }
-    }
-
-    /**
-     * "Total de productos otorgados en el corte": suma de los vales autorizados a esta distribuidora
-     * entre el corte anterior y el corte actual. Supuesto a confirmar (ver documento fuente, ambiguo).
-     */
-    private function totalProductosOtorgadosEnCorte(Relacion $relacion): float
-    {
-        $corteAnterior = Relacion::query()
-            ->where('distribuidora_id', $relacion->distribuidora_id)
-            ->where('id', '!=', $relacion->id)
-            ->where('fecha_corte', '<', $relacion->fecha_corte)
-            ->latest('fecha_corte')
-            ->first();
-
-        $desde = $corteAnterior?->fecha_corte ?? $relacion->distribuidora?->created_at;
-
-        return (float) Vale::query()
-            ->where('distribuidora_id', $relacion->distribuidora_id)
-            ->when($desde, fn ($q) => $q->where('fecha_autorizacion', '>=', $desde))
-            ->where('fecha_autorizacion', '<=', $relacion->fecha_corte)
-            ->sum('monto');
     }
 
     /**
