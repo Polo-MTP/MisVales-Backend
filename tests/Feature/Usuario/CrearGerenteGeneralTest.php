@@ -93,6 +93,33 @@ it('el Gerente General NO puede dar de alta otro Gerente General -- solo Adminis
     expect(User::where('email', 'otro.gg@example.com')->exists())->toBeFalse();
 });
 
+it('el Administrador NO puede dar de alta un segundo Gerente General si ya existe uno (activo o no)', function (): void {
+    crearGerenteGeneralExistente();
+    Sanctum::actingAs(crearAdministradorActor());
+
+    $response = $this->postJson('/api/v1/usuarios/gerente-general', datosPersonalesValidosGG([
+        'nombre' => 'Segundo', 'apellido_paterno' => 'GG', 'apellido_materno' => null,
+        'email' => 'segundo.gg@example.com',
+    ]));
+
+    $response->assertStatus(422)->assertJsonValidationErrors('role');
+    expect(User::where('email', 'segundo.gg@example.com')->exists())->toBeFalse();
+});
+
+it('el Administrador NO puede dar de alta un segundo Gerente General ni aunque el existente esté desactivado', function (): void {
+    $rolGG = Role::firstOrCreate(['name' => 'Gerente General']);
+    User::factory()->create(['role_id' => $rolGG->id, 'is_active' => false]);
+    Sanctum::actingAs(crearAdministradorActor());
+
+    $response = $this->postJson('/api/v1/usuarios/gerente-general', datosPersonalesValidosGG([
+        'nombre' => 'Segundo', 'apellido_paterno' => 'GG', 'apellido_materno' => null,
+        'email' => 'segundo.gg.b@example.com',
+    ]));
+
+    $response->assertStatus(422)->assertJsonValidationErrors('role');
+    expect(User::where('email', 'segundo.gg.b@example.com')->exists())->toBeFalse();
+});
+
 it('no se puede colar otro rol -- el endpoint siempre crea Gerente General, ignora cualquier role_id que manden', function (): void {
     Sanctum::actingAs(crearAdministradorActor());
 

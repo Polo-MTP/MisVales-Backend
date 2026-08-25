@@ -119,3 +119,36 @@ it('rechaza dar de alta un Gerente de Sucursal en una sucursal deshabilitada', f
     expect(User::where('email', 'cerrada@example.com')->exists())->toBeFalse();
     Mail::assertNothingSent();
 });
+
+it('rechaza dar de alta un segundo Gerente de Sucursal activo en una sucursal que ya tiene uno', function (): void {
+    $sucursal = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-001', 'es_matriz' => true, 'is_active' => true]);
+    $rolGS = Role::firstOrCreate(['name' => 'Gerente de Sucursal']);
+    User::factory()->create(['role_id' => $rolGS->id, 'sucursal_id' => $sucursal->id, 'is_active' => true]);
+    Sanctum::actingAs(crearGerenteGeneralUsr());
+
+    $response = $this->postJson('/api/v1/usuarios/gerente-sucursal', datosPersonalesValidosGS([
+        'nombre' => 'Segundo', 'apellido_paterno' => 'Gerente', 'apellido_materno' => null,
+        'email' => 'segundo.gerente@example.com',
+        'sucursal_id' => $sucursal->id,
+    ]));
+
+    $response->assertStatus(422)->assertJsonValidationErrors('sucursal_id');
+    expect(User::where('email', 'segundo.gerente@example.com')->exists())->toBeFalse();
+    Mail::assertNothingSent();
+});
+
+it('sí permite dar de alta un Gerente de Sucursal si el anterior de esa sucursal ya está desactivado', function (): void {
+    $sucursal = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-001', 'es_matriz' => true, 'is_active' => true]);
+    $rolGS = Role::firstOrCreate(['name' => 'Gerente de Sucursal']);
+    User::factory()->create(['role_id' => $rolGS->id, 'sucursal_id' => $sucursal->id, 'is_active' => false]);
+    Sanctum::actingAs(crearGerenteGeneralUsr());
+
+    $response = $this->postJson('/api/v1/usuarios/gerente-sucursal', datosPersonalesValidosGS([
+        'nombre' => 'Reemplazo', 'apellido_paterno' => 'Gerente', 'apellido_materno' => null,
+        'email' => 'reemplazo.gerente@example.com',
+        'sucursal_id' => $sucursal->id,
+    ]));
+
+    $response->assertStatus(201);
+    expect(User::where('email', 'reemplazo.gerente@example.com')->exists())->toBeTrue();
+});

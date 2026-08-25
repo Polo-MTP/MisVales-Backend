@@ -102,6 +102,21 @@ final class UsuarioController extends ApiController
             ]);
         }
 
+        // Como mucho un Gerente de Sucursal activo por sucursal -- si el actual se va, primero
+        // hay que desactivarlo (o moverlo a otra sucursal) antes de poder dar de alta uno
+        // nuevo aquí. Uno inactivo no cuenta: ya dejó el puesto, la sucursal queda libre.
+        $yaTieneGerente = User::query()
+            ->where('role_id', $rolGerenteSucursal->id)
+            ->where('sucursal_id', $sucursal->id)
+            ->where('is_active', true)
+            ->exists();
+
+        if ($yaTieneGerente) {
+            throw ValidationException::withMessages([
+                'sucursal_id' => 'Esta sucursal ya tiene un Gerente de Sucursal activo asignado.',
+            ]);
+        }
+
         $data = $request->validated();
         $passwordGenerada = Str::password(22);
 
@@ -146,10 +161,24 @@ final class UsuarioController extends ApiController
      * auto-perpetúe sin que Administrador se entere). El rol queda fijo en el controller. Un
      * Gerente General no está atado a ninguna sucursal en particular (ve todo), así que se
      * asigna a la matriz en vez de pedir sucursal_id en el request.
+     *
+     * Solo puede haber UN Gerente General en todo el sistema, sin excepción -- no hay forma de
+     * "degradarlo" para abrir espacio a otro. Se checa por existencia (activo o no): si el
+     * único que hay se desactivó, no se reemplaza creando uno nuevo, se reactiva el que ya
+     * existe (fuera de la app, igual que Administrador). Esta validación va aquí -- antes de
+     * armar nada -- y no en CrearGerenteGeneralRequest, porque necesita pegarle a la base de
+     * datos, no es una regla de forma del payload.
      */
     public function crearGerenteGeneral(CrearGerenteGeneralRequest $request): JsonResponse
     {
         $rolGerenteGeneral = Role::query()->where('name', 'Gerente General')->firstOrFail();
+
+        if (User::query()->where('role_id', $rolGerenteGeneral->id)->exists()) {
+            throw ValidationException::withMessages([
+                'role' => 'Ya existe un Gerente General en el sistema. No se puede crear otro -- reactiva o recupera la cuenta existente en vez de crear una nueva.',
+            ]);
+        }
+
         $matriz = Sucursal::query()->where('es_matriz', true)->first();
 
         if (! $matriz) {

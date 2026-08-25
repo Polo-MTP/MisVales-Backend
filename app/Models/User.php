@@ -53,6 +53,7 @@ use Laravel\Sanctum\HasApiTokens;
 #[Hidden([
     'password',
     'remember_token',
+    'es_el_unico_administrador',
 ])]
 final class User extends Authenticatable
 {
@@ -62,6 +63,27 @@ final class User extends Authenticatable
     use HasFactory;
 
     use Notifiable;
+
+    /**
+     * Mantiene 'es_el_unico_administrador' en sincronía con el rol en CADA guardado (alta o
+     * cambio de rol) -- true solo si el usuario es Administrador, null para cualquier otro
+     * caso. El índice único de esa columna (ver la migración) es lo que de verdad hace
+     * imposible que exista un segundo Administrador; esto solo la mantiene actualizada para
+     * que ese candado no dependa de que alguien la llene a mano.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (User $user): void {
+            if ($user->exists && ! $user->isDirty('role_id')) {
+                return;
+            }
+
+            $user->es_el_unico_administrador = $user->role_id !== null
+                && Role::query()->whereKey($user->role_id)->where('name', 'Administrador')->exists()
+                ? true
+                : null;
+        });
+    }
 
     /**
      * Rol que determina los permisos del usuario.
@@ -155,6 +177,7 @@ final class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
             'is_locked' => 'boolean',
+            'es_el_unico_administrador' => 'boolean',
             'failed_attempts' => 'integer',
             'locked_until' => 'datetime',
         ];
