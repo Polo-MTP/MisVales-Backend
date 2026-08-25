@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'distribuidora_id',
     'relacion_id',
+    'vale_id',
     'tipo',
     'monto',
     'motivo',
@@ -37,10 +38,20 @@ final class ExcedenteMovimiento extends Model
 
     /**
      * Relación (corte) que originó el excedente (tipo=generado) o lo consumió (tipo=aplicado).
+     * Null en tipo=reembolsado -- no hay ningún corte involucrado, es una devolución directa.
      */
     public function relacion(): BelongsTo
     {
         return $this->belongsTo(Relacion::class);
+    }
+
+    /**
+     * Vale al que pertenece este saldo -- el excedente es del cliente/vale que lo generó, no
+     * un pozo agregado de la distribuidora.
+     */
+    public function vale(): BelongsTo
+    {
+        return $this->belongsTo(Vale::class);
     }
 
     /**

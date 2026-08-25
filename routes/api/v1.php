@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\MfaController;
 use App\Http\Controllers\Api\V1\Producto\ProductoController;
 use App\Http\Controllers\Api\V1\Relacion\ConciliacionController;
 use App\Http\Controllers\Api\V1\Relacion\RelacionController;
+use App\Http\Controllers\Api\V1\Relacion\SolicitudReembolsoExcedenteController;
 use App\Http\Controllers\Api\V1\Reporte\ReporteController;
 use App\Http\Controllers\Api\V1\Sucursal\SucursalController;
 use App\Http\Controllers\Api\V1\UploadController;
@@ -433,6 +434,19 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
             ->middleware('role:Distribuidora')
             ->name('api.v1.vales.store');
 
+        // Reembolso del saldo a favor de un vale ya liquidado sin más cuotas que lo consuman
+        // solo (ver ExcedenteConciliacionService/SolicitudReembolsoExcedenteService). Deben ir
+        // ANTES de las rutas con {vale}: aunque aquí no colisionan (verbos/formas distintas),
+        // es el mismo criterio ya usado en el resto del archivo para rutas literales vs wildcard.
+        Route::get('reembolso-excedente', [SolicitudReembolsoExcedenteController::class, 'index'])
+            ->middleware('role:Cajera,Coordinador,Gerente de Sucursal,Gerente General')
+            ->name('api.v1.vales.reembolso_excedente.index');
+
+        // Decisión del gerente — solo VPN, igual que el resto de decisiones de autorización.
+        Route::put('reembolso-excedente/{solicitud}/decidir', [SolicitudReembolsoExcedenteController::class, 'decidir'])
+            ->middleware(['role:Gerente de Sucursal,Gerente General', 'vpn'])
+            ->name('api.v1.vales.reembolso_excedente.decidir');
+
         // La cajera valida en persona los datos del cliente contra el vale — paso obligatorio
         // antes de poder autorizar/pagar. Misma razón que autorizar: responde desde red pública.
         Route::put('{vale}/validar', [ValeController::class, 'validar'])
@@ -454,6 +468,11 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
         Route::put('{vale}/activar', [ValeController::class, 'activar'])
             ->middleware('role:Distribuidora')
             ->name('api.v1.vales.activar');
+
+        // Solo la cajera pide el reembolso -- lo ve en la misma pantalla donde consulta el vale.
+        Route::post('{vale}/reembolso-excedente', [SolicitudReembolsoExcedenteController::class, 'store'])
+            ->middleware('role:Cajera')
+            ->name('api.v1.vales.reembolso_excedente.store');
     });
 
     // ============================================================

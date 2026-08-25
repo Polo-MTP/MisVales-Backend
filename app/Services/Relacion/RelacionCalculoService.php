@@ -40,6 +40,7 @@ final class RelacionCalculoService
         private readonly ConfiguracionService $configuracionService,
         private readonly NotificacionService $notificacionService,
         private readonly ExcedenteConciliacionService $excedenteConciliacionService,
+        private readonly RelacionLiquidacionService $relacionLiquidacionService,
     ) {}
 
     /**
@@ -224,9 +225,16 @@ final class RelacionCalculoService
             $totales = [
                 'capital' => 0.0, 'comision' => 0.0, 'interes' => 0.0, 'seguro' => 0.0, 'categoria' => 0.0, 'recargo' => 0.0, 'total' => 0.0,
             ];
+            $totalAbonadoPorExcedente = 0.0;
 
             foreach ($valesPendientes as $vale) {
                 $detalle = $this->calcularDetalleVale($relacion, $vale, $comisionBasePct, $interesPctQuincena, $multaNoPago);
+
+                // Si este vale tiene saldo a favor de un excedente de un corte anterior (pagó
+                // de más y todavía no se le aplicó a ninguna cuota suya), se descuenta aquí
+                // mismo contra la cuota que se le acaba de generar -- antes de que nadie vea
+                // este corte, sin que la distribuidora ni la cajera tengan que hacer nada.
+                $totalAbonadoPorExcedente += $this->excedenteConciliacionService->aplicarAlVale($detalle, $vale);
 
                 $totales['capital'] += (float) $detalle->capital;
                 $totales['comision'] += (float) $detalle->comision;
@@ -247,11 +255,16 @@ final class RelacionCalculoService
                 'total_a_pagar' => $totales['total'],
             ]);
 
-            // Si la distribuidora tiene saldo a favor de un excedente de un corte anterior
-            // (pagó de más y no se le aplicó todavía), se descuenta aquí mismo, antes de que
-            // nadie vea este corte -- así ni la distribuidora ni la cajera tienen que hacer
-            // nada para que se refleje.
-            $this->excedenteConciliacionService->aplicarAlNuevoCorte($relacion, $fechaCorte);
+            if ($totalAbonadoPorExcedente > 0.0) {
+                // Corte recién creado: nada más pudo haberlo abonado todavía, así que el total
+                // de excedente aplicado ES el total_abonado inicial (no se suma a nada previo).
+                $relacion->total_abonado = $totalAbonadoPorExcedente;
+                $saldoPendiente = $totales['total'] - $totalAbonadoPorExcedente;
+                $relacion->estado = $saldoPendiente <= 0.01 ? 'liquidada' : 'parcial';
+                $relacion->save();
+
+                $this->relacionLiquidacionService->procesarLiquidacion($relacion, $fechaCorte);
+            }
 
             $relacion = $relacion->fresh(['detalles.vale', 'detalles.cliente', 'detalles.producto', 'categoriaSnapshot']);
 

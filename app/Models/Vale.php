@@ -29,6 +29,7 @@ final class Vale extends Model
         'fecha_validacion',
         'fecha_autorizacion',
         'numero_transferencia',
+        'saldo_excedente',
     ];
 
     protected $casts = [
@@ -40,6 +41,7 @@ final class Vale extends Model
         'fecha_autorizacion' => 'datetime',
         'ine_verificada' => 'boolean',
         'comprobante_domicilio_verificado' => 'boolean',
+        'saldo_excedente' => 'decimal:2',
     ];
 
     /**
@@ -80,5 +82,22 @@ final class Vale extends Model
     public function validadoPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'validado_por');
+    }
+
+    /**
+     * Movimientos del saldo a favor de ESTE vale (generado por pagos de más en conciliación,
+     * consumido en cuotas futuras del mismo vale, o reembolsado) -- ver ExcedenteConciliacionService.
+     */
+    public function excedenteMovimientos(): HasMany
+    {
+        return $this->hasMany(ExcedenteMovimiento::class);
+    }
+
+    /**
+     * Solicitudes de reembolso del saldo a favor de este vale.
+     */
+    public function solicitudesReembolsoExcedente(): HasMany
+    {
+        return $this->hasMany(SolicitudReembolsoExcedente::class);
     }
 }

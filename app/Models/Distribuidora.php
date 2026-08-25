@@ -24,7 +24,6 @@ final class Distribuidora extends Model
         // 'credito_disponible' → lo calculamos, no lo guardamos
         'categoria_id',
         'puntos_acumulados',
-        'saldo_excedente',
         'estado',              // ahora es string (ACTIVO, INACTIVO, etc.)
         // Nuevos campos que agregaste en tu migración:
         'sucursal_id',
@@ -42,7 +41,6 @@ final class Distribuidora extends Model
     protected $casts = [
         'limite_credito' => 'decimal:2',
         'puntos_acumulados' => 'integer',
-        'saldo_excedente' => 'decimal:2',
         'estado' => 'string',
         'fecha_aprobacion' => 'datetime',
     ];
@@ -147,7 +145,9 @@ final class Distribuidora extends Model
     }
 
     /**
-     * Movimientos del saldo a favor generado por pagos de más en conciliación bancaria.
+     * Movimientos del saldo a favor generado por pagos de más en conciliación bancaria --
+     * denormalizado aquí (además de en cada Vale) solo para reporte/auditoría a nivel
+     * distribuidora; el saldo real vive por vale (ver getSaldoExcedenteAttribute()).
      */
     public function excedenteMovimientos(): HasMany
     {
@@ -185,6 +185,17 @@ final class Distribuidora extends Model
         }
 
         return trim($datos->nombre.' '.$datos->apellido_paterno.' '.($datos->apellido_materno ?? ''));
+    }
+
+    /**
+     * Suma del saldo a favor de TODOS los vales de esta distribuidora -- solo para mostrar un
+     * total en el dashboard/"ver saldo disponible". El saldo real (y el que se consume/
+     * reembolsa) vive por vale (Vale::saldo_excedente), a propósito: así el excedente de un
+     * cliente nunca paga la deuda de otro cliente de la misma distribuidora.
+     */
+    public function getSaldoExcedenteAttribute(): float
+    {
+        return (float) ($this->vales()->sum('saldo_excedente') ?? 0);
     }
 
     /**

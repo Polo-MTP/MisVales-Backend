@@ -332,11 +332,16 @@ final class ConciliacionBancariaService
             $this->relacionLiquidacionService->procesarLiquidacion($relacion, $fechaAbono);
 
             // Si el banco reportó más de lo que se debía (o dos abonos distintos matchearon el
-            // mismo concepto por error), el excedente se registra en el saldo a favor de la
-            // distribuidora (ExcedenteConciliacionService) -- se descuenta solo del siguiente
-            // corte que se le genere, sin que nadie tenga que aplicarlo a mano.
-            $excedente = (float) $relacion->total_abonado - (float) $relacion->total_a_pagar;
-            $this->excedenteConciliacionService->registrar($relacion, $excedente);
+            // mismo concepto por error), el excedente se registra en el saldo a favor del VALE
+            // específico que lo generó (ExcedenteConciliacionService) -- nunca de la
+            // distribuidora en general, para que el excedente de un cliente no termine pagando
+            // la deuda de otro. Se descuenta solo de las cuotas futuras de ESE mismo vale.
+            if ($detalle) {
+                $this->excedenteConciliacionService->registrarParaDetalle($relacion, $detalle);
+            } else {
+                $excedente = (float) $relacion->total_abonado - (float) $relacion->total_a_pagar;
+                $this->excedenteConciliacionService->registrarParaRelacion($relacion, $excedente);
+            }
         });
     }
 

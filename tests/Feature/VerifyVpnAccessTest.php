@@ -106,6 +106,17 @@ it('las dos rutas de decisión confirmadas por infra tienen el middleware vpn ad
 });
 
 /**
+ * Mueve dinero real fuera del sistema al aprobarse -- mismo criterio que el resto de
+ * decisiones de autorización de este archivo.
+ */
+it('la decisión de reembolso de excedente tiene el middleware vpn adjunto', function (): void {
+    $ruta = Route::getRoutes()->getByName('api.v1.vales.reembolso_excedente.decidir');
+
+    expect($ruta)->not->toBeNull()
+        ->and($ruta->middleware())->toContain('vpn');
+});
+
+/**
  * Se había quedado sin 'vpn' -- a diferencia de usuarios/personal (mismo tipo de alta de
  * cuentas de staff, que sí lo tenía), nada lo cubría con un test.
  */

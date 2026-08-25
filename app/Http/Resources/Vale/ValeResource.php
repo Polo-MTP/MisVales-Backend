@@ -62,6 +62,11 @@ final class ValeResource extends JsonResource
             'comprobante_domicilio_verificado' => $this->comprobante_domicilio_verificado,
             'fecha_autorizacion' => $this->fecha_autorizacion?->toIso8601String(),
             'numero_transferencia' => $this->numero_transferencia,
+            // Saldo a favor de ESTE vale (no de la distribuidora) por un pago de más en
+            // conciliación -- ver ExcedenteConciliacionService. Se aplica solo a las cuotas
+            // futuras de este mismo vale; si ya está 'pagado' y aquí sigue habiendo algo, ya no
+            // hay ninguna cuota que lo consuma sola (ver SolicitudReembolsoExcedente).
+            'saldo_excedente' => (float) $this->saldo_excedente,
             'created_at' => $this->created_at?->toIso8601String(),
             // Cortes (relaciones) donde ya se facturó alguna cuota de este vale -- antes no había
             // forma de rastrear, desde el vale, en qué corte(s) quedó incluido.
