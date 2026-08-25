@@ -23,6 +23,22 @@ it('una petición sin autenticar trae error_code UNAUTHENTICATED', function (): 
         ->assertJsonPath('error_code', ApiErrorCode::UNAUTHENTICATED->value);
 });
 
+/**
+ * getJson() siempre manda "Accept: application/json" por debajo -- igual que el frontend real
+ * (ver auth.interceptor.ts), pero eso significaba que ESTE caso nunca se probaba: sin ese
+ * header, Authenticate::redirectTo() de Laravel intentaba route('login') para armar un
+ * redirect -- esta app es 100% API, esa ruta no existe, y construir esa URL aventaba
+ * RouteNotFoundException sin capturar ANTES de que la excepción de autenticación se terminara
+ * de armar, resultando en 500 SERVER_ERROR en vez de 401 UNAUTHENTICATED. Un curl suelto,
+ * Postman sin configurar, o cualquier cliente que no sea este frontend lo hubiera pisado.
+ * Corregido con Authenticate::redirectUsing(fn () => null) en bootstrap/app.php.
+ */
+it('una petición sin autenticar y SIN header Accept:application/json también trae error_code UNAUTHENTICATED (no 500)', function (): void {
+    $this->get('/api/v1/me')
+        ->assertStatus(401)
+        ->assertJsonPath('error_code', ApiErrorCode::UNAUTHENTICATED->value);
+});
+
 it('un rol sin permiso para la ruta trae error_code FORBIDDEN', function (): void {
     $role = Role::firstOrCreate(['name' => 'Cajera']);
     Sanctum::actingAs(User::factory()->create(['role_id' => $role->id, 'is_active' => true]));

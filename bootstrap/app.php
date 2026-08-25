@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\ApiErrorCode;
+use Illuminate\Auth\Middleware\Authenticate;
 use App\Http\Middleware\CheckRole;
 use App\Http\Middleware\EnsureEmailVerified;
 use App\Http\Middleware\EnsureTokenNotIdle;
@@ -60,6 +61,18 @@ return Application::configure(basePath: dirname(__DIR__))
         // prepend() queda además como el middleware más externo posible, para que el header
         // sobreviva a cualquier otra cosa que truene después.
         $middleware->prepend(SecurityHeaders::class);
+
+        // Sin esto, una petición sin sesión que además NO manda "Accept: application/json"
+        // (el frontend real siempre lo manda -- ver auth.interceptor.ts -- pero cualquier otro
+        // cliente: curl suelto, Postman sin configurar, una integración externa futura, no
+        // necesariamente) truena en 500 en vez de devolver el 401 esperado. Authenticate::
+        // redirectTo() por default intenta route('login') para construir un redirect -- esta
+        // app es 100% API, esa ruta no existe, y construir esa URL avienta
+        // RouteNotFoundException sin capturar antes de que la excepción de autenticación
+        // siquiera se termine de armar. Con esto nunca intenta redirigir a ningún lado: el
+        // flujo cae siempre al render(AuthenticationException) de abajo, con su error_code
+        // UNAUTHENTICATED correcto, sin importar qué Accept mande el cliente.
+        Authenticate::redirectUsing(fn () => null);
 
         // Activa el modo "stateful" de Sanctum: peticiones que vienen de un dominio listado en
         // SANCTUM_STATEFUL_DOMAINS se autentican por cookie de sesión httpOnly en vez de Bearer
