@@ -46,10 +46,19 @@ return Application::configure(basePath: dirname(__DIR__))
         // El alias por sí solo no aplica el middleware a ninguna ruta: hay que
         // adjuntarlo al grupo 'api' para que corra en todas las respuestas de la API.
         $middleware->api(append: [
-            SecurityHeaders::class,
             TrimStrings::class,
             ConvertEmptyStringsToNull::class,
         ]);
+
+        // SecurityHeaders (incluye X-Server-Number, ver la clase) va en el stack GLOBAL, no
+        // solo en el grupo 'api': una ruta que no existe en absoluto ni siquiera llega a
+        // ejecutar el middleware de un grupo -- Laravel no puede saber a qué grupo pertenece
+        // algo que no matcheó ninguna ruta. Confirmado en vivo: este proyecto además tiene una
+        // fallback route (grazulex/laravel-apiroute) que SÍ atrapa cualquier URL, con su propio
+        // stack de middleware ajeno al de 'api' -- solo el global envuelve también a esa. Con
+        // prepend() queda además como el middleware más externo posible, para que el header
+        // sobreviva a cualquier otra cosa que truene después.
+        $middleware->prepend(SecurityHeaders::class);
 
         // Activa el modo "stateful" de Sanctum: peticiones que vienen de un dominio listado en
         // SANCTUM_STATEFUL_DOMAINS se autentican por cookie de sesión httpOnly en vez de Bearer

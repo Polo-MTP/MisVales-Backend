@@ -15,6 +15,16 @@ final class SecurityHeaders
         /** @var Response $response */
         $response = $next($request);
 
+        // Identifica qué instancia de servidor atendió la petición -- antes solo se exponía
+        // en el body de GET /status, llamado una sola vez al cargar el login. Detrás de un
+        // balanceador con varias instancias, soporte no tenía forma de saber cuál sirvió
+        // cualquier otra petición (ni siquiera una que falló) para reproducir un problema.
+        // Va en TODA respuesta de la API, éxito o error, porque este middleware envuelve la
+        // ejecución completa del request -- una excepción no atrapada se convierte en
+        // Response antes de burbujear de vuelta hasta aquí, así que el header se sigue
+        // aplicando igual.
+        $response->headers->set('X-Server-Number', (string) config('app.server_number', '?'));
+
         $response->headers->set('X-Frame-Options', 'DENY');
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('X-XSS-Protection', '1; mode=block');
