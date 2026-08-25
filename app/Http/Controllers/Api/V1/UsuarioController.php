@@ -99,7 +99,7 @@ final class UsuarioController extends ApiController
             ]);
         }
 
-        $passwordGenerada = Str::password(16);
+        $passwordGenerada = Str::password(22);
 
         $usuario = User::query()->create([
             'name' => $request->string('name'),
@@ -140,7 +140,7 @@ final class UsuarioController extends ApiController
         $rolAdministrador = Role::query()->where('name', 'Administrador')->firstOrFail();
         $matriz = Sucursal::query()->where('es_matriz', true)->first();
 
-        $passwordGenerada = Str::password(16);
+        $passwordGenerada = Str::password(22);
 
         $usuario = User::query()->create([
             'name' => $request->string('name'),
@@ -215,7 +215,7 @@ final class UsuarioController extends ApiController
             ]);
         }
 
-        $passwordGenerada = Str::password(16);
+        $passwordGenerada = Str::password(22);
 
         $usuario = User::query()->create([
             'name' => $request->string('name'),

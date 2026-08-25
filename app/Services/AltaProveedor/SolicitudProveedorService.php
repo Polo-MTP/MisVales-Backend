@@ -288,7 +288,7 @@ final class SolicitudProveedorService
                 // correo al nuevo usuario -- mismo patrón que crearAdministrador/
                 // crearGerenteSucursal/crearPersonalSucursal en UsuarioController, para que nadie
                 // más que la distribuidora llegue a conocerla.
-                $passwordGenerada = Str::password(16);
+                $passwordGenerada = Str::password(22);
 
                 // Crear la cuenta de usuario para la distribuidora asignada a la sucursal de la solicitud
                 /** @var User $distribuidoraUser */

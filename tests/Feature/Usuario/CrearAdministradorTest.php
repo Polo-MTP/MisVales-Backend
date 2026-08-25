@@ -53,7 +53,7 @@ it('el Gerente General puede dar de alta un Administrador, con contraseña gener
         ->and($creado->role->name)->toBe('Administrador')
         ->and($creado->sucursal->es_matriz)->toBeTrue();
 
-    Mail::assertSent(PersonalCredencialesMail::class, fn ($mail) => $mail->hasTo('nuevo.admin@example.com') && strlen($mail->password) >= 16);
+    Mail::assertSent(PersonalCredencialesMail::class, fn ($mail) => $mail->hasTo('nuevo.admin@example.com') && strlen($mail->password) >= 22);
 });
 
 it('el Gerente de Sucursal NO puede dar de alta un Administrador -- escalaría su alcance más allá de su sucursal', function (): void {
