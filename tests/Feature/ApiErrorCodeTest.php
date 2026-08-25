@@ -39,6 +39,26 @@ it('una petición sin autenticar y SIN header Accept:application/json también t
         ->assertJsonPath('error_code', ApiErrorCode::UNAUTHENTICATED->value);
 });
 
+/**
+ * TokenMismatchException (sesión/CSRF vencidos) llega a nuestros renderers ya convertida por
+ * Laravel en un HttpException(419, 'CSRF token mismatch.') -- Illuminate\Foundation\Exceptions\
+ * Handler::prepareException() hace esa conversión antes de que cualquier render() nuestro la
+ * vea, así que no se puede atrapar por tipo, solo por status. Antes de este caso especial en
+ * bootstrap/app.php, ese string interno en inglés llegaba tal cual a la pantalla del usuario
+ * (visto en vivo en producción). Se resuelve igual que una sesión vencida (401
+ * UNAUTHENTICATED): el interceptor del frontend ya sabe limpiar la sesión y mandar a login.
+ */
+it('un token CSRF vencido (419) responde como sesión vencida, no con el mensaje interno de Laravel', function (): void {
+    Route::middleware('api')->post('/__test/error-code-csrf', function (): void {
+        throw new Illuminate\Session\TokenMismatchException('CSRF token mismatch.');
+    });
+
+    $this->postJson('/__test/error-code-csrf')
+        ->assertStatus(401)
+        ->assertJsonPath('error_code', ApiErrorCode::UNAUTHENTICATED->value)
+        ->assertJsonPath('message', 'Tu sesión expiró o la página llevaba mucho tiempo abierta. Recarga la página e inicia sesión de nuevo.');
+});
+
 it('un rol sin permiso para la ruta trae error_code FORBIDDEN', function (): void {
     $role = Role::firstOrCreate(['name' => 'Cajera']);
     Sanctum::actingAs(User::factory()->create(['role_id' => $role->id, 'is_active' => true]));

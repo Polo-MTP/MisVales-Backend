@@ -167,6 +167,26 @@ return Application::configure(basePath: dirname(__DIR__))
             'error_code' => ApiErrorCode::RATE_LIMITED->value,
         ], 429));
 
+        // TokenMismatchException (sesión/CSRF vencidos) nunca llega aquí como ella misma:
+        // Illuminate\Foundation\Exceptions\Handler::prepareException() ya la convirtió en un
+        // HttpException(419, 'CSRF token mismatch.') antes de que cualquier render() nuestro la
+        // vea -- por eso solo se puede atrapar por status, no por tipo. Sin este caso, caía en
+        // el handler genérico de abajo (pensado para abort() con mensaje propio) y el string
+        // interno de Laravel, en inglés y sin ninguna acción clara, llegaba tal cual a la
+        // pantalla del usuario. Se resuelve igual que una sesión vencida: el interceptor del
+        // frontend ya sabe limpiar la sesión y mandar a login en cuanto ve un 401.
+        $exceptions->render(function (HttpExceptionInterface $e, Request $request): ?JsonResponse {
+            if ($e->getStatusCode() !== 419) {
+                return null;
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Tu sesión expiró o la página llevaba mucho tiempo abierta. Recarga la página e inicia sesión de nuevo.',
+                'error_code' => ApiErrorCode::UNAUTHENTICATED->value,
+            ], 401);
+        });
+
         // Cubre los abort($codigo, 'mensaje') usados en toda la app (403, 409, 422...).
         // El mensaje de un abort() sí es siempre texto que el propio desarrollador
         // escribió pensando en el usuario final, así que es seguro devolverlo tal cual.
