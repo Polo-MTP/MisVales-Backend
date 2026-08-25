@@ -77,6 +77,13 @@ return [
             'options'      => extension_loaded('pdo_mysql') ? array_filter([
                 (PHP_VERSION_ID >= 80500 ? \Pdo\Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
                 (PHP_VERSION_ID >= 80500 ? \Pdo\Mysql::ATTR_SSL_VERIFY_SERVER_CERT : PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT) => true,
+                // Sin esto, un servidor de BD caído/inalcanzable (no un rechazo rápido de
+                // conexión, sino uno que simplemente no responde) deja a PHP esperando al
+                // timeout de TCP del sistema operativo -- puede ser 20-75s o más, colgando el
+                // worker de PHP-FPM todo ese tiempo. PDO::ATTR_TIMEOUT es del PDO base, no
+                // driver-específico, por eso no lleva el mismo condicional de \Pdo\Mysql que
+                // los SSL de arriba.
+                PDO::ATTR_TIMEOUT => (int) env('DB_CONNECT_TIMEOUT', 3),
             ]) : [],
         ]),
 
