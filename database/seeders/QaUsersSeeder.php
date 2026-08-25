@@ -27,15 +27,14 @@ final class QaUsersSeeder extends Seeder
 
     public function run(): void
     {
-        $adminRole = Role::query()->where('name', 'Administrador')->first();
-        $gerenteGeneralRole = Role::query()->where('name', 'Gerente General')->first();
-        $gerenteSucursalRole = Role::query()->where('name', 'Gerente de Sucursal')->first();
+        // Administrador, Gerente General y Gerente de Sucursal NO se generan aquí: solo puede
+        // haber uno de cada uno (y uno por sucursal, en el caso de Gerente de Sucursal) en todo
+        // el sistema -- esas cuentas canónicas las provee EquipoDemoSeeder.
         $coordinadorRole = Role::query()->where('name', 'Coordinador')->first();
         $verificadorRole = Role::query()->where('name', 'Verificador')->first();
         $cajeraRole = Role::query()->where('name', 'Cajera')->first();
         $distribuidoraRole = Role::query()->where('name', 'Distribuidora')->first();
 
-        $matriz = Sucursal::query()->where('es_matriz', true)->first();
         $sucursalGomez = Sucursal::query()->where('nombre', 'Sucursal Gómez Palacio')->first();
 
         $categoriaBronce = CategoriaDistribuidora::query()->where('nombre', 'BRONCE')->first();
@@ -46,42 +45,6 @@ final class QaUsersSeeder extends Seeder
                 'name' => 'QA Coordinador',
                 'password' => Hash::make(self::PASSWORD),
                 'role_id' => $coordinadorRole?->id,
-                'sucursal_id' => $sucursalGomez?->id,
-                'is_active' => true,
-                'email_verified_at' => now(),
-            ]
-        );
-
-        User::query()->updateOrCreate(
-            ['email' => 'ygz765434+ad@gmail.com'],
-            [
-                'name' => 'QA Administrador',
-                'password' => Hash::make(self::PASSWORD),
-                'role_id' => $adminRole?->id,
-                'sucursal_id' => $matriz?->id,
-                'is_active' => true,
-                'email_verified_at' => now(),
-            ]
-        );
-
-        User::query()->updateOrCreate(
-            ['email' => 'ygz765434+gg@gmail.com'],
-            [
-                'name' => 'QA Gerente General',
-                'password' => Hash::make(self::PASSWORD),
-                'role_id' => $gerenteGeneralRole?->id,
-                'sucursal_id' => $matriz?->id,
-                'is_active' => true,
-                'email_verified_at' => now(),
-            ]
-        );
-
-        User::query()->updateOrCreate(
-            ['email' => 'ygz765434+gs@gmail.com'],
-            [
-                'name' => 'QA Gerente de Sucursal',
-                'password' => Hash::make(self::PASSWORD),
-                'role_id' => $gerenteSucursalRole?->id,
                 'sucursal_id' => $sucursalGomez?->id,
                 'is_active' => true,
                 'email_verified_at' => now(),

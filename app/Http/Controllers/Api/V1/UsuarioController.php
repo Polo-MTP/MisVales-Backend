@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Api\V1\Usuario\CrearGerenteGeneralRequest;
 use App\Http\Requests\Api\V1\Usuario\CrearGerenteSucursalRequest;
 use App\Http\Requests\Api\V1\Usuario\CrearPersonalSucursalRequest;
+use App\Http\Requests\Api\V1\Usuario\MoverGerenteSucursalRequest;
 use App\Http\Requests\Api\V1\Usuario\ReasignarPersonalRequest;
 use App\Http\Resources\UserResource;
 use App\Mail\PersonalCredencialesMail;
@@ -312,6 +313,52 @@ final class UsuarioController extends ApiController
         }
 
         return $this->created(new UserResource($usuario->load(['role', 'sucursal', 'gerente'])));
+    }
+
+    /**
+     * Mueve a un Gerente de Sucursal de una sucursal a otra -- típicamente cuando conviene
+     * reubicarlo en vez de darlo de baja y contratar uno nuevo. No se puede mover a la misma
+     * sucursal en la que ya está, y la sucursal destino debe estar activa y sin un Gerente de
+     * Sucursal activo ya asignado (misma regla de "como mucho uno por sucursal" que
+     * crearGerenteSucursal() aplica al dar de alta). El personal a su cargo (Coordinador/
+     * Verificador/Cajera) NO se mueve con él -- si también hace falta reubicarlo, es
+     * reasignarPersonal() quien lo hace, por separado.
+     */
+    public function moverGerenteSucursal(MoverGerenteSucursalRequest $request, User $usuario): JsonResponse
+    {
+        if ($usuario->role?->name !== 'Gerente de Sucursal') {
+            throw new DomainException('El usuario indicado no es Gerente de Sucursal.');
+        }
+
+        $sucursalDestino = Sucursal::query()->find($request->integer('sucursal_id'));
+        if (! $sucursalDestino || ! $sucursalDestino->is_active) {
+            throw ValidationException::withMessages([
+                'sucursal_id' => 'La sucursal indicada está deshabilitada y no puede recibir un Gerente de Sucursal.',
+            ]);
+        }
+
+        if ($usuario->sucursal_id === $sucursalDestino->id) {
+            throw ValidationException::withMessages([
+                'sucursal_id' => 'El Gerente de Sucursal ya pertenece a esa sucursal.',
+            ]);
+        }
+
+        $yaTieneGerente = User::query()
+            ->where('role_id', $usuario->role_id)
+            ->where('sucursal_id', $sucursalDestino->id)
+            ->where('is_active', true)
+            ->exists();
+
+        if ($yaTieneGerente) {
+            throw ValidationException::withMessages([
+                'sucursal_id' => 'La sucursal destino ya tiene un Gerente de Sucursal activo asignado.',
+            ]);
+        }
+
+        $usuario->sucursal_id = $sucursalDestino->id;
+        $usuario->save();
+
+        return $this->success(new UserResource($usuario->load(['role', 'sucursal'])));
     }
 
     /**

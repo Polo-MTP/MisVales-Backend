@@ -97,6 +97,13 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
         ->middleware(['role:Gerente General', 'vpn'])
         ->name('api.v1.usuarios.reasignar_personal');
 
+    // Mueve a un Gerente de Sucursal existente a otra sucursal -- decisión gerencial (igual que
+    // reasignar-gerente), va con VPN. La sucursal destino debe seguir sin Gerente de Sucursal
+    // activo propio, misma regla que crearGerenteSucursal().
+    Route::put('usuarios/gerente-sucursal/{usuario}/mover', [UsuarioController::class, 'moverGerenteSucursal'])
+        ->middleware(['role:Gerente General', 'vpn'])
+        ->name('api.v1.usuarios.mover_gerente_sucursal');
+
     // MÓDULO: SUCURSALES. Alta/edición de sucursales normales es de Gerente General; la
     // sucursal matriz (alta, o volver matriz a una existente) es solo de Administrador -- el
     // control fino de cuál caso aplica vive en SucursalStoreRequest/SucursalUpdateRequest, el

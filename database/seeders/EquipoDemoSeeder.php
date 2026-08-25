@@ -23,7 +23,6 @@ final class EquipoDemoSeeder extends Seeder
 {
     public function run(): void
     {
-        $adminRole = Role::query()->where('name', 'Administrador')->first();
         $gerenteGeneralRole = Role::query()->where('name', 'Gerente General')->first();
         $gerenteSucursalRole = Role::query()->where('name', 'Gerente de Sucursal')->first();
         $coordinadorRole = Role::query()->where('name', 'Coordinador')->first();
@@ -42,18 +41,10 @@ final class EquipoDemoSeeder extends Seeder
             ->first();
 
         // --- Grupo 1 ---
-        User::query()->updateOrCreate(
-            ['email' => 'aguiladorada1998@hotmail.com'],
-            [
-                'name' => 'Wilbert (Administrador)',
-                'password' => Hash::make('Whnyikxm64#'),
-                'role_id' => $adminRole?->id,
-                'sucursal_id' => $matriz?->id,
-                'is_active' => true,
-                'email_verified_at' => now(),
-            ]
-        );
-
+        // El único Administrador del sistema es 'trejomisaelperez2304@gmail.com' (ver
+        // UserSeeder) -- es la cuenta que se usa para operar (dar de alta al Gerente General,
+        // etc.), así que no se crea otra aquí; esa duplicaba el rol y chocaba con el candado de
+        // unicidad a nivel de base de datos.
         User::query()->updateOrCreate(
             ['email' => '6aguila.dorada.1998@gmail.com'],
             [

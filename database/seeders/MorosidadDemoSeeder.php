@@ -42,7 +42,10 @@ final class MorosidadDemoSeeder extends Seeder
         $categoriaBronce = CategoriaDistribuidora::query()->where('nombre', 'BRONCE')->first();
         $categoriaOro = CategoriaDistribuidora::query()->where('nombre', 'ORO')->first();
         $coordinador = User::query()->where('email', 'coordinador@correo.com')->first();
-        $gerenteGeneral = User::query()->where('email', 'gerente.general@correo.com')->first();
+        // No se fija por correo: solo puede haber un Gerente General en todo el sistema, y el
+        // correo exacto que lo tiene depende de qué seeder lo haya dado de alta (ver
+        // EquipoDemoSeeder), así que se busca por rol para no romperse si ese correo cambia.
+        $gerenteGeneral = User::query()->whereHas('role', fn ($q) => $q->where('name', 'Gerente General'))->first();
 
         $productoA = Producto::query()->where('monto', 1500)->first();
         $productoB = Producto::query()->where('monto', 2000)->first();

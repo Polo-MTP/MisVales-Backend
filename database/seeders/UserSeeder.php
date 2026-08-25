@@ -18,8 +18,6 @@ final class UserSeeder extends Seeder
     public function run(): void
     {
         $adminRole = Role::query()->where('name', 'Administrador')->first();
-        $gerenteGeneralRole = Role::query()->where('name', 'Gerente General')->first();
-        $gerenteSucursalRole = Role::query()->where('name', 'Gerente de Sucursal')->first();
         $coordinadorRole = Role::query()->where('name', 'Coordinador')->first();
         $verificadorRole = Role::query()->where('name', 'Verificador')->first();
         $cajeraRole = Role::query()->where('name', 'Cajera')->first();
@@ -29,8 +27,6 @@ final class UserSeeder extends Seeder
         $matriz = Sucursal::query()->where('es_matriz', true)->first();
         /** @var Sucursal|null $sucursalGomez */
         $sucursalGomez = Sucursal::query()->where('nombre', 'Sucursal Gómez Palacio')->first();
-        /** @var Sucursal|null $sucursalDurango */
-        $sucursalDurango = Sucursal::query()->where('nombre', 'Sucursal Durango')->first();
 
         // Buscar un coordinador existente para asignarlo a la distribuidora
         $coordinador = User::query()
@@ -38,7 +34,10 @@ final class UserSeeder extends Seeder
             ->where('sucursal_id', $sucursalGomez?->id)
             ->first();
 
-        // 1. Administradores (Sucursal Matriz)
+        // 1. Administrador (Sucursal Matriz) -- el único que puede haber en todo el sistema, es
+        // la cuenta que se usa para operar (dar de alta al Gerente General, etc.), así que se
+        // mantiene aquí en vez de en EquipoDemoSeeder. Gerente General y Gerente de Sucursal
+        // (uno por sucursal) sí los provee EquipoDemoSeeder -- no se duplican aquí.
         User::query()->updateOrCreate(
             ['email' => 'trejomisaelperez2304@gmail.com'],
             [
@@ -46,57 +45,6 @@ final class UserSeeder extends Seeder
                 'password' => Hash::make('8Yro|U_WZi4.39Nny'),
                 'role_id' => $adminRole?->id,
                 'sucursal_id' => $matriz?->id,
-                'is_active' => true,
-                'email_verified_at' => now(),
-            ]
-        );
-
-        User::query()->updateOrCreate(
-            ['email' => 'admin@correo.com'],
-            [
-                'name' => 'Admin Test (Matriz)',
-                'password' => Hash::make('Password123!'),
-                'role_id' => $adminRole?->id,
-                'sucursal_id' => $matriz?->id,
-                'is_active' => true,
-                'email_verified_at' => now(),
-            ]
-        );
-
-        // 2. Gerente General (Sucursal Matriz - Acceso Global a todas las sucursales)
-        User::query()->updateOrCreate(
-            ['email' => 'gerente.general@correo.com'],
-            [
-                'name' => 'Gerente General (Matriz Global)',
-                'password' => Hash::make('Password123!'),
-                'role_id' => $gerenteGeneralRole?->id,
-                'sucursal_id' => $matriz?->id,
-                'is_active' => true,
-                'email_verified_at' => now(),
-            ]
-        );
-
-        // 3. Gerente de Sucursal Gómez Palacio
-        User::query()->updateOrCreate(
-            ['email' => 'gerente.sucursal@correo.com'],
-            [
-                'name' => 'Gerente Sucursal Gómez Palacio',
-                'password' => Hash::make('Password123!'),
-                'role_id' => $gerenteSucursalRole?->id,
-                'sucursal_id' => $sucursalGomez?->id,
-                'is_active' => true,
-                'email_verified_at' => now(),
-            ]
-        );
-
-        // 4. Gerente de Sucursal Durango (Para probar restricción entre sucursales)
-        User::query()->updateOrCreate(
-            ['email' => 'gerente.durango@correo.com'],
-            [
-                'name' => 'Gerente Sucursal Durango',
-                'password' => Hash::make('Password123!'),
-                'role_id' => $gerenteSucursalRole?->id,
-                'sucursal_id' => $sucursalDurango?->id,
                 'is_active' => true,
                 'email_verified_at' => now(),
             ]
@@ -189,7 +137,10 @@ final class UserSeeder extends Seeder
                 'password_hash' => Hash::make('Password123!'),
                 'comentarios_verificador' => 'Verificado correctamente',
                 'fecha_aprobacion' => now(),
-                'aprobado_por' => $gerenteGeneralRole?->id, // Asignar aprobador
+                // 'aprobado_por' es FK a users.id -- iba el id del ROL Gerente General por
+                // error (colaba de milagro en SQLite sin FKs forzadas; truena en MySQL o con
+                // 'foreign_keys' activado, ver DatabaseSeederSingletonTest).
+                'aprobado_por' => $coordinador?->id,
             ]
         );
     }

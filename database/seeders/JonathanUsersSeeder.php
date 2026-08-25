@@ -25,11 +25,15 @@ final class JonathanUsersSeeder extends Seeder
 
     private const int PER_ROLE = 3;
 
-    /** @var array<string, string> */
+    /**
+     * Administrador, Gerente General y Gerente de Sucursal quedan fuera a propósito: solo
+     * puede haber uno de cada uno (y uno por sucursal, en el caso de Gerente de Sucursal) en
+     * todo el sistema, así que no tiene sentido generarlos en lote -- esas cuentas canónicas
+     * las provee EquipoDemoSeeder.
+     *
+     * @var array<string, string>
+     */
     private const ROLE_CODES = [
-        'Administrador' => 'ad',
-        'Gerente General' => 'gg',
-        'Gerente de Sucursal' => 'gs',
         'Coordinador' => 'co',
         'Verificador' => 've',
         'Cajera' => 'ca',
@@ -38,7 +42,6 @@ final class JonathanUsersSeeder extends Seeder
 
     public function run(): void
     {
-        $matriz = Sucursal::query()->where('es_matriz', true)->first();
         $sucursalGomez = Sucursal::query()->where('nombre', 'Sucursal Gómez Palacio')->first();
         $categoriaBronce = CategoriaDistribuidora::query()->where('nombre', 'BRONCE')->first();
 
@@ -48,7 +51,7 @@ final class JonathanUsersSeeder extends Seeder
 
         foreach (self::ROLE_CODES as $roleName => $code) {
             $role = Role::query()->where('name', $roleName)->first();
-            $sucursal = in_array($roleName, ['Administrador', 'Gerente General'], true) ? $matriz : $sucursalGomez;
+            $sucursal = $sucursalGomez;
 
             for ($i = 1; $i <= self::PER_ROLE; $i++) {
                 $email = sprintf('jonathan.hister.6776+%s%d@gmail.com', $code, $i);
