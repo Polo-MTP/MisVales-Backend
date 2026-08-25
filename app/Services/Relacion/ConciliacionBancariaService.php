@@ -208,6 +208,17 @@ final class ConciliacionBancariaService
             throw new InvalidArgumentException('Referencia o monto inválido.');
         }
 
+        $relacion = Relacion::query()->where('referencia_pago', $datos['referencia'])->first();
+
+        // Si el corte tiene más de un vale y la distribuidora puso el concepto de uno en
+        // particular, el abono es de ESE vale, no del corte completo -- buscarlo solo dentro
+        // de los detalles de la relación ya encontrada (el concepto no es global, es por vale).
+        // Se calcula ANTES del chequeo de duplicados de abajo porque el respaldo sin folio lo
+        // necesita (ver comentario ahí).
+        $detalle = ($relacion && $datos['concepto'] !== '')
+            ? RelacionDetalle::query()->where('relacion_id', $relacion->id)->where('concepto', $datos['concepto'])->first()
+            : null;
+
         // El folio de pago es el identificador único que da el banco a esa transferencia --
         // si ya existe un abono con el mismo folio, es el mismo pago (Excel resubido, o el
         // banco exporta "últimos N días" y una fila se solapa con la importación anterior):
@@ -221,10 +232,12 @@ final class ConciliacionBancariaService
         } else {
             // Sin folio (el banco no siempre lo trae, ej. depósitos en ventanilla) no hay
             // identificador único que comparar -- se arma uno compuesto con el resto de los
-            // datos EXACTOS de la fila. Que dos pagos reales distintos coincidan a la vez en
-            // referencia, monto, fecha Y hora es prácticamente imposible, así que si ya existe
-            // un abono (también sin folio) con los cuatro iguales, es el mismo movimiento
-            // reimportado, no uno nuevo.
+            // datos EXACTOS de la fila, incluyendo relacion_detalle_id: sin esto, dos vales
+            // DISTINTOS del mismo corte multi-vale que coincidieran en monto+fecha+hora se
+            // habrían tratado como el mismo pago reimportado, perdiendo el segundo abono real.
+            // Que dos pagos reales distintos coincidan a la vez en los cinco es prácticamente
+            // imposible, así que si ya existe un abono (también sin folio) con todo igual, es
+            // el mismo movimiento reimportado, no uno nuevo.
             $existente = AbonoConciliacion::query()
                 ->whereNull('folio_pago')
                 ->where('referencia_leida', $datos['referencia'])
@@ -235,21 +248,13 @@ final class ConciliacionBancariaService
                 // API con vigente_desde/vigente_hasta.
                 ->when($datos['fecha_pago'] === null, fn ($q) => $q->whereNull('fecha_pago'), fn ($q) => $q->whereDate('fecha_pago', $datos['fecha_pago']))
                 ->when($datos['hora_pago'] === null, fn ($q) => $q->whereNull('hora_pago'), fn ($q) => $q->where('hora_pago', $datos['hora_pago']))
+                ->when($detalle === null, fn ($q) => $q->whereNull('relacion_detalle_id'), fn ($q) => $q->where('relacion_detalle_id', $detalle->id))
                 ->first();
 
             if ($existente) {
                 return $existente;
             }
         }
-
-        $relacion = Relacion::query()->where('referencia_pago', $datos['referencia'])->first();
-
-        // Si el corte tiene más de un vale y la distribuidora puso el concepto de uno en
-        // particular, el abono es de ESE vale, no del corte completo -- buscarlo solo dentro
-        // de los detalles de la relación ya encontrada (el concepto no es global, es por vale).
-        $detalle = ($relacion && $datos['concepto'] !== '')
-            ? RelacionDetalle::query()->where('relacion_id', $relacion->id)->where('concepto', $datos['concepto'])->first()
-            : null;
 
         $abono = AbonoConciliacion::query()->create([
             'relacion_id' => $relacion?->id,

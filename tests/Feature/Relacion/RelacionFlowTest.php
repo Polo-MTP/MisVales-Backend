@@ -523,6 +523,39 @@ it('un corte con dos vales: cada uno se paga por separado usando su propio "Conc
         ->and($relacion->estado)->toBe('liquidada');
 });
 
+it('dos vales del mismo corte con igual monto, pagados sin folio a la misma fecha/hora, NO se confunden entre sí', function (): void {
+    // Caso borde del respaldo de deduplicación sin folio (ver procesarFila()): si no
+    // distinguiera por relacion_detalle_id, este segundo pago se leería como "duplicado" del
+    // primero (misma referencia+monto+fecha+hora) y se perdería en silencio.
+    $distribuidora = crearDistribuidora();
+    $valeA = crearVale($distribuidora, 15000, 8);
+    $valeB = crearVale($distribuidora, 15000, 8);
+
+    $relacion = app(RelacionCalculoService::class)->generarParaDistribuidora($distribuidora, '2026-02-15');
+    $relacion->loadMissing('detalles');
+
+    $detalleA = $relacion->detalles->firstWhere('vale_id', $valeA->id);
+    $detalleB = $relacion->detalles->firstWhere('vale_id', $valeB->id);
+
+    expect((float) $detalleA->total)->toBe((float) $detalleB->total);
+
+    $cajera = User::factory()->create();
+
+    $archivo = crearExcelBanco([
+        [1, $detalleA->concepto, $relacion->referencia_pago, (float) $detalleA->total, '', '13/2/2026', '10:00', 'Transferencia'],
+        [2, $detalleB->concepto, $relacion->referencia_pago, (float) $detalleB->total, '', '13/2/2026', '10:00', 'Transferencia'],
+    ]);
+
+    $resumen = app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, $cajera);
+
+    expect($resumen['conciliadas'])->toBe(2)
+        ->and($resumen['duplicados'])->toBe(0);
+
+    expect($detalleA->fresh()->estado)->toBe('pagado')
+        ->and($detalleB->fresh()->estado)->toBe('pagado')
+        ->and($relacion->fresh()->estado)->toBe('liquidada');
+});
+
 it('sin concepto (o corte de un solo vale) el abono se sigue aplicando al corte completo, como antes', function (): void {
     $distribuidora = crearDistribuidora();
     crearVale($distribuidora, 15000, 8);
