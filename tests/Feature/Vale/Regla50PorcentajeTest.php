@@ -21,10 +21,11 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 uses(RefreshDatabase::class);
 
 /**
- * Regla del 50%: el PRIMER vale de una distribuidora (o el primero desde un aumento de
- * crédito recién aprobado y aún no "estrenado") no puede pasar del porcentaje configurado
- * ('regla_50_pct', default 50%) del crédito relevante. Cualquier vale posterior a ese ya
- * solo lo limita el crédito disponible.
+ * Regla del 50% + margen: el PRIMER vale de una distribuidora (o el primero desde un aumento
+ * de crédito recién aprobado y aún no "estrenado") no puede pasar del porcentaje configurado
+ * ('regla_50_pct', default 50%) del crédito relevante, más un margen fijo editable
+ * ('margen_aumento_credito', default $500) -- mismo margen en los dos casos. Cualquier vale
+ * posterior a ese ya solo lo limita el crédito disponible.
  */
 function crearDistribuidoraQA50(float $limiteCredito = 10000): Distribuidora
 {
@@ -79,19 +80,21 @@ beforeEach(function (): void {
     Configuracion::create(['clave' => 'regla_50_pct', 'valor' => '50', 'tipo_dato' => 'decimal', 'vigente_desde' => '2025-01-01', 'modificado_por' => $admin->id]);
 });
 
-it('bloquea el primer vale de una distribuidora nueva si excede el 50% del crédito total', function (): void {
+it('bloquea el primer vale de una distribuidora nueva si excede el 50% del crédito total + el margen', function (): void {
     $distribuidora = crearDistribuidoraQA50(10000);
     $cliente = crearClienteQA50($distribuidora);
-    $producto = productoQA50(5001, $distribuidora->usuario_id);
+    // Tope esperado: 10000 * 50% + margen (default $500) = 5500.
+    $producto = productoQA50(5501, $distribuidora->usuario_id);
 
     expect(fn () => app(ValeService::class)->solicitar(['cliente_id' => $cliente->id, 'producto_id' => $producto->id], usuarioFrescoQA50($distribuidora)))
         ->toThrow(HttpException::class);
 });
 
-it('permite el primer vale de una distribuidora nueva justo en el 50% exacto', function (): void {
+it('permite el primer vale de una distribuidora nueva justo en el tope (50% + margen)', function (): void {
     $distribuidora = crearDistribuidoraQA50(10000);
     $cliente = crearClienteQA50($distribuidora);
-    $producto = productoQA50(5000, $distribuidora->usuario_id);
+    // Tope esperado: 10000 * 50% + margen (default $500) = 5500.
+    $producto = productoQA50(5500, $distribuidora->usuario_id);
 
     $vale = app(ValeService::class)->solicitar(['cliente_id' => $cliente->id, 'producto_id' => $producto->id], usuarioFrescoQA50($distribuidora));
 

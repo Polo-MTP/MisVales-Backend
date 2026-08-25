@@ -212,11 +212,14 @@ final class Distribuidora extends Model
 
     /**
      * Monto máximo que la distribuidora puede pedir ahora mismo en un vale nuevo: debe estar
-     * activa/en verificación, respetar el crédito disponible y, si es su primer vale (o el
-     * primero desde un aumento de crédito reciente), no exceder el porcentaje máximo
-     * configurable ('regla_50_pct'). Sirve tanto para validar una solicitud puntual
-     * (puedeSolicitarVale) como para filtrar de antemano qué productos del catálogo puede
-     * ver/elegir (ProductoService::listar()).
+     * activa/en verificación, respetar el crédito disponible y, si tiene el 100% de su crédito
+     * disponible (es su primer vale, o el primero desde un aumento de crédito reciente y aún
+     * no "estrenado"), no exceder el porcentaje máximo configurable ('regla_50_pct') más un
+     * margen fijo editable ('margen_aumento_credito', default $500) -- mismo margen en ambos
+     * casos, para no dejar sin colchón justo al vale que más lo necesita (el primero, cuando
+     * todavía no hay ningún historial de pago que respalde a la distribuidora). Sirve tanto
+     * para validar una solicitud puntual (puedeSolicitarVale) como para filtrar de antemano
+     * qué productos del catálogo puede ver/elegir (ProductoService::listar()).
      */
     public function montoMaximoDisponible(bool $esPrimerVale = false): float
     {
@@ -227,18 +230,17 @@ final class Distribuidora extends Model
 
         $configuracionService = app(ConfiguracionService::class);
         $porcentaje = (float) ($configuracionService->obtenerValorVigente('regla_50_pct') ?? 50);
+        $margen = (float) ($configuracionService->obtenerValorVigente('margen_aumento_credito') ?? 500);
 
-        // Regla del porcentaje máximo para el primer vale de la distribuidora.
+        // Regla del porcentaje máximo + margen para el primer vale de la distribuidora.
         if ($esPrimerVale) {
-            return min($this->credito_disponible, $this->limite_credito * ($porcentaje / 100));
+            return min($this->credito_disponible, ($this->limite_credito * ($porcentaje / 100)) + $margen);
         }
 
         // Un aumento de crédito no se puede usar de un solo golpe: el primer vale después de
-        // un aumento aprobado y aún no "estrenado" respeta el mismo porcentaje de caución,
-        // mas un margen de tolerancia fijo (config 'margen_aumento_credito', default $500).
+        // un aumento aprobado y aún no "estrenado" respeta el mismo porcentaje de caución +
+        // margen, calculado sobre el disponible actual (que ya refleja el aumento).
         if ($this->aumentoCreditoSinConsumir() !== null) {
-            $margen = (float) ($configuracionService->obtenerValorVigente('margen_aumento_credito') ?? 500);
-
             return min($this->credito_disponible, ($this->credito_disponible * ($porcentaje / 100)) + $margen);
         }
 
