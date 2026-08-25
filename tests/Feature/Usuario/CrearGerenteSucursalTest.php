@@ -46,7 +46,7 @@ it('el Gerente General puede dar de alta un Gerente de Sucursal, con contraseña
         ->and($creado->email_verified_at)->not->toBeNull()
         ->and($creado->role->name)->toBe('Gerente de Sucursal');
 
-    Mail::assertSent(PersonalCredencialesMail::class, fn ($mail) => $mail->hasTo('nuevo.gerente@example.com') && strlen($mail->password) >= 16);
+    Mail::assertSent(PersonalCredencialesMail::class, fn ($mail) => $mail->hasTo('nuevo.gerente@example.com') && strlen($mail->password) >= 22);
 });
 
 it('no se puede colar otro rol -- el endpoint siempre crea Gerente de Sucursal, ignora cualquier role_id que manden', function (): void {

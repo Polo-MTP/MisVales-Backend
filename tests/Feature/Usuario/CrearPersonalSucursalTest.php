@@ -63,7 +63,7 @@ it('el Gerente General puede dar de alta Coordinador, Verificador o Cajera indic
         ->assertJsonMissingPath('data.password');
 
     // La contraseña la genera el sistema y se manda por correo -- nunca la escribe quien da de alta.
-    Mail::assertSent(PersonalCredencialesMail::class, fn ($mail) => $mail->hasTo($email) && strlen($mail->password) >= 16);
+    Mail::assertSent(PersonalCredencialesMail::class, fn ($mail) => $mail->hasTo($email) && strlen($mail->password) >= 22);
 
     // El Gerente General no es el gerente asignado -- el gerente debe enterarse de que tiene personal nuevo.
     expect(Notificacion::where('destinatario_id', $gerente->id)->where('accion', 'personal_asignado')->exists())->toBeTrue();

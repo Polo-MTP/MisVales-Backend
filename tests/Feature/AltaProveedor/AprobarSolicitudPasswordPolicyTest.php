@@ -63,7 +63,7 @@ it('un password enviado en el request se ignora -- el sistema genera el suyo pro
     $nuevoUsuario = User::where('email', 'nuevo.proveedor@correo.com')->first();
     expect($nuevoUsuario)->not->toBeNull();
 
-    Mail::assertSent(PersonalCredencialesMail::class, fn ($mail) => $mail->hasTo('nuevo.proveedor@correo.com') && $mail->password !== 'esto-se-ignora' && strlen($mail->password) >= 16);
+    Mail::assertSent(PersonalCredencialesMail::class, fn ($mail) => $mail->hasTo('nuevo.proveedor@correo.com') && $mail->password !== 'esto-se-ignora' && strlen($mail->password) >= 22);
 });
 
 it('aprueba sin necesidad de mandar password, crea la cuenta y deja un solo rastro de auditoría del alta', function (): void {
@@ -103,5 +103,5 @@ it('le envía la contraseña generada por correo a la distribuidora aprobada -- 
         'email' => 'nuevo.proveedor@correo.com',
     ])->assertStatus(200);
 
-    Mail::assertSent(PersonalCredencialesMail::class, fn ($mail) => $mail->hasTo('nuevo.proveedor@correo.com') && strlen($mail->password) >= 16);
+    Mail::assertSent(PersonalCredencialesMail::class, fn ($mail) => $mail->hasTo('nuevo.proveedor@correo.com') && strlen($mail->password) >= 22);
 });

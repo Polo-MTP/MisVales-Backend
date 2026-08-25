@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Enums\ApiErrorCode;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -30,6 +31,7 @@ final class EnsureUserIsActive
             return response()->json([
                 'success' => false,
                 'message' => 'Tu cuenta ha sido desactivada por un administrador. Contacta a soporte.',
+                'error_code' => ApiErrorCode::ACCOUNT_INACTIVE->value,
             ], Response::HTTP_FORBIDDEN);
         }
 

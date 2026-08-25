@@ -37,10 +37,12 @@ beforeEach(function (): void {
     Configuracion::create(['clave' => 'regla_50_pct', 'valor' => '50', 'tipo_dato' => 'decimal', 'vigente_desde' => '2025-01-01', 'modificado_por' => $admin->id]);
 });
 
-it('a una distribuidora nueva (primer vale) solo se le muestran productos dentro del 50% de su límite', function (): void {
+it('a una distribuidora nueva (primer vale) solo se le muestran productos dentro del 50% de su límite + el margen', function (): void {
+    // Tope esperado: 10000 * 50% + margen (default $500) = 5500.
     crearProductoCatalogo(4000);
     crearProductoCatalogo(5000);
-    crearProductoCatalogo(5001);
+    crearProductoCatalogo(5500);
+    crearProductoCatalogo(5501);
     crearProductoCatalogo(8000);
 
     $distribuidora = crearDistribuidoraCatalogo(10000);
@@ -50,7 +52,7 @@ it('a una distribuidora nueva (primer vale) solo se le muestran productos dentro
 
     $response->assertStatus(200);
     $montos = collect($response->json())->pluck('monto')->map(fn ($m) => (float) $m)->sort()->values();
-    expect($montos->all())->toBe([4000.0, 5000.0]);
+    expect($montos->all())->toBe([4000.0, 5000.0, 5500.0]);
 });
 
 it('el Gerente General sigue viendo el catálogo completo sin filtrar', function (): void {

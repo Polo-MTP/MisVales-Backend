@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Enums\ApiErrorCode;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -44,6 +45,7 @@ final class EnsureTokenNotIdle
             return response()->json([
                 'success' => false,
                 'message' => 'Tu sesión se cerró por inactividad. Inicia sesión de nuevo.',
+                'error_code' => ApiErrorCode::SESSION_IDLE_TIMEOUT->value,
             ], Response::HTTP_UNAUTHORIZED);
         }
 
