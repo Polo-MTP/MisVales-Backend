@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Api\V1\Usuario\CrearAdministradorRequest;
+use App\Http\Requests\Api\V1\Usuario\CrearGerenteGeneralRequest;
 use App\Http\Requests\Api\V1\Usuario\CrearGerenteSucursalRequest;
 use App\Http\Requests\Api\V1\Usuario\CrearPersonalSucursalRequest;
 use App\Http\Requests\Api\V1\Usuario\ReasignarPersonalRequest;
@@ -159,6 +160,41 @@ final class UsuarioController extends ApiController
             (string) $usuario->email,
             (string) $passwordGenerada,
             (string) $rolAdministrador->name,
+        ));
+
+        return $this->created(new UserResource($usuario->load(['role', 'sucursal'])));
+    }
+
+    /**
+     * Da de alta un Gerente General. Administrador y Gerente General pueden llegar aquí -- el
+     * rol queda fijo en el controller igual que en crearAdministrador. Un Gerente General no
+     * está atado a ninguna sucursal en particular (ve todo), así que se asigna a la matriz en
+     * vez de pedir sucursal_id en el request, mismo patrón que crearAdministrador.
+     */
+    public function crearGerenteGeneral(CrearGerenteGeneralRequest $request): JsonResponse
+    {
+        $rolGerenteGeneral = Role::query()->where('name', 'Gerente General')->firstOrFail();
+        $matriz = Sucursal::query()->where('es_matriz', true)->first();
+
+        $passwordGenerada = Str::password(22);
+
+        $usuario = User::query()->create([
+            'name' => $request->string('name'),
+            'email' => $request->string('email'),
+            'password' => Hash::make($passwordGenerada),
+            'role_id' => $rolGerenteGeneral->id,
+            'sucursal_id' => $matriz?->id,
+            'is_active' => true,
+        ]);
+
+        $usuario->email_verified_at = now();
+        $usuario->save();
+
+        Mail::to((string) $usuario->email)->send(new PersonalCredencialesMail(
+            (string) $usuario->name,
+            (string) $usuario->email,
+            (string) $passwordGenerada,
+            (string) $rolGerenteGeneral->name,
         ));
 
         return $this->created(new UserResource($usuario->load(['role', 'sucursal'])));

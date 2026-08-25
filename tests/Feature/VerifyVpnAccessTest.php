@@ -111,10 +111,11 @@ it('las dos rutas de decisión confirmadas por infra tienen el middleware vpn ad
  * autorización (aprobar/rechazar solicitudes, cambiar parámetros de negocio), que sí. Debe
  * poder crearse personal también desde la red pública.
  */
-it('la alta de Gerente de Sucursal, Administrador y Personal de Sucursal NO exige VPN', function (): void {
+it('la alta de Gerente de Sucursal, Administrador, Gerente General y Personal de Sucursal NO exige VPN', function (): void {
     $rutas = [
         'api.v1.usuarios.crear_gerente_sucursal',
         'api.v1.usuarios.crear_administrador',
+        'api.v1.usuarios.crear_gerente_general',
         'api.v1.usuarios.crear_personal_sucursal',
     ];
 

@@ -88,6 +88,13 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
         ->middleware('role:Gerente General')
         ->name('api.v1.usuarios.crear_administrador');
 
+    // Da de alta Gerente General -- Administrador (para poder arrancar/reponer la cadena de
+    // mando) y Gerente General (para poder dar de alta cualquier rol de staff, incluido el
+    // suyo propio). Gerente de Sucursal NO puede: sería escalar su propio alcance.
+    Route::post('usuarios/gerente-general', [UsuarioController::class, 'crearGerenteGeneral'])
+        ->middleware('role:Administrador,Gerente General')
+        ->name('api.v1.usuarios.crear_gerente_general');
+
     // Da de alta Coordinador, Verificador o Cajera -- el rol viene restringido a esas 3
     // opciones desde CrearPersonalSucursalRequest. Gerente de Sucursal solo puede darlos de
     // alta en su propia sucursal, relacionados a sí mismo; Gerente General puede asignar
