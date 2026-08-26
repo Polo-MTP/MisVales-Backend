@@ -141,14 +141,19 @@ it('no genera relación si la distribuidora no tiene vales pendientes', function
     expect($relacion)->toBeNull();
 });
 
-it('no permite generar dos relaciones para la misma distribuidora en la misma fecha de corte', function (): void {
+it('si ya existe un corte en la fecha indicada, genera el siguiente con la fecha corrida un día', function (): void {
     $distribuidora = crearDistribuidora();
     crearVale($distribuidora, 15000, 8);
 
-    app(RelacionCalculoService::class)->generarParaDistribuidora($distribuidora, '2026-02-15');
+    $service = app(RelacionCalculoService::class);
+    $primeraRelacion = $service->generarParaDistribuidora($distribuidora, '2026-02-15');
+    $segundaRelacion = $service->generarParaDistribuidora($distribuidora, '2026-02-15');
 
-    app(RelacionCalculoService::class)->generarParaDistribuidora($distribuidora, '2026-02-15');
-})->throws(DomainException::class);
+    expect($primeraRelacion->fecha_corte->toDateString())->toBe('2026-02-15')
+        ->and($segundaRelacion->fecha_corte->toDateString())->toBe('2026-02-16')
+        ->and($segundaRelacion->referencia_pago)->not->toBe($primeraRelacion->referencia_pago)
+        ->and($segundaRelacion->detalles->first()->cuota_numero)->toBe(2);
+});
 
 it('aplica recargo cuando la cuota anterior del mismo vale no quedó pagada', function (): void {
     $distribuidora = crearDistribuidora();

@@ -109,13 +109,13 @@ it('respeta los días de corte propios de la sucursal, no los globales por defec
         ->and($resultadoDia10['generadas'])->toHaveKey($distribuidora->id);
 });
 
-it('si una distribuidora falla al generar su corte, las demás igual se generan y el error queda reportado', function (): void {
+it('si una distribuidora ya tiene un corte generado hoy, igual genera el siguiente con fecha corrida, sin afectar a las demás', function (): void {
     $distA = crearDistribuidoraParaCorte('DIST-A');
     $distB = crearDistribuidoraParaCorte('DIST-B');
     crearValeParaCorte($distA, 15000, 8);
     crearValeParaCorte($distB, 15000, 8);
 
-    // Fuerza el conflicto en A: ya existe una relación de A para esa fecha de corte.
+    // A ya tiene un corte generado hoy (ej. un clic manual anterior en el mismo día real).
     Relacion::create([
         'distribuidora_id' => $distA->id, 'sucursal_id' => $distA->sucursal_id,
         'referencia_pago' => 'REF-PRECREADA-A', 'fecha_corte' => '2026-02-15',
@@ -124,8 +124,8 @@ it('si una distribuidora falla al generar su corte, las demás igual se generan 
 
     $resultado = app(RelacionCalculoService::class)->generarCortesDelDia('2026-02-15');
 
-    expect($resultado['generadas'])->toHaveCount(1)
-        ->and($resultado['generadas'])->toHaveKey($distB->id)
-        ->and($resultado['errores'])->toHaveCount(1)
-        ->and($resultado['errores'])->toHaveKey($distA->id);
+    expect($resultado['errores'])->toBeEmpty()
+        ->and($resultado['generadas'])->toHaveCount(2)
+        ->and($resultado['generadas'][$distA->id]->fecha_corte->toDateString())->toBe('2026-02-16')
+        ->and($resultado['generadas'][$distB->id]->fecha_corte->toDateString())->toBe('2026-02-15');
 });

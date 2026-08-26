@@ -14,7 +14,6 @@ use App\Services\Configuracion\ConfiguracionService;
 use App\Services\Notificacion\NotificacionService;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
-use DomainException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -148,18 +147,16 @@ final class RelacionCalculoService
     /**
      * Genera la relación de un corte para una distribuidora. Si no tiene vales con saldo
      * pendiente, no genera nada (retorna null).
+     *
+     * Si ya existe un corte para $fechaCorte, no truena: recorre día por día hasta encontrar
+     * una fecha libre para esta distribuidora (ver siguienteFechaCorteLibre()). Esto es lo que
+     * permite generar más de un corte el mismo día real -- el gerente da clic, se genera el
+     * corte de la quincena pendiente; da clic otra vez, se genera el de la siguiente quincena
+     * con fecha_corte corrida un día (y por lo tanto referencia_pago distinta).
      */
     public function generarParaDistribuidora(Distribuidora $distribuidora, ?string $fechaCorte = null): ?Relacion
     {
-        $fechaCorte = $fechaCorte ? Carbon::parse($fechaCorte) : now();
-
-        if (Relacion::query()
-            ->where('distribuidora_id', $distribuidora->id)
-            ->whereDate('fecha_corte', $fechaCorte->toDateString())
-            ->exists()
-        ) {
-            throw new DomainException('Ya existe una relación generada para esta distribuidora en la fecha de corte indicada.');
-        }
+        $fechaCorteSolicitada = $fechaCorte ? Carbon::parse($fechaCorte) : now();
 
         $valesPendientes = Vale::query()
             ->where('distribuidora_id', $distribuidora->id)
@@ -171,41 +168,30 @@ final class RelacionCalculoService
             return null;
         }
 
-        [$fechaLimitePago, $fechaAnticipadoDesde, $fechaAnticipadoHasta] = $this->calcularFechas(
-            $distribuidora->sucursal_id,
-            $fechaCorte
-        );
-
         $comisionBasePct = (float) ($this->configuracionService->obtenerValorVigente('comision_base_pct') ?? 10);
         $interesPctQuincena = (float) ($this->configuracionService->obtenerValorVigente('interes_pct_quincena') ?? 5);
         $multaNoPago = (float) ($this->configuracionService->obtenerValorVigente('multa_no_pago') ?? 300);
 
         return DB::transaction(function () use (
             $distribuidora,
-            $fechaCorte,
-            $fechaLimitePago,
-            $fechaAnticipadoDesde,
-            $fechaAnticipadoHasta,
+            $fechaCorteSolicitada,
             $valesPendientes,
             $comisionBasePct,
             $interesPctQuincena,
             $multaNoPago,
         ): Relacion {
-            // Vuelve a bloquear y revisar aquí adentro: el exists() de arriba corrió sin lock,
-            // así que dos llamadas casi simultáneas (un reintento manual que choca con el job
-            // programado, por ejemplo) podrían pasarlo ambas antes de que cualquiera inserte su
-            // Relacion. lockForUpdate() serializa esa ventana -- la segunda, tras esperar el
-            // commit de la primera, ve la relación recién creada y recibe el mismo
-            // DomainException amigable en vez de un QueryException crudo por el unique constraint.
+            // Serializa el acceso a esta distribuidora: dos llamadas casi simultáneas (dos
+            // clics seguidos del gerente, o un reintento manual que choca con el job
+            // programado) no deben pisarse -- lockForUpdate() obliga a la segunda a esperar el
+            // commit de la primera antes de decidir su propia fecha_corte.
             Distribuidora::query()->whereKey($distribuidora->id)->lockForUpdate()->first();
 
-            if (Relacion::query()
-                ->where('distribuidora_id', $distribuidora->id)
-                ->whereDate('fecha_corte', $fechaCorte->toDateString())
-                ->exists()
-            ) {
-                throw new DomainException('Ya existe una relación generada para esta distribuidora en la fecha de corte indicada.');
-            }
+            $fechaCorte = $this->siguienteFechaCorteLibre($distribuidora->id, $fechaCorteSolicitada);
+
+            [$fechaLimitePago, $fechaAnticipadoDesde, $fechaAnticipadoHasta] = $this->calcularFechas(
+                $distribuidora->sucursal_id,
+                $fechaCorte
+            );
 
             /** @var Relacion $relacion */
             $relacion = Relacion::query()->create([
@@ -483,6 +469,27 @@ final class RelacionCalculoService
     private function construirConceptoVale(int $valeId, int $cuotaNumero): string
     {
         return sprintf('%05d%04d', $valeId, $cuotaNumero);
+    }
+
+    /**
+     * Recorre día por día desde $fechaCorte hasta encontrar una fecha sin relación ya generada
+     * para esta distribuidora. fecha_corte es la base de referencia_pago (ver
+     * construirReferenciaPago()), así que cada corte adicional el mismo día real necesita una
+     * fecha propia para no compartir referencia con el anterior.
+     */
+    private function siguienteFechaCorteLibre(int $distribuidoraId, Carbon $fechaCorte): Carbon
+    {
+        $fecha = $fechaCorte->copy();
+
+        while (Relacion::query()
+            ->where('distribuidora_id', $distribuidoraId)
+            ->whereDate('fecha_corte', $fecha->toDateString())
+            ->exists()
+        ) {
+            $fecha = $fecha->copy()->addDay();
+        }
+
+        return $fecha;
     }
 
     /**
