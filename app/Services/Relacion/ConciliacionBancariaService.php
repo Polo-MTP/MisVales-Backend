@@ -219,6 +219,18 @@ final class ConciliacionBancariaService
             ? RelacionDetalle::query()->where('relacion_id', $relacion->id)->where('concepto', $datos['concepto'])->first()
             : null;
 
+        // Sin concepto que matchee (no vino, o no encontró nada), pero si la relación tiene UN
+        // solo vale no hay ninguna ambigüedad real -- el pago solo puede ser de ese detalle.
+        // Cuando el abono cubre el total, RelacionLiquidacionService::marcarValesPagados() ya
+        // corrige esto por su cuenta (fuerza 'pagado' en todos los detalles de una Relacion que
+        // queda 'liquidada', tenga o no concepto). Pero un abono PARCIAL nunca deja la Relacion
+        // en 'liquidada', así que esa red de seguridad no corre: sin esto, el RelacionDetalle.pago
+        // se quedaba en 0 (y su estado en 'pendiente') aunque Relacion.total_abonado sí reflejara
+        // el abono parcial -- inconsistente entre el total del corte y su único detalle.
+        if (! $detalle && $relacion) {
+            $detalle = $this->detalleUnicoSiAplica($relacion);
+        }
+
         // El folio de pago es el identificador único que da el banco a esa transferencia --
         // si ya existe un abono con el mismo folio, es el mismo pago (Excel resubido, o el
         // banco exporta "últimos N días" y una fila se solapa con la importación anterior):
@@ -343,6 +355,19 @@ final class ConciliacionBancariaService
                 $this->excedenteConciliacionService->registrarParaRelacion($relacion, $excedente);
             }
         });
+    }
+
+    /**
+     * Si la relación tiene un solo RelacionDetalle (un solo vale en ese corte), lo regresa --
+     * sin ambigüedad posible, un pago sin concepto (o con concepto que no matcheó nada) solo
+     * puede ser de ese vale. Con más de un detalle no hay forma de saber cuál es, se regresa
+     * null (el abono se sigue aplicando solo al total de la relación, como siempre).
+     */
+    private function detalleUnicoSiAplica(Relacion $relacion): ?RelacionDetalle
+    {
+        $detalles = RelacionDetalle::query()->where('relacion_id', $relacion->id)->get();
+
+        return $detalles->count() === 1 ? $detalles->first() : null;
     }
 
     /**

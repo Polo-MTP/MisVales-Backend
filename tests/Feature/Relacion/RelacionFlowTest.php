@@ -561,11 +561,20 @@ it('dos vales del mismo corte con igual monto, pagados sin folio a la misma fech
         ->and($relacion->fresh()->estado)->toBe('liquidada');
 });
 
-it('sin concepto (o corte de un solo vale) el abono se sigue aplicando al corte completo, como antes', function (): void {
+/**
+ * Sin concepto que matchee, pero con un solo vale en el corte, no hay ninguna ambigüedad --
+ * el pago solo puede ser de ese vale. Cuando cubre el total, RelacionLiquidacionService::
+ * marcarValesPagados() ya se encargaba de marcar el detalle como 'pagado' (corre siempre que
+ * la Relacion completa queda 'liquidada', sin importar si el abono traía concepto o no) --
+ * esta prueba solo confirma que sigue siendo así.
+ */
+it('sin concepto, con un solo vale en el corte que se paga completo, el detalle queda pagado', function (): void {
     $distribuidora = crearDistribuidora();
     crearVale($distribuidora, 15000, 8);
 
     $relacion = app(RelacionCalculoService::class)->generarParaDistribuidora($distribuidora, '2026-02-15');
+    $relacion->loadMissing('detalles');
+    $detalle = $relacion->detalles->first();
     $cajera = User::factory()->create();
 
     $archivo = crearExcelBanco([
@@ -573,7 +582,37 @@ it('sin concepto (o corte de un solo vale) el abono se sigue aplicando al corte 
     ]);
     app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, $cajera);
 
-    expect($relacion->fresh()->estado)->toBe('liquidada');
+    expect($relacion->fresh()->estado)->toBe('liquidada')
+        ->and($detalle->fresh()->estado)->toBe('pagado');
+});
+
+/**
+ * Este es el caso que SÍ dependía del fix de ConciliacionBancariaService::detalleUnicoSiAplica():
+ * un abono PARCIAL sin concepto en un corte de un solo vale. Antes, sin concepto que matchear,
+ * el monto se sumaba solo a Relacion.total_abonado (rama sin $detalle de aplicarAbono()) -- el
+ * RelacionDetalle.pago se quedaba en 0 y su estado en 'pendiente', aunque la Relacion sí
+ * reflejara el abono parcial. Como la Relacion nunca llega a 'liquidada' con un pago parcial,
+ * marcarValesPagados() tampoco corre para corregirlo -- a diferencia del caso de pago
+ * completo de arriba, aquí no había ninguna otra red de seguridad.
+ */
+it('sin concepto, con un solo vale en el corte, un abono PARCIAL sí se refleja en el detalle (no solo en la relación)', function (): void {
+    $distribuidora = crearDistribuidora();
+    crearVale($distribuidora, 15000, 8);
+
+    $relacion = app(RelacionCalculoService::class)->generarParaDistribuidora($distribuidora, '2026-02-15');
+    $relacion->loadMissing('detalles');
+    $detalle = $relacion->detalles->first();
+    $cajera = User::factory()->create();
+
+    $montoParcial = round((float) $relacion->total_a_pagar / 2, 2);
+    $archivo = crearExcelBanco([
+        [1, 'Pago sin concepto', $relacion->referencia_pago, $montoParcial, 'F-PARCIAL', '13/2/2026', '10:00', 'Transferencia'],
+    ]);
+    app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, $cajera);
+
+    expect($relacion->fresh()->estado)->toBe('parcial')
+        ->and((float) $detalle->fresh()->pago)->toBe($montoParcial)
+        ->and($detalle->fresh()->estado)->toBe('parcial');
 });
 
 it('si el banco reporta más de lo que se debía, avisa al Gerente de Sucursal y al Coordinador del excedente', function (): void {

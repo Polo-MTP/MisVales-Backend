@@ -91,14 +91,17 @@ it('escenario real: vale + corte + abono parcial + corte con recargo + segundo v
         ->and($corte1->detalles->first()->cuota_numero)->toBe(1)
         ->and((float) $corte1->detalles->first()->recargo)->toBe(0.0);
 
-    // Le abonan $1,000 -- NO cubre el total ($1,812) -> la relación queda 'parcial',
-    // la cuota sigue 'pendiente' (no se marca 'pagado' hasta liquidar completo).
+    // Le abonan $1,000 -- NO cubre el total ($1,812) -> la relación queda 'parcial', y como el
+    // corte es de un solo vale (sin ambigüedad posible sobre a cuál detalle pertenece, ver
+    // ConciliacionBancariaService::detalleUnicoSiAplica()) el abono también se refleja en el
+    // detalle: 'parcial', no 'pagado' -- eso es lo que sigue disparando el recargo del corte 2.
     $archivo1 = crearExcelBancoEscenario([[1, 'Abono parcial', $corte1->referencia_pago, 1000, 'F001', '14/2/2026', '10:00', 'Transferencia']]);
     $conciliacionService->importarArchivo($archivo1, null, $cajera);
     $corte1->refresh();
     expect($corte1->estado)->toBe('parcial')
         ->and((float) $corte1->total_abonado)->toBe(1000.0)
-        ->and($corte1->detalles->first()->estado)->toBe('pendiente');
+        ->and((float) $corte1->detalles->first()->pago)->toBe(1000.0)
+        ->and($corte1->detalles->first()->estado)->toBe('parcial');
 
     // Corte 2/8: como la cuota 1 no quedó 'pagado' (el abono no la liquidó), esta trae recargo.
     $corte2 = $calculoService->generarParaDistribuidora($d1, '2026-03-15');
