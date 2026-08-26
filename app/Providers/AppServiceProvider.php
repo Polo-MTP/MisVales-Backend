@@ -146,6 +146,13 @@ final class AppServiceProvider extends ServiceProvider
             \App\Models\ConvenioBancario::class,
             \App\Models\Configuracion::class,
             \App\Models\ConfiguracionFechas::class,
+            // Faltaban -- el Verificador corrige nombre/CURP/dirección directo sobre estas dos
+            // filas (ver SolicitudProveedorService::verificarSolicitud()) y quedaba sin rastro
+            // en el log que ve Administrador: SolicitudProveedor sí está arriba, pero su propio
+            // 'updated' solo trae los campos que le pertenecen a ÉL (estado, cumple...), nunca
+            // los de estas dos tablas relacionadas.
+            \App\Models\DatosPersonales::class,
+            \App\Models\Direccion::class,
         ] as $modelo) {
             $modelo::observe(AuditLogObserver::class);
         }

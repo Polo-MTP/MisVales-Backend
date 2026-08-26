@@ -11,6 +11,8 @@ use App\Models\Cliente;
 use App\Models\Configuracion;
 use App\Models\ConfiguracionFechas;
 use App\Models\ConvenioBancario;
+use App\Models\DatosPersonales;
+use App\Models\Direccion;
 use App\Models\Distribuidora;
 use App\Models\Evidencia;
 use App\Models\Notificacion;
@@ -172,6 +174,10 @@ final class AuditLogObserver
             $model instanceof ConfiguracionFechas => 'Configuración',
             $model instanceof SolicitudProveedor,
             $model instanceof Evidencia => 'Alta Proveedores',
+            // Compartidas entre varios flujos (alta de proveedor, clientes, personal interno) --
+            // no hay un único módulo dueño, así que se agrupan aparte en vez de "adivinar" uno.
+            $model instanceof DatosPersonales,
+            $model instanceof Direccion => 'Datos Personales',
             $model instanceof Relacion,
             $model instanceof RelacionDetalle,
             $model instanceof RelacionPerdon => 'Relaciones',
