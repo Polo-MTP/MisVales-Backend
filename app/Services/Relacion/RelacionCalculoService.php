@@ -47,6 +47,12 @@ final class RelacionCalculoService
      * (o la fecha indicada) uno de sus dos días de corte quincenales configurados. Las
      * distribuidoras sin vales pendientes se omiten silenciosamente.
      *
+     * $forzar=true se salta esa restricción de día -- lo usa el disparo manual (botón "Generar
+     * Cortes del Día"): el gerente decide generar en el momento, sin importar si hoy coincide
+     * con el día de corte configurado. El job automático programado (GenerarCortesRelaciones,
+     * corre solo a la 1am) sigue llamando esto con $forzar=false para respetar el calendario
+     * quincenal real.
+     *
      * Cada distribuidora se procesa aislada: si una truena (ej. ya existe relación para esa
      * fecha), las demás siguen generándose normal — antes, una sola excepción dentro del
      * chunk() detenía TODO el resto del lote sin avisar cuántas sí se alcanzaron a generar.
@@ -55,7 +61,7 @@ final class RelacionCalculoService
      *                                                                             generadas indexadas por distribuidora_id, y mensajes de error por distribuidora
      *                                                                             que falló (indexados igual).
      */
-    public function generarCortesDelDia(?string $fecha = null): array
+    public function generarCortesDelDia(?string $fecha = null, bool $forzar = false): array
     {
         $fechaCorte = $fecha ? Carbon::parse($fecha) : now();
         $generadas = [];
@@ -64,16 +70,18 @@ final class RelacionCalculoService
         Distribuidora::query()
             ->where('estado', 'ACTIVO')
             ->with('sucursal', 'categoria')
-            ->chunk(50, function ($distribuidoras) use ($fechaCorte, &$generadas, &$errores): void {
+            ->chunk(50, function ($distribuidoras) use ($fechaCorte, $forzar, &$generadas, &$errores): void {
                 foreach ($distribuidoras as $distribuidora) {
                     try {
-                        $fechasConfig = $this->configuracionService->obtenerFechasVigentes(
-                            $distribuidora->sucursal_id,
-                            $fechaCorte->toDateString()
-                        );
+                        if (! $forzar) {
+                            $fechasConfig = $this->configuracionService->obtenerFechasVigentes(
+                                $distribuidora->sucursal_id,
+                                $fechaCorte->toDateString()
+                            );
 
-                        if (! $this->esDiaDeCorte($fechasConfig, $fechaCorte)) {
-                            continue;
+                            if (! $this->esDiaDeCorte($fechasConfig, $fechaCorte)) {
+                                continue;
+                            }
                         }
 
                         $relacion = $this->generarParaDistribuidora($distribuidora, $fechaCorte->toDateString());

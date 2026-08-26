@@ -133,6 +133,11 @@ final class RelacionController extends ApiController
     /**
      * Genera el corte de una distribuidora específica, o el corte del día para todas
      * las distribuidoras que correspondan, si no se indica distribuidora_id.
+     *
+     * Este es el disparo MANUAL (el gerente da clic): siempre genera, sin importar si hoy
+     * coincide con el día de corte quincenal configurado -- esa restricción de calendario solo
+     * aplica al job automático (GenerarCortesRelaciones, corre solo a la 1am). Por eso
+     * generarCortesDelDia() se llama aquí con $forzar=true.
      */
     public function generar(Request $request): JsonResponse
     {
@@ -156,7 +161,7 @@ final class RelacionController extends ApiController
                 );
             }
 
-            $resultado = $this->relacionCalculoService->generarCortesDelDia($request->input('fecha_corte'));
+            $resultado = $this->relacionCalculoService->generarCortesDelDia($request->input('fecha_corte'), forzar: true);
             $generadas = $resultado['generadas'];
             $errores = $resultado['errores'];
 

@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Models\Vale;
 use App\Services\Relacion\RelacionCalculoService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
 
@@ -71,6 +72,17 @@ it('no genera nada si la fecha indicada no es día de corte (ni el 15 ni fin de 
     expect($resultado['generadas'])->toBeEmpty()
         ->and($resultado['errores'])->toBeEmpty()
         ->and(Relacion::query()->count())->toBe(0);
+});
+
+it('con forzar=true genera el corte aunque la fecha no sea día de corte configurado', function (): void {
+    $distribuidora = crearDistribuidoraParaCorte('DIST-FORZAR');
+    crearValeParaCorte($distribuidora, 15000, 8);
+
+    $resultado = app(RelacionCalculoService::class)->generarCortesDelDia('2026-02-20', forzar: true);
+
+    expect($resultado['generadas'])->toHaveCount(1)
+        ->and($resultado['generadas'])->toHaveKey($distribuidora->id)
+        ->and($resultado['generadas'][$distribuidora->id]->fecha_corte->toDateString())->toBe('2026-02-20');
 });
 
 it('genera el corte en el último día del mes, el segundo corte quincenal', function (): void {
@@ -128,4 +140,45 @@ it('si una distribuidora ya tiene un corte generado hoy, igual genera el siguien
         ->and($resultado['generadas'])->toHaveCount(2)
         ->and($resultado['generadas'][$distA->id]->fecha_corte->toDateString())->toBe('2026-02-16')
         ->and($resultado['generadas'][$distB->id]->fecha_corte->toDateString())->toBe('2026-02-15');
+});
+
+it('POST /relaciones/generar (el botón real) genera el corte aunque hoy no sea día de corte configurado', function (): void {
+    $distribuidora = crearDistribuidoraParaCorte('DIST-BOTON');
+    crearValeParaCorte($distribuidora, 15000, 8);
+
+    $rolGerenteGeneral = Role::firstOrCreate(['name' => 'Gerente General']);
+    $gerenteGeneral = User::factory()->create(['role_id' => $rolGerenteGeneral->id, 'is_active' => true]);
+    Sanctum::actingAs($gerenteGeneral);
+
+    // 2026-02-20 no es ni el 15 ni fin de mes -- sin forzar, generarCortesDelDia lo omitiría.
+    $this->postJson('/api/v1/relaciones/generar', ['fecha_corte' => '2026-02-20'])
+        ->assertCreated()
+        ->assertJsonCount(1, 'data.relaciones')
+        ->assertJsonPath('data.relaciones.0.fecha_corte', '2026-02-20')
+        ->assertJsonPath('data.errores', []);
+
+    expect(Relacion::query()->count())->toBe(1);
+});
+
+it('POST /relaciones/generar dos veces el mismo día genera dos cortes distintos, con fecha corrida', function (): void {
+    $distribuidora = crearDistribuidoraParaCorte('DIST-BOTON-2X');
+    crearValeParaCorte($distribuidora, 15000, 8);
+
+    $rolGerenteGeneral = Role::firstOrCreate(['name' => 'Gerente General']);
+    $gerenteGeneral = User::factory()->create(['role_id' => $rolGerenteGeneral->id, 'is_active' => true]);
+    Sanctum::actingAs($gerenteGeneral);
+
+    $this->postJson('/api/v1/relaciones/generar', ['fecha_corte' => '2026-02-20'])
+        ->assertCreated()
+        ->assertJsonPath('data.relaciones.0.fecha_corte', '2026-02-20');
+
+    $this->postJson('/api/v1/relaciones/generar', ['fecha_corte' => '2026-02-20'])
+        ->assertCreated()
+        ->assertJsonCount(1, 'data.relaciones')
+        ->assertJsonPath('data.relaciones.0.fecha_corte', '2026-02-21')
+        ->assertJsonPath('data.errores', []);
+
+    expect(Relacion::query()->count())->toBe(2)
+        ->and(Relacion::query()->orderBy('id')->get()->map(fn (Relacion $r) => $r->fecha_corte->toDateString())->toArray())
+        ->toBe(['2026-02-20', '2026-02-21']);
 });
