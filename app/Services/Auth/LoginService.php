@@ -18,6 +18,17 @@ use Illuminate\Support\Facades\URL;
 final class LoginService
 {
     /**
+     * Hash bcrypt válido de un valor que nadie va a mandar como password -- se usa SOLO para
+     * que Hash::check() le cueste al servidor lo mismo (el costo real está en bcrypt, no en la
+     * comparación en sí) cuando el email no existe. Sin esto, "usuario no encontrado" regresa
+     * casi instantáneo (solo un SELECT) mientras que "usuario existe, password incorrecto" paga
+     * el costo de bcrypt -- un atacante puede distinguir ambos casos por tiempo de respuesta
+     * aunque el mensaje sea idéntico, exactamente el mismo riesgo de enumeración de cuentas que
+     * forgotPassword()/resetPassword() ya evitan a propósito con el mismo mensaje genérico.
+     */
+    private const string HASH_SENUELO = '$2y$12$VDJiBUhPQIz51gVbuUtlWeEn/tRCPTCwU3FA2AOJOVhTPBU6/oto6';
+
+    /**
      * Realiza el proceso de inicio de sesión validando credenciales y evaluando requerimientos de MFA.
      *
      * @param  array{email: string, password: string}  $data
@@ -34,6 +45,10 @@ final class LoginService
         $user = User::query()->where('email', $data['email'])->first();
 
         if (! $user) {
+            // Paga el mismo costo de bcrypt que pagaría si el usuario sí existiera pero la
+            // contraseña fuera incorrecta -- ver HASH_SENUELO.
+            Hash::check($data['password'], self::HASH_SENUELO);
+
             Log::debug('LoginService: Usuario no encontrado en la base de datos', [
                 'email' => $data['email'],
             ]);
