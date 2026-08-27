@@ -103,10 +103,18 @@ it('escenario real: vale + corte + abono parcial + corte con recargo + segundo v
         ->and((float) $corte1->detalles->first()->pago)->toBe(1000.0)
         ->and($corte1->detalles->first()->estado)->toBe('parcial');
 
-    // Corte 2/8: como la cuota 1 no quedó 'pagado' (el abono no la liquidó), esta trae recargo.
+    // Pasada su fecha límite (2026-02-16) sin liquidarse -> la multa se le agrega A ELLA MISMA
+    // (corte 1), no al corte 2 que se genere después.
+    app(App\Services\Relacion\RelacionEstadoService::class)->marcarVencidas('2026-03-01');
+    $corte1->refresh();
+    expect((float) $corte1->total_a_pagar)->toBe(2187.0)
+        ->and((float) $corte1->total_recargos)->toBe(300.0)
+        ->and($corte1->estado)->toBe('vencida');
+
+    // Corte 2/8: nace limpio -- el atraso de la cuota 1 ya quedó cobrado en su propio corte.
     $corte2 = $calculoService->generarParaDistribuidora($d1, '2026-03-15');
-    expect((float) $corte2->total_a_pagar)->toBe(2187.5)
-        ->and((float) $corte2->total_recargos)->toBe(300.0)
+    expect((float) $corte2->total_a_pagar)->toBe(1812.0)
+        ->and((float) $corte2->total_recargos)->toBe(0.0)
         ->and($corte2->detalles->first()->cuota_numero)->toBe(2);
 
     // --- Distribuidora 2 (ORO 10%): vale de $8,000 a 4 quincenas, no le abonan nada ---
@@ -120,13 +128,13 @@ it('escenario real: vale + corte + abono parcial + corte con recargo + segundo v
 
     dump([
         'D1 - Vale $10,000 / 8 quincenas / categoría PLATA 6% / abono parcial $1,000 en el corte 1' => [
-            'Corte 1 (cuota 1 de 8) - recién dado el vale' => [
+            'Corte 1 (cuota 1 de 8) - abono parcial, luego vencida (multa aplicada aquí mismo)' => [
                 'a_pagar' => (float) $corte1->total_a_pagar,
                 'recargo' => (float) $corte1->total_recargos,
                 'abonado' => (float) $corte1->total_abonado,
                 'estado' => $corte1->estado,
             ],
-            'Corte 2 (cuota 2 de 8) - tras abono parcial en el corte anterior' => [
+            'Corte 2 (cuota 2 de 8) - nace limpio, el atraso quedó en el corte 1' => [
                 'a_pagar' => (float) $corte2->total_a_pagar,
                 'recargo' => (float) $corte2->total_recargos,
                 'abonado' => (float) $corte2->total_abonado,

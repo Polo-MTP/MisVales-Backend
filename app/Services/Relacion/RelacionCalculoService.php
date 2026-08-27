@@ -178,7 +178,6 @@ final class RelacionCalculoService
 
         $comisionBasePct = (float) ($this->configuracionService->obtenerValorVigente('comision_base_pct') ?? 10);
         $interesPctQuincena = (float) ($this->configuracionService->obtenerValorVigente('interes_pct_quincena') ?? 5);
-        $multaNoPago = (float) ($this->configuracionService->obtenerValorVigente('multa_no_pago') ?? 300);
 
         return DB::transaction(function () use (
             $distribuidora,
@@ -186,7 +185,6 @@ final class RelacionCalculoService
             $valesPendientes,
             $comisionBasePct,
             $interesPctQuincena,
-            $multaNoPago,
         ): Relacion {
             // Serializa el acceso a esta distribuidora: dos llamadas casi simultáneas (dos
             // clics seguidos del gerente, o un reintento manual que choca con el job
@@ -222,7 +220,7 @@ final class RelacionCalculoService
             $totalAbonadoPorExcedente = 0.0;
 
             foreach ($valesPendientes as $vale) {
-                $detalle = $this->calcularDetalleVale($relacion, $vale, $comisionBasePct, $interesPctQuincena, $multaNoPago);
+                $detalle = $this->calcularDetalleVale($relacion, $vale, $comisionBasePct, $interesPctQuincena);
 
                 // Si este vale tiene saldo a favor de un excedente de un corte anterior (pagó
                 // de más y todavía no se le aplicó a ninguna cuota suya), se descuenta aquí
@@ -363,47 +361,31 @@ final class RelacionCalculoService
         ];
     }
 
+    /**
+     * Una cuota recién generada siempre nace limpia: sin recargo y con su descuento de
+     * categoría completo. La multa por atraso ya no se calcula aquí -- vive en la quincena que
+     * de verdad se atrasó, no en la que se genera después (ver
+     * RelacionEstadoService::marcarVencidas()).
+     */
     private function calcularDetalleVale(
         Relacion $relacion,
         Vale $vale,
         float $comisionBasePct,
         float $interesPctQuincena,
-        float $multaNoPago,
     ): RelacionDetalle {
         $quincenas = max(1, (int) ($vale->quincenas ?? $vale->producto?->quincenas ?? 1));
         $monto = (float) $vale->monto;
 
         $cuotaAnterior = RelacionDetalle::query()
             ->where('vale_id', $vale->id)
-            ->with('relacion')
             ->latest('id')
             ->first();
 
         $cuotaNumero = $cuotaAnterior ? $cuotaAnterior->cuota_numero + 1 : 1;
 
-        // Recargo: solo si la cuota anterior de este mismo vale sigue sin liquidarse Y YA SE LE
-        // VENCIÓ EL PLAZO (fecha_limite_pago de su propio corte, anterior a la fecha de este
-        // corte nuevo) -- no basta con que todavía no esté 'pagado'. Sin esta segunda condición,
-        // dos cortes forzados el mismo día real (botón "Generar Cortes del Día" dado dos veces
-        // seguidas, ver RelacionController::generar()) le metían multa a la segunda cuota aunque
-        // la distribuidora ni siquiera hubiera tenido oportunidad de pagar la primera todavía.
-        $fechaLimiteAnterior = $cuotaAnterior?->relacion?->fecha_limite_pago;
-        $seVencioLaAnterior = $fechaLimiteAnterior !== null && $fechaLimiteAnterior->lt($relacion->fecha_corte);
-        $recargo = ($cuotaAnterior && $cuotaAnterior->estado !== 'pagado' && $seVencioLaAnterior) ? $multaNoPago : 0.0;
-
         // Ganancia de la distribuidora por su categoría (Cobre/Plata/Oro), snapshot al generar el corte.
         $porcentajeCategoria = (float) ($relacion->porcentaje_comision_snapshot ?? 0);
         $base = $this->calcularMontosBase($monto, $quincenas, $comisionBasePct, $interesPctQuincena, $porcentajeCategoria);
-
-        if ($recargo > 0.0) {
-            // Con recargo pierde el descuento de esta quincena ("se le quita la comisión por
-            // regla") y paga el monto completo sin categoría de por medio.
-            $categoria = 0.0;
-            $total = round($base['capital'] + $base['comision'] + $base['interes'] + $base['seguro'] + $recargo, 2);
-        } else {
-            $categoria = $base['categoria'];
-            $total = $base['pago_quincenal'];
-        }
 
         return RelacionDetalle::query()->create([
             'relacion_id' => $relacion->id,
@@ -417,10 +399,10 @@ final class RelacionCalculoService
             'comision' => $base['comision'],
             'interes' => $base['interes'],
             'seguro' => $base['seguro'],
-            'categoria' => $categoria,
-            'recargo' => $recargo,
+            'categoria' => $base['categoria'],
+            'recargo' => 0.0,
             'pago' => 0,
-            'total' => $total,
+            'total' => $base['pago_quincenal'],
             'estado' => 'pendiente',
         ]);
     }

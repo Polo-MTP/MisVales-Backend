@@ -155,7 +155,7 @@ it('si ya existe un corte en la fecha indicada, genera el siguiente con la fecha
         ->and($segundaRelacion->detalles->first()->cuota_numero)->toBe(2);
 });
 
-it('aplica recargo cuando la cuota anterior del mismo vale no quedó pagada', function (): void {
+it('aplica el recargo a la propia cuota vencida cuando se marca la relación como vencida, no a la siguiente', function (): void {
     $distribuidora = crearDistribuidora();
     $vale = crearVale($distribuidora, 15000, 8);
 
@@ -163,9 +163,16 @@ it('aplica recargo cuando la cuota anterior del mismo vale no quedó pagada', fu
     $primeraRelacion = $service->generarParaDistribuidora($distribuidora, '2026-02-15');
     expect((float) $primeraRelacion->detalles->first()->recargo)->toBe(0.0);
 
+    // El límite de pago de la primera cuota es 2026-02-16 -- se marca vencida después de esa fecha.
+    app(RelacionEstadoService::class)->marcarVencidas('2026-02-20');
+
+    expect((float) $primeraRelacion->fresh()->detalles->first()->recargo)->toBe(300.0)
+        ->and($primeraRelacion->fresh()->estado)->toBe('vencida');
+
+    // La cuota nueva nace limpia -- el recargo se quedó en la que de verdad se atrasó.
     $segundaRelacion = $service->generarParaDistribuidora($distribuidora, '2026-03-15');
 
-    expect((float) $segundaRelacion->detalles->first()->recargo)->toBe(300.0)
+    expect((float) $segundaRelacion->detalles->first()->recargo)->toBe(0.0)
         ->and($segundaRelacion->detalles->first()->cuota_numero)->toBe(2);
 });
 
@@ -182,6 +189,11 @@ it('no aplica recargo si la cuota anterior del mismo vale ya se liquidó puntual
     app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, User::factory()->create());
 
     expect($primeraRelacion->fresh()->detalles->first()->estado)->toBe('pagado');
+
+    // Ya pagada: no debe calificar para el vencimiento, aunque haya pasado su fecha límite.
+    app(RelacionEstadoService::class)->marcarVencidas('2026-02-20');
+    expect((float) $primeraRelacion->fresh()->detalles->first()->recargo)->toBe(0.0)
+        ->and($primeraRelacion->fresh()->estado)->toBe('liquidada');
 
     $segundaRelacion = $service->generarParaDistribuidora($distribuidora, '2026-03-15');
 
@@ -261,6 +273,37 @@ it('concilia aunque el banco exporte la referencia como número y pierda los cer
         ->and($resumen['sin_coincidencia'])->toBe(0);
 
     expect($relacion->fresh()->estado)->toBe('liquidada');
+});
+
+/**
+ * Mismo problema que la referencia (Excel exportando la columna como número, perdiendo los
+ * ceros a la izquierda), pero del lado del 'concepto' -- el identificador que distingue, DENTRO
+ * de un corte con varios vales, a cuál corresponde cada abono. Antes normalizarReferencia()
+ * cubría solo 'referencia'; sin el mismo tratamiento para 'concepto', un pago con el monto
+ * exacto de un vale se aplicaba al TOTAL de la relación (por no encontrar el detalle) en vez de
+ * marcar ESE vale como pagado -- dejando su RelacionDetalle.estado en 'pendiente' para siempre,
+ * lo que le metía recargo indebido en la siguiente quincena aunque sí se hubiera pagado a tiempo.
+ */
+it('concilia por concepto aunque el banco lo exporte como número y pierda los ceros a la izquierda', function (): void {
+    $distribuidora = crearDistribuidora();
+    $valeA = crearVale($distribuidora, 15000, 8, '2026-02-01');
+    $valeB = crearVale($distribuidora, 8000, 4, '2026-02-01');
+
+    $relacion = app(RelacionCalculoService::class)->generarParaDistribuidora($distribuidora, '2026-02-15');
+    $detalleA = $relacion->detalles->firstWhere('vale_id', $valeA->id);
+    $detalleB = $relacion->detalles->firstWhere('vale_id', $valeB->id);
+
+    $cajera = User::factory()->create();
+
+    // (int) tira los ceros a la izquierda de 'concepto', igual que se simula para 'referencia'.
+    $archivo = crearExcelBanco([
+        [1, (int) $detalleA->concepto, $relacion->referencia_pago, (float) $detalleA->total, 'F960', '13/2/2026', '14:00', 'Transferencia'],
+    ]);
+
+    app(ConciliacionBancariaService::class)->importarArchivo($archivo, null, $cajera);
+
+    expect($detalleA->fresh()->estado)->toBe('pagado')
+        ->and($detalleB->fresh()->estado)->toBe('pendiente');
 });
 
 it('reimportar el mismo excel del banco no duplica el abono (mismo folio de pago)', function (): void {
@@ -478,30 +521,55 @@ it('marca como vencidas las relaciones cuya fecha límite de pago ya pasó', fun
         ->and($relacion->fresh()->estado)->toBe('vencida');
 });
 
+/**
+ * Antes, el recargo se calculaba al generar la SIGUIENTE cuota -- la última quincena de un
+ * vale (1/1, sin ninguna cuota después) nunca tenía una "siguiente" que se lo cobrara, así que
+ * un vale a una sola quincena que se atrasara jamás recibía multa. Con la multa viviendo en la
+ * propia relación vencida (marcarVencidas()), esto ya no depende de que exista un corte futuro.
+ */
+it('la última quincena de un vale sí recibe su multa, aunque no exista una cuota siguiente', function (): void {
+    $distribuidora = crearDistribuidora();
+    crearVale($distribuidora, 5000, 1);
+
+    $relacion = app(RelacionCalculoService::class)->generarParaDistribuidora($distribuidora, '2026-02-15');
+    expect((float) $relacion->total_recargos)->toBe(0.0);
+
+    app(RelacionEstadoService::class)->marcarVencidas('2026-03-01');
+
+    expect((float) $relacion->fresh()->total_recargos)->toBe(300.0)
+        ->and($relacion->fresh()->estado)->toBe('vencida');
+});
+
 it('perdonar condona el recargo y el interés, y reduce el total a pagar (no toca capital/comisión/seguro/categoría)', function (): void {
     $distribuidora = crearDistribuidora();
     crearVale($distribuidora, 15000, 8);
 
     $service = app(RelacionCalculoService::class);
-    $service->generarParaDistribuidora($distribuidora, '2026-02-15');
-    $segundaRelacion = $service->generarParaDistribuidora($distribuidora, '2026-03-15');
+    $primeraRelacion = $service->generarParaDistribuidora($distribuidora, '2026-02-15');
+    expect((float) $primeraRelacion->total_a_pagar)->toBe(2712.0);
 
-    // Vale sin liquidar la 1a cuota -> la 2a cuota trae recargo, sin descuento de categoría ni piso.
-    expect((float) $segundaRelacion->total_recargos)->toBe(300.0)
-        ->and((float) $segundaRelacion->total_interes)->toBe(750.0)
-        ->and((float) $segundaRelacion->total_a_pagar)->toBe(3125.0);
+    // Sin liquidar y su fecha límite (2026-02-16) ya pasó -> se le agrega la multa a ELLA
+    // misma, no a la siguiente que se genere después.
+    app(RelacionEstadoService::class)->marcarVencidas('2026-03-01');
+    $primeraRelacion->refresh();
+
+    // 2712 (total original) + 300 (recargo) + 112.5 (descuento de categoría que se pierde) = 3124.5
+    expect((float) $primeraRelacion->total_recargos)->toBe(300.0)
+        ->and((float) $primeraRelacion->total_interes)->toBe(750.0)
+        ->and((float) $primeraRelacion->total_a_pagar)->toBe(3124.5)
+        ->and($primeraRelacion->estado)->toBe('vencida');
 
     $gerente = User::factory()->create();
-    $perdonada = app(RelacionEstadoService::class)->perdonar($segundaRelacion, $gerente, 'atraso justificado');
+    $perdonada = app(RelacionEstadoService::class)->perdonar($primeraRelacion, $gerente, 'atraso justificado');
 
     expect($perdonada->estado)->toBe('perdonada')
         ->and((float) $perdonada->total_recargos)->toBe(0.0)
         ->and((float) $perdonada->total_interes)->toBe(0.0)
-        // 3125 - 300 (recargo) - 750 (interés) = 2075; capital+comisión+seguro se quedan igual.
-        ->and((float) $perdonada->total_a_pagar)->toBe(2075.0)
+        // 3124.5 - 300 (recargo) - 750 (interés) = 2074.5; capital+comisión+seguro se quedan igual.
+        ->and((float) $perdonada->total_a_pagar)->toBe(2074.5)
         ->and((float) $perdonada->detalles->first()->recargo)->toBe(0.0)
         ->and((float) $perdonada->detalles->first()->interes)->toBe(0.0)
-        ->and((float) $perdonada->detalles->first()->total)->toBe(2075.0);
+        ->and((float) $perdonada->detalles->first()->total)->toBe(2074.5);
 });
 
 it('perdona la primera y segunda relación vencida, y marca la tercera como pérdida', function (): void {

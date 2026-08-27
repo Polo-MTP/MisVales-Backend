@@ -26,28 +26,78 @@ final class RelacionEstadoService
 
     /**
      * Marca como 'vencida' cualquier relación pendiente/parcial cuya fecha límite de pago ya
-     * pasó, y evalúa MOROSIDAD automática para cada distribuidora afectada.
+     * pasó, le aplica la multa por no pago a sus propias cuotas sin liquidar, y evalúa
+     * MOROSIDAD automática para cada distribuidora afectada.
+     *
+     * La multa vive en la quincena que se atrasó, no en la siguiente: antes,
+     * RelacionCalculoService le agregaba el recargo a la cuota NUEVA cuando detectaba que la
+     * anterior seguía sin pagar -- eso dejaba a la última quincena de un vale sin ninguna forma
+     * de recibir su multa (no hay "cuota siguiente" que la cargue), y mezclaba en un mismo
+     * corte cargos que le corresponden a otro. Aquí, en cambio, el vencimiento se detecta y se
+     * cobra sobre la relación que de verdad se atrasó, sin depender de que exista una después.
      */
     public function marcarVencidas(?string $fecha = null): int
     {
         $fecha = $fecha ?? now()->toDateString();
 
-        $distribuidorasAfectadas = Relacion::query()
+        $relacionesVencidas = Relacion::query()
             ->whereIn('estado', ['pendiente', 'parcial'])
             ->whereDate('fecha_limite_pago', '<', $fecha)
-            ->pluck('distribuidora_id')
-            ->unique();
+            ->with('detalles')
+            ->get();
 
-        $total = Relacion::query()
-            ->whereIn('estado', ['pendiente', 'parcial'])
-            ->whereDate('fecha_limite_pago', '<', $fecha)
-            ->update(['estado' => 'vencida']);
+        $multaNoPago = (float) ($this->configuracionService->obtenerValorVigente('multa_no_pago') ?? 300);
 
-        foreach ($distribuidorasAfectadas as $distribuidoraId) {
+        foreach ($relacionesVencidas as $relacion) {
+            $this->aplicarMultaPorVencimiento($relacion, $multaNoPago);
+            $relacion->estado = 'vencida';
+            $relacion->save();
+        }
+
+        foreach ($relacionesVencidas->pluck('distribuidora_id')->unique() as $distribuidoraId) {
             $this->evaluarMorosidad((int) $distribuidoraId);
         }
 
-        return $total;
+        return $relacionesVencidas->count();
+    }
+
+    /**
+     * Le agrega la multa (y le quita el descuento de categoría, misma regla de siempre: "con
+     * recargo pierde el descuento de esa quincena") a cada cuota de $relacion que sigue sin
+     * liquidarse. Idempotente por diseño: una vez que una cuota ya tiene recargo > 0, o ya está
+     * 'pagada', se salta -- necesario porque una relación 'vencida' puede recibir un abono
+     * parcial después (ConciliacionBancariaService::aplicarAbono() la regresa a 'parcial' si no
+     * la liquida del todo), volviendo a calificar para este método en la siguiente corrida sin
+     * que eso duplique la multa ya cobrada.
+     */
+    private function aplicarMultaPorVencimiento(Relacion $relacion, float $multaNoPago): void
+    {
+        $recargoAgregado = 0.0;
+        $categoriaPerdida = 0.0;
+
+        foreach ($relacion->detalles as $detalle) {
+            $saldoCuota = (float) $detalle->total - (float) $detalle->pago;
+
+            if ($detalle->estado === 'pagado' || (float) $detalle->recargo > 0.0 || $saldoCuota <= 0.01) {
+                continue;
+            }
+
+            $categoriaDeEstaCuota = (float) $detalle->categoria;
+
+            $detalle->recargo = $multaNoPago;
+            $detalle->categoria = 0.0;
+            $detalle->total = round((float) $detalle->total + $multaNoPago + $categoriaDeEstaCuota, 2);
+            $detalle->save();
+
+            $recargoAgregado += $multaNoPago;
+            $categoriaPerdida += $categoriaDeEstaCuota;
+        }
+
+        if ($recargoAgregado > 0.0) {
+            $relacion->total_recargos = round((float) $relacion->total_recargos + $recargoAgregado, 2);
+            $relacion->total_categoria = round((float) $relacion->total_categoria - $categoriaPerdida, 2);
+            $relacion->total_a_pagar = round((float) $relacion->total_a_pagar + $recargoAgregado + $categoriaPerdida, 2);
+        }
     }
 
     /**

@@ -182,8 +182,12 @@ final class ConciliacionBancariaService
             'referencia' => $this->normalizarReferencia($fila['referencia'] ?? ''),
             // Identifica el vale específico cuando el corte junta varios y la distribuidora
             // los paga por separado -- ver RelacionCalculoService::construirConceptoVale().
-            // Vacío/no-match: el abono se aplica al corte completo, igual que antes.
-            'concepto' => trim((string) ($fila['concepto'] ?? '')),
+            // Vacío/no-match: el abono se aplica al corte completo, igual que antes. Mismo
+            // problema que 'referencia' (Excel exportando la columna como número, perdiendo
+            // los ceros a la izquierda) -- concepto también es puramente numérico
+            // (%05d vale_id + %04d cuota_numero, 9 dígitos), así que necesita el mismo
+            // re-rellenado antes de comparar contra RelacionDetalle.concepto.
+            'concepto' => $this->normalizarNumeroConLongitud($fila['concepto'] ?? '', 9),
             'monto' => (float) preg_replace('/[^0-9.\-]/', '', (string) ($fila['pago'] ?? 0)),
             // '' normalizado a null (no solo "sin la clave"): una celda vacía en el Excel debe
             // guardarse como NULL, no como string vacío -- si no, el respaldo de deduplicación
@@ -453,13 +457,25 @@ final class ConciliacionBancariaService
      */
     private function normalizarReferencia(mixed $valor): string
     {
-        $referencia = trim((string) $valor);
+        return $this->normalizarNumeroConLongitud($valor, 18);
+    }
 
-        if ($referencia !== '' && ctype_digit($referencia) && mb_strlen($referencia) < 18) {
-            return mb_str_pad($referencia, 18, '0', STR_PAD_LEFT);
+    /**
+     * Re-rellena con ceros a la izquierda un identificador puramente numérico de longitud fija
+     * (referencia_pago: 18 dígitos: 9 de distribuidora + 9 de fecha; concepto: 9 dígitos: 5 de
+     * vale_id + 4 de cuota_numero) que Excel exportó como número en vez de texto, perdiendo los
+     * ceros que sí tenía el valor original. Si no es puramente numérico (o ya mide lo esperado),
+     * se deja tal cual -- ya viene bien, o no es este tipo de problema.
+     */
+    private function normalizarNumeroConLongitud(mixed $valor, int $longitud): string
+    {
+        $texto = trim((string) $valor);
+
+        if ($texto !== '' && ctype_digit($texto) && mb_strlen($texto) < $longitud) {
+            return mb_str_pad($texto, $longitud, '0', STR_PAD_LEFT);
         }
 
-        return $referencia;
+        return $texto;
     }
 
     /**
