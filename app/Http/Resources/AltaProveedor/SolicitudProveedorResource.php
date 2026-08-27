@@ -76,6 +76,11 @@ final class SolicitudProveedorResource extends JsonResource
                 'name' => $this->gerente?->name,
                 'email' => $this->gerente?->email,
             ],
+            'categoria' => $this->categoria ? [
+                'id' => $this->categoria->id,
+                'nombre' => $this->categoria->nombre,
+                'porcentaje_comision' => $this->categoria->porcentaje_comision,
+            ] : null,
             'evidencias' => EvidenciaResource::collection($this->whenLoaded('evidencias')),
             'logs_auditoria' => LogNuevoProveedorResource::collection($this->whenLoaded('logs')),
             'created_at' => $this->created_at?->toIso8601String(),

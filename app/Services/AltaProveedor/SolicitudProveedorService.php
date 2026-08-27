@@ -16,6 +16,7 @@ use App\Models\SolicitudProveedor;
 use App\Models\User;
 use App\Mail\PersonalCredencialesMail;
 use App\Services\Notificacion\NotificacionService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -77,6 +78,7 @@ final class SolicitudProveedorService
                 'datos_vehiculos' => $data['datos_vehiculos'] ?? null,
                 'datos_vivienda' => $data['datos_vivienda'] ?? null,
                 'referencia_laboral' => $data['referencia_laboral'] ?? null,
+                'categoria_id' => $data['categoria_id'] ?? null,
             ]);
 
             // Auditoría inicial de creación
@@ -114,7 +116,7 @@ final class SolicitudProveedorService
                 'sucursal_id' => $solicitud->sucursal_id,
             ]);
 
-            return $solicitud->load(['datosPersonales.direccion', 'sucursal', 'coordinador', 'evidencias']);
+            return $solicitud->load(['datosPersonales.direccion', 'sucursal', 'coordinador', 'categoria', 'evidencias']);
         });
     }
 
@@ -152,13 +154,21 @@ final class SolicitudProveedorService
             // Auditoría y actualización de Datos Personales
             if (! empty($data['datos_personales']) && is_array($data['datos_personales']) && $datosPersonales) {
                 foreach ($data['datos_personales'] as $campo => $nuevoValor) {
-                    if ($nuevoValor !== null && $datosPersonales->{$campo} !== $nuevoValor) {
+                    // 'fecha_nacimiento' está casteado a Carbon en el modelo -- comparar/loguear
+                    // el objeto tal cual contra el string que manda el request siempre daría
+                    // "cambió" (tipos distintos) y ensuciaría el log con un datetime completo en
+                    // vez de solo la fecha. Se normaliza a string de fecha antes de comparar.
+                    $valorActual = $datosPersonales->{$campo} instanceof Carbon
+                        ? $datosPersonales->{$campo}->toDateString()
+                        : $datosPersonales->{$campo};
+
+                    if ($nuevoValor !== null && (string) $valorActual !== (string) $nuevoValor) {
                         LogNuevoProveedor::query()->create([
                             'solicitud_id' => $solicitud->id,
                             'entidad_tipo' => 'DatosPersonales',
                             'entidad_id' => $datosPersonales->id,
                             'campo' => $campo,
-                            'valor_anterior' => (string) $datosPersonales->{$campo},
+                            'valor_anterior' => (string) $valorActual,
                             'valor_nuevo' => (string) $nuevoValor,
                             'modificado_por' => $verificador->id,
                             'fecha_hora' => now(),
@@ -246,7 +256,7 @@ final class SolicitudProveedorService
                 );
             }
 
-            return $solicitud->load(['datosPersonales.direccion', 'sucursal', 'coordinador', 'verificador', 'evidencias', 'logs']);
+            return $solicitud->load(['datosPersonales.direccion', 'sucursal', 'coordinador', 'verificador', 'categoria', 'evidencias', 'logs']);
         });
     }
 
@@ -324,6 +334,7 @@ final class SolicitudProveedorService
                     'sucursal_id' => $solicitud->sucursal_id,
                     'coordinador_id' => $solicitud->coordinador_id,
                     'verificador_id' => $solicitud->verificador_id,
+                    'categoria_id' => $solicitud->categoria_id,
                     'aprobado_por' => $gerente->id,
                     'fecha_aprobacion' => now(),
                     'comentarios_verificador' => $solicitud->comentario_verificador,
@@ -411,7 +422,7 @@ final class SolicitudProveedorService
                 'estado' => $solicitud->estado,
             ]);
 
-            return $solicitud->load(['datosPersonales.direccion', 'sucursal', 'coordinador', 'verificador', 'gerente', 'evidencias', 'logs']);
+            return $solicitud->load(['datosPersonales.direccion', 'sucursal', 'coordinador', 'verificador', 'gerente', 'categoria', 'evidencias', 'logs']);
         });
     }
 }

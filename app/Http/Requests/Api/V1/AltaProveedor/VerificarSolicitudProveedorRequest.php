@@ -34,6 +34,8 @@ final class VerificarSolicitudProveedorRequest extends FormRequest
             'datos_personales.apellido_paterno' => ['nullable', 'string', 'max:255'],
             'datos_personales.apellido_materno' => ['nullable', 'string', 'max:255'],
             'datos_personales.curp' => ['nullable', 'string', 'size:18'],
+            'datos_personales.fecha_nacimiento' => ['nullable', 'date'],
+            'datos_personales.lugar_nacimiento' => ['nullable', 'string', 'max:255'],
 
             // Dirección opcionalmente editada por el Verificador
             'direccion' => ['nullable', 'array'],

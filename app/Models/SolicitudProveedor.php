@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'datos_vehiculos',
     'datos_vivienda',
     'referencia_laboral',
+    'categoria_id',
 ])]
 final class SolicitudProveedor extends Model
 {
@@ -76,6 +77,17 @@ final class SolicitudProveedor extends Model
         }
 
         return trim($datos->nombre.' '.$datos->apellido_paterno.' '.($datos->apellido_materno ?? ''));
+    }
+
+    /**
+     * Categoría (Bronce, Plata, Oro, etc.) elegida por el Coordinador al capturar la
+     * solicitud -- se traslada a la Distribuidora cuando Gerencia la aprueba (ver
+     * SolicitudProveedorService::aprobarORechazar()). Opcional: puede asignarse o
+     * cambiarse después directamente sobre la Distribuidora ya creada.
+     */
+    public function categoria(): BelongsTo
+    {
+        return $this->belongsTo(CategoriaDistribuidora::class, 'categoria_id');
     }
 
     /**

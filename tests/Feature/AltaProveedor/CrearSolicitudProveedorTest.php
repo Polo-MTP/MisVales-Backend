@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\CategoriaDistribuidora;
 use App\Models\DatosPersonales;
 use App\Models\Direccion;
 use App\Models\Evidencia;
@@ -72,6 +73,19 @@ it('si algo truena a la mitad (ej. se cae la conexión a la BD), no queda nada c
         ->and(DatosPersonales::count())->toBe(0)
         ->and(SolicitudProveedor::count())->toBe(0)
         ->and(Evidencia::count())->toBe(0);
+});
+
+it('guarda la categoría elegida por el Coordinador al capturar la solicitud', function (): void {
+    $coordinador = crearCoordinadorParaSolicitud();
+    $categoria = CategoriaDistribuidora::create(['nombre' => 'ORO', 'porcentaje_comision' => 4, 'activo' => true]);
+
+    $data = datosSolicitudValidos();
+    $data['categoria_id'] = $categoria->id;
+
+    $solicitud = app(SolicitudProveedorService::class)->crearSolicitud($data, $coordinador);
+
+    expect($solicitud->categoria_id)->toBe($categoria->id)
+        ->and($solicitud->categoria->nombre)->toBe('ORO');
 });
 
 it('reintentar después de una falla crea la solicitud normalmente -- no queda bloqueada por el intento fallido', function (): void {

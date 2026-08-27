@@ -43,7 +43,7 @@ final class SolicitudProveedorController extends ApiController
                 AllowedFilter::exact('coordinador_id'),
                 AllowedFilter::exact('verificador_id'),
             )
-            ->allowedIncludes('datosPersonales.direccion', 'sucursal', 'coordinador', 'verificador', 'gerente', 'evidencias', 'logs')
+            ->allowedIncludes('datosPersonales.direccion', 'sucursal', 'coordinador', 'verificador', 'gerente', 'categoria', 'evidencias', 'logs')
             ->allowedSorts('created_at', 'id')
             ->defaultSort('-created_at')
             ->paginate();
@@ -65,7 +65,7 @@ final class SolicitudProveedorController extends ApiController
             return $this->forbidden('Acceso Denegado. No tienes permisos para consultar solicitudes pertenecientes a otra sucursal.');
         }
 
-        $solicitud->load(['datosPersonales.direccion', 'sucursal', 'coordinador', 'verificador', 'gerente', 'evidencias', 'logs.usuario']);
+        $solicitud->load(['datosPersonales.direccion', 'sucursal', 'coordinador', 'verificador', 'gerente', 'categoria', 'evidencias', 'logs.usuario']);
 
         return $this->success(new SolicitudProveedorResource($solicitud));
     }

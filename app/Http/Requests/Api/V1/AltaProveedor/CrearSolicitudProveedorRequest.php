@@ -53,6 +53,10 @@ final class CrearSolicitudProveedorRequest extends FormRequest
             // Asignación opcional de Verificador por el Coordinador
             'verificador_id' => ['nullable', 'integer', 'exists:users,id'],
 
+            // Categoría (Bronce, Plata, Oro, etc.) opcional -- se traslada a la Distribuidora
+            // si Gerencia aprueba la solicitud (ver SolicitudProveedorService).
+            'categoria_id' => ['nullable', 'integer', 'exists:categorias_distribuidoras,id'],
+
             // Evidencias iniciales (URLs de archivos subidos al servidor de imágenes)
             'evidencias' => ['nullable', 'array'],
             'evidencias.*.tipo_documento' => ['required', 'string', 'max:100'],

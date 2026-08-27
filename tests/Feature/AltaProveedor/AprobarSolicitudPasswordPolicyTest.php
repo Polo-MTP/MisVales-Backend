@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use App\Mail\PersonalCredencialesMail;
 use App\Models\AuditLog;
+use App\Models\CategoriaDistribuidora;
 use App\Models\DatosPersonales;
 use App\Models\Direccion;
+use App\Models\Distribuidora;
 use App\Models\Role;
 use App\Models\SolicitudProveedor;
 use App\Models\Sucursal;
@@ -89,6 +91,27 @@ it('aprueba sin necesidad de mandar password, crea la cuenta y deja un solo rast
     $auditDistribuidora = AuditLog::where('action', 'Distribuidora.creado')->latest()->first();
     expect($auditDistribuidora)->not->toBeNull()
         ->and($auditDistribuidora->ip_address)->not->toBeNull();
+});
+
+it('traslada la categoría elegida en la solicitud a la Distribuidora creada al aprobar', function (): void {
+    $sucursal = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-'.uniqid(), 'es_matriz' => true, 'is_active' => true]);
+    $categoria = CategoriaDistribuidora::create(['nombre' => 'PLATA', 'porcentaje_comision' => 3, 'activo' => true]);
+    $solicitud = crearSolicitudProveedorPendiente($sucursal);
+    $solicitud->update(['categoria_id' => $categoria->id]);
+    $gerente = crearGerenteGeneralActivo();
+    Sanctum::actingAs($gerente);
+
+    $this->postJson("/api/v1/alta-proveedor/solicitudes/{$solicitud->id}/aprobar", [
+        'decision' => 'aprobado',
+        'limite_credito_asignado' => 20000,
+        'email' => 'con.categoria@correo.com',
+    ])->assertStatus(200);
+
+    $nuevoUsuario = User::where('email', 'con.categoria@correo.com')->first();
+    $distribuidora = Distribuidora::where('usuario_id', $nuevoUsuario->id)->first();
+
+    expect($distribuidora)->not->toBeNull()
+        ->and($distribuidora->categoria_id)->toBe($categoria->id);
 });
 
 it('le envía la contraseña generada por correo a la distribuidora aprobada -- si no, no tiene forma de saberla', function (): void {

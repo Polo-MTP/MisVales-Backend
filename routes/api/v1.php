@@ -321,11 +321,12 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
                 ->name('api.v1.productos.destroy');
         });
 
-    // Catálogo de categorías de distribuidora (usado por el selector de PUT distribuidoras/{id}/credito
-    // y por RelacionCalculoService al calcular el descuento de categoría en cada corte).
+    // Catálogo de categorías de distribuidora (usado por el selector de PUT distribuidoras/{id}/credito,
+    // por el selector opcional de categoría al capturar una solicitud de alta de proveedor, y por
+    // RelacionCalculoService al calcular el descuento de categoría en cada corte).
     Route::prefix('categorias-distribuidoras')->group(function (): void {
         Route::get('/', [CategoriaDistribuidoraController::class, 'index'])
-            ->middleware('role:Gerente de Sucursal,Gerente General')
+            ->middleware('role:Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.categorias_distribuidoras.index');
 
         Route::post('/', [CategoriaDistribuidoraController::class, 'store'])
