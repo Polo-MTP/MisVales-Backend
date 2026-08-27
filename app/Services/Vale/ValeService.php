@@ -7,6 +7,7 @@ namespace App\Services\Vale;
 use App\Models\Cliente;
 use App\Models\Distribuidora;
 use App\Models\Producto;
+use App\Models\SeguroTabla;
 use App\Models\User;
 use App\Models\Vale;
 use DomainException;
@@ -73,7 +74,21 @@ final class ValeService
             throw new DomainException('La distribuidora no cumple las condiciones para solicitar este vale (crédito disponible insuficiente o límite del primer vale excedido).');
         }
 
-        return DB::transaction(function () use ($distribuidora, $cliente, $producto, $data): Vale {
+        // Se resuelve el rango de seguro que corresponde al monto de ESTE vale y se congela
+        // aquí mismo -- antes se recalculaba en vivo en cada corte (RelacionCalculoService),
+        // así que un cambio en seguros_tabla afectaba retroactivamente cuotas de vales que ya
+        // llevaban tiempo autorizados. Ahora, una vez generado, el vale conserva el mismo
+        // seguro_monto durante toda su vida sin importar qué cambie después en la
+        // configuración. No puede existir un vale sin seguro: si ningún rango activo cubre
+        // este monto, no se genera el vale.
+        /** @var SeguroTabla|null $seguroTabla */
+        $seguroTabla = SeguroTabla::query()->activo()->paraMonto((float) $producto->monto)->orderByDesc('monto_desde')->first();
+
+        if (! $seguroTabla) {
+            throw new DomainException('No hay una tarifa de seguro configurada para este monto. No se puede generar el vale sin seguro.');
+        }
+
+        return DB::transaction(function () use ($distribuidora, $cliente, $producto, $seguroTabla, $data): Vale {
             /** @var Vale $vale */
             $vale = Vale::query()->create([
                 'distribuidora_id' => $distribuidora->id,
@@ -81,6 +96,8 @@ final class ValeService
                 'producto_id' => $producto->id,
                 'monto' => $producto->monto,
                 'quincenas' => $producto->quincenas,
+                'seguro_tabla_id' => $seguroTabla->id,
+                'seguro_monto' => $seguroTabla->seguro_monto,
                 'tipo' => $data['tipo'] ?? 'pre-vale',
                 'estado' => 'solicitado',
                 'fecha_solicitud' => now(),

@@ -279,15 +279,20 @@ final class RelacionCalculoService
      * comportamiento futuro que todavía no pasa) y usa la configuración vigente EN ESTE
      * MOMENTO, que puede cambiar antes de que el corte real se genere.
      *
+     * $seguroMonto: si ya existe un vale (ver ValeResource::construirEstimacion()), se le pasa
+     * su seguro_monto ya congelado para que el estimado coincida con lo que de verdad se va a
+     * cobrar; si es null (no hay vale todavía, ej. /productos/{id}/simulacion), se resuelve en
+     * vivo por rango de monto, igual que antes.
+     *
      * @return array{capital: float, comision: float, interes: float, seguro: float, categoria: float, pago_quincenal: float, total_estimado_plazo: float}
      */
-    public function simularPagoQuincenal(float $monto, int $quincenas, ?Distribuidora $distribuidora = null): array
+    public function simularPagoQuincenal(float $monto, int $quincenas, ?Distribuidora $distribuidora = null, ?float $seguroMonto = null): array
     {
         $comisionBasePct = (float) ($this->configuracionService->obtenerValorVigente('comision_base_pct') ?? 10);
         $interesPctQuincena = (float) ($this->configuracionService->obtenerValorVigente('interes_pct_quincena') ?? 5);
         $porcentajeCategoria = (float) ($distribuidora?->categoria?->porcentaje_comision ?? 0);
 
-        $base = $this->calcularMontosBase($monto, max(1, $quincenas), $comisionBasePct, $interesPctQuincena, $porcentajeCategoria);
+        $base = $this->calcularMontosBase($monto, max(1, $quincenas), $comisionBasePct, $interesPctQuincena, $porcentajeCategoria, $seguroMonto);
 
         return [
             ...$base,
@@ -328,7 +333,8 @@ final class RelacionCalculoService
 
         foreach ($valesPendientes as $vale) {
             $quincenas = max(1, (int) ($vale->quincenas ?? $vale->producto?->quincenas ?? 1));
-            $base = $this->calcularMontosBase((float) $vale->monto, $quincenas, $comisionBasePct, $interesPctQuincena, $porcentajeCategoria);
+            $seguroMonto = $vale->seguro_monto !== null ? (float) $vale->seguro_monto : null;
+            $base = $this->calcularMontosBase((float) $vale->monto, $quincenas, $comisionBasePct, $interesPctQuincena, $porcentajeCategoria, $seguroMonto);
 
             $cuotaAnterior = RelacionDetalle::query()->where('vale_id', $vale->id)->latest('id')->first();
             $cuotaNumero = $cuotaAnterior ? $cuotaAnterior->cuota_numero + 1 : 1;
@@ -385,7 +391,11 @@ final class RelacionCalculoService
 
         // Ganancia de la distribuidora por su categoría (Cobre/Plata/Oro), snapshot al generar el corte.
         $porcentajeCategoria = (float) ($relacion->porcentaje_comision_snapshot ?? 0);
-        $base = $this->calcularMontosBase($monto, $quincenas, $comisionBasePct, $interesPctQuincena, $porcentajeCategoria);
+        // El seguro del vale queda congelado desde que se solicitó (ver ValeService::solicitar())
+        // -- no cambia si la tabla de seguros cambia después. Solo un vale de ANTES de ese
+        // cambio (seguro_monto null) cae de vuelta al cálculo en vivo por rango de monto.
+        $seguroMonto = $vale->seguro_monto !== null ? (float) $vale->seguro_monto : null;
+        $base = $this->calcularMontosBase($monto, $quincenas, $comisionBasePct, $interesPctQuincena, $porcentajeCategoria, $seguroMonto);
 
         return RelacionDetalle::query()->create([
             'relacion_id' => $relacion->id,
@@ -413,9 +423,14 @@ final class RelacionCalculoService
      * piso. Es la misma fórmula que calcularDetalleVale() aplica cuando no hay recargo — la
      * comparten el cálculo real del corte y simularPagoQuincenal().
      *
+     * $seguroMonto: el costo TOTAL de seguro ya resuelto (ej. el snapshot congelado del vale,
+     * ver Vale::seguro_monto). Si es null, se resuelve en vivo por rango de monto -- solo pasa
+     * para vales de antes de que el seguro quedara congelado al solicitarse, o para una
+     * simulación sin vale detrás.
+     *
      * @return array{capital: float, comision: float, interes: float, seguro: float, categoria: float, pago_quincenal: float}
      */
-    private function calcularMontosBase(float $monto, int $quincenas, float $comisionBasePct, float $interesPctQuincena, float $porcentajeCategoria): array
+    private function calcularMontosBase(float $monto, int $quincenas, float $comisionBasePct, float $interesPctQuincena, float $porcentajeCategoria, ?float $seguroMonto = null): array
     {
         $quincenas = max(1, $quincenas);
 
@@ -423,7 +438,7 @@ final class RelacionCalculoService
         $comision = round(($monto * $comisionBasePct / 100) / $quincenas, 2);
         // Interés simple sobre el total del plazo, prorrateado entre quincenas (ver "Analisis de calculo de relacion").
         $interes = round($monto * $interesPctQuincena / 100, 2);
-        $seguro = round($this->calcularSeguro($monto) / $quincenas, 2);
+        $seguro = round(($seguroMonto ?? $this->calcularSeguro($monto)) / $quincenas, 2);
         $categoria = round(($monto * $porcentajeCategoria / 100) / $quincenas, 2);
 
         // ROUNDDOWN al piso (no round()) tal como el documento fuente calcula el "Pago Distribuidora".

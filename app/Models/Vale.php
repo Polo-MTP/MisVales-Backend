@@ -21,6 +21,8 @@ final class Vale extends Model
         'producto_id',
         'monto',
         'quincenas',     // snapshot del producto al momento del alta
+        'seguro_tabla_id', // rango de seguro con el que se generó el vale (referencia, ver seguro_monto)
+        'seguro_monto',    // snapshot del monto del seguro -- fijo de por vida del vale, ver RelacionCalculoService
         'tipo',          // 'pre-vale' o 'vale-digital'
         'estado',        // 'solicitado', 'validado', 'autorizado', 'pagado', 'vencido', 'incidencia'
         'activo',        // la distribuidora la activa/desactiva sin autorización
@@ -35,6 +37,7 @@ final class Vale extends Model
     protected $casts = [
         'monto' => 'decimal:2',
         'quincenas' => 'integer',
+        'seguro_monto' => 'decimal:2',
         'activo' => 'boolean',
         'fecha_solicitud' => 'datetime',
         'fecha_validacion' => 'datetime',
@@ -66,6 +69,16 @@ final class Vale extends Model
     public function producto(): BelongsTo
     {
         return $this->belongsTo(Producto::class);
+    }
+
+    /**
+     * Rango de seguro con el que se generó este vale -- solo de referencia (para mostrar de
+     * dónde salió), el monto real que se usa en los cortes es el snapshot en seguro_monto, no
+     * el seguro_monto vigente de este rango (que puede haber cambiado desde entonces).
+     */
+    public function seguroTabla(): BelongsTo
+    {
+        return $this->belongsTo(SeguroTabla::class);
     }
 
     /**

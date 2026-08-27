@@ -52,6 +52,9 @@ final class ValeResource extends JsonResource
             ] : null,
             'monto' => $this->monto,
             'quincenas' => $this->quincenas,
+            // Congelado al solicitarse (ver ValeService::solicitar()) -- no cambia aunque la
+            // tabla de seguros cambie después. null solo en vales de antes de este cambio.
+            'seguro_monto' => $this->seguro_monto !== null ? (float) $this->seguro_monto : null,
             'tipo' => $this->tipo,
             'estado' => $this->estado,
             'activo' => $this->activo,
@@ -106,6 +109,7 @@ final class ValeResource extends JsonResource
             (float) $this->monto,
             $quincenas,
             $this->distribuidora,
+            $this->seguro_monto !== null ? (float) $this->seguro_monto : null,
         );
 
         return [

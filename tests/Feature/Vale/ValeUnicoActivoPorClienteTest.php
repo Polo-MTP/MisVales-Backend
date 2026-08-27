@@ -11,6 +11,7 @@ use App\Models\Distribuidora;
 use App\Models\HistorialClienteDistr;
 use App\Models\Producto;
 use App\Models\Role;
+use App\Models\SeguroTabla;
 use App\Models\Sucursal;
 use App\Models\User;
 use App\Models\Vale;
@@ -45,6 +46,7 @@ function crearDistribuidoraConCliente(float $limiteCredito = 20000): array
 beforeEach(function (): void {
     $admin = User::factory()->create();
     Configuracion::create(['clave' => 'regla_50_pct', 'valor' => '50', 'tipo_dato' => 'decimal', 'vigente_desde' => '2025-01-01', 'modificado_por' => $admin->id]);
+    SeguroTabla::create(['monto_desde' => 0, 'monto_hasta' => null, 'seguro_monto' => 100, 'activo' => true]);
 });
 
 it('no permite solicitar un segundo vale para un cliente que ya tiene uno sin liquidar', function (): void {
