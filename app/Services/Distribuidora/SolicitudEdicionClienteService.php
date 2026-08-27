@@ -34,6 +34,8 @@ final class SolicitudEdicionClienteService
         string $motivo,
         User $cajera,
     ): SolicitudEdicionCliente {
+        $cliente->loadMissing('datosPersonales.direccion');
+
         /** @var SolicitudEdicionCliente $solicitud */
         $solicitud = SolicitudEdicionCliente::query()->create([
             'cliente_id' => $cliente->id,
@@ -42,6 +44,13 @@ final class SolicitudEdicionClienteService
             'campos_propuestos' => [
                 'datos_personales' => $datosPersonalesPropuestos,
                 'direccion' => $direccionPropuesta,
+                // Snapshot de cuándo se editó por última vez el registro real al momento de
+                // pedir la autorización -- aplicar() lo compara contra el valor actual antes de
+                // sobreescribir nada. Ver la nota completa en aplicar().
+                '_snapshot' => [
+                    'datos_personales_updated_at' => $cliente->datosPersonales?->updated_at?->toISOString(),
+                    'direccion_updated_at' => $cliente->datosPersonales?->direccion?->updated_at?->toISOString(),
+                ],
             ],
             'motivo' => $motivo,
             'estado' => 'pendiente',
@@ -122,6 +131,28 @@ final class SolicitudEdicionClienteService
             $cliente = $solicitud->cliente()->with('datosPersonales.direccion')->firstOrFail();
             $campos = $solicitud->campos_propuestos;
             $datosPersonales = $cliente->datosPersonales;
+
+            // La solicitud guarda una foto estática de los valores propuestos, capturada cuando
+            // la cajera la pidió -- sin esto, si alguien más (Distribuidora, Gerente General)
+            // edita el mismo cliente directamente (PUT clientes/{id}) MIENTRAS la solicitud
+            // sigue pendiente, aprobarla y aplicarla aquí sobreescribe esa edición más reciente
+            // con el valor propuesto viejo, sin avisar a nadie -- un revert silencioso. Se
+            // compara el 'updated_at' real contra el snapshot tomado al solicitar; si no
+            // coincide, alguien más tocó el registro desde entonces. 'updated_at' solo guarda
+            // hasta el segundo, así que una edición directa dentro del mismo segundo que el
+            // snapshot no se detecta -- ventana angosta, mismo tipo de límite de precisión ya
+            // aceptado en otras partes de este código (ver aumentoCreditoSinConsumir()).
+            $snapshot = $campos['_snapshot'] ?? null;
+            if ($snapshot) {
+                $datosCambiaronDesdeLaSolicitud = $datosPersonales
+                    && $datosPersonales->updated_at?->toISOString() !== $snapshot['datos_personales_updated_at'];
+                $direccionCambioDesdeLaSolicitud = $datosPersonales?->direccion
+                    && $datosPersonales->direccion->updated_at?->toISOString() !== $snapshot['direccion_updated_at'];
+
+                if ($datosCambiaronDesdeLaSolicitud || $direccionCambioDesdeLaSolicitud) {
+                    throw new DomainException('Este cliente fue editado por otra vía después de que se pidió esta autorización. Vuelve a solicitar la edición con los datos actuales antes de aplicarla, para no sobreescribir un cambio más reciente.');
+                }
+            }
 
             if (! empty($campos['datos_personales']) && $datosPersonales) {
                 $datosPersonales->fill(array_filter($campos['datos_personales'], fn ($val) => $val !== null));

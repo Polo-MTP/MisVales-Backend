@@ -14,6 +14,7 @@ use App\Models\Role;
 use App\Models\SolicitudAumentoCredito;
 use App\Models\Sucursal;
 use App\Models\User;
+use App\Models\Vale;
 use App\Services\Vale\ValeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -234,6 +235,33 @@ it('REGRESION: un vale "de juguete" sin autorizar tras un aumento no cuenta como
     $producto = productoQA50(9501, $distribuidora->usuario_id);
     expect(fn () => $svc->solicitar(['cliente_id' => $cliente->id, 'producto_id' => $producto->id], usuarioFrescoQA50($distribuidora)))
         ->toThrow(DomainException::class);
+});
+
+it('REGRESION: autorizar() vuelve a checar el tope del 50%, no solo el crédito disponible', function (): void {
+    // autorizar() solo comparaba contra credito_disponible (el crédito total), sin volver a
+    // aplicar la caución del 50% -- ese tope solo se revisaba en solicitar(). Si el primer vale
+    // que de verdad se autoriza cabe en el crédito total pero excede la caución del 50% + margen
+    // (posible si dos "primeros vales" se solicitaron en paralelo y luego se autorizan uno por
+    // uno), antes pasaba de largo. Ahora se vuelve a evaluar aquí mismo, en el momento en que el
+    // crédito realmente se compromete.
+    $distribuidora = crearDistribuidoraQA50(10000);
+    $svc = app(ValeService::class);
+
+    // Tope del primer vale: 10000 * 50% + margen (500) = 5500. $9000 cabe en el crédito total
+    // (10000) pero excede por mucho ese tope -- solicitar() ya lo bloquea normalmente, así que
+    // se simula el vale directo en 'validado' (como si la validación del tope al solicitar se
+    // hubiera saltado, ej. por la ventana de una carrera entre dos solicitudes paralelas).
+    $cliente = crearClienteQA50($distribuidora);
+    $vale = Vale::create([
+        'distribuidora_id' => $distribuidora->id, 'cliente_id' => $cliente->id, 'monto' => 9000, 'quincenas' => 4,
+        'tipo' => 'vale-digital', 'estado' => 'validado', 'fecha_solicitud' => now(), 'fecha_validacion' => now(),
+        'ine_verificada' => true, 'comprobante_domicilio_verificado' => true,
+    ]);
+
+    expect(fn () => $svc->autorizar($vale, usuarioFrescoQA50($distribuidora)))
+        ->toThrow(DomainException::class);
+
+    expect($vale->fresh()->estado)->toBe('validado');
 });
 
 it('REGRESION: un vale creado en el mismo segundo que un aumento aprobado no debe saltarse el tope del siguiente vale', function (): void {

@@ -72,6 +72,44 @@ it('flujo completo: solicitar, aprobar y aplicar edita exactamente los campos au
         ->and($solicitud->fresh()->estado)->toBe('aplicada');
 });
 
+/**
+ * Antes, aplicar() sobreescribía con el valor propuesto (capturado al SOLICITAR) sin fijarse
+ * si el registro real había cambiado desde entonces -- una edición directa del cliente (ej. la
+ * propia Distribuidora, vía PUT clientes/{id}) mientras la solicitud de la cajera seguía
+ * pendiente/aprobada se revertía en silencio al aplicar la autorización, con el valor viejo.
+ */
+it('REGRESION: no revierte en silencio una edición directa hecha mientras la solicitud seguía pendiente', function (): void {
+    ['cajera' => $cajera, 'gerenteSucursal' => $gerenteSucursal] = crearUsuariosSucursalEdicion();
+    $cliente = crearClienteParaEdicion();
+
+    $solicitud = app(SolicitudEdicionClienteService::class)->solicitar(
+        $cliente,
+        ['nombre' => 'Juan Corregido (propuesto por cajera)'],
+        [],
+        'CURP con typo',
+        $cajera
+    );
+
+    $solicitud = app(SolicitudEdicionClienteService::class)->decidir($solicitud, 'aprobada', 'Ok', $gerenteSucursal);
+
+    // updated_at solo guarda hasta el segundo -- sin cruzar un segundo real de reloj, la
+    // edición directa de abajo podría quedar en el mismo segundo que el snapshot tomado al
+    // solicitar, y la comparación no vería ninguna diferencia (mismo problema ya conocido en
+    // otras partes de este código con created_at/fecha_decision).
+    sleep(1);
+
+    // Mientras tanto, alguien más (ej. la propia Distribuidora) edita el cliente directamente,
+    // por fuera de este flujo de autorización -- con un nombre distinto al propuesto.
+    $cliente->datosPersonales->update(['nombre' => 'Juan Editado Directo']);
+
+    expect(fn () => app(SolicitudEdicionClienteService::class)->aplicar($solicitud, $cajera))
+        ->toThrow(DomainException::class);
+
+    // El nombre editado directamente sigue ahí -- no se revirtió al valor propuesto viejo.
+    expect($cliente->fresh()->datosPersonales->nombre)->toBe('Juan Editado Directo')
+        ->and($solicitud->fresh()->estado)->toBe('aprobada');
+});
+
 it('una solicitud rechazada no puede aplicarse', function (): void {
     ['cajera' => $cajera, 'gerenteSucursal' => $gerenteSucursal] = crearUsuariosSucursalEdicion();
     $cliente = crearClienteParaEdicion();

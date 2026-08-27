@@ -102,6 +102,23 @@ it('una distribuidora no puede desactivar el vale de otra distribuidora', functi
     app(ValeService::class)->desactivar($vale, $distribuidoraB->usuario);
 })->throws(Symfony\Component\HttpKernel\Exception\HttpException::class);
 
+it('un vale desactivado por la distribuidora ya no se puede validar ni autorizar', function (): void {
+    $distribuidora = crearDistribuidoraActivacion();
+    $vale = crearValeSolicitado($distribuidora, 5000, 4);
+    $usuarioDistribuidora = $distribuidora->usuario;
+    $svc = app(ValeService::class);
+
+    $svc->desactivar($vale, $usuarioDistribuidora);
+    expect($vale->fresh()->activo)->toBeFalse();
+
+    // La distribuidora "canceló" este vale -- la cajera no debe poder seguir validándolo ni
+    // autorizándolo, aunque el estado siga en 'solicitado' (desactivar() no lo cambia).
+    expect(fn () => $svc->validar($vale->fresh(), $usuarioDistribuidora, '012345678901234567', true, true))
+        ->toThrow(DomainException::class);
+
+    expect($vale->fresh()->estado)->toBe('solicitado');
+});
+
 it('un vale solicitado desactivado no cuenta en el crédito disponible ni entra a un nuevo corte', function (): void {
     $distribuidora = crearDistribuidoraActivacion();
     $vale = crearValeSolicitado($distribuidora, 5000, 4);

@@ -111,6 +111,14 @@ final class ValeService
             throw new DomainException("Solo se pueden validar vales en estado 'solicitado' (actual: {$vale->estado}).");
         }
 
+        // La distribuidora pudo haber "cancelado" este vale (desactivar(), que solo aplica
+        // mientras sigue en 'solicitado') sin que su estado cambie de 'solicitado' -- sin este
+        // chequeo, la cajera podía seguir validándolo y autorizándolo igual, comprometiendo
+        // crédito real de una solicitud que la distribuidora creía cancelada.
+        if (! $vale->activo) {
+            throw new DomainException('Este vale fue desactivado por la distribuidora y ya no puede validarse.');
+        }
+
         if ($ineVerificada === false || $comprobanteDomicilioVerificado === false) {
             throw new DomainException('No se puede validar el vale: la INE y el comprobante de domicilio del cliente deben coincidir. Corrige los datos o pide autorización para editarlos antes de continuar.');
         }
@@ -154,11 +162,28 @@ final class ValeService
             throw new DomainException("Solo se pueden autorizar vales ya validados (actual: {$vale->estado}). Valida los datos del cliente primero.");
         }
 
+        if (! $vale->activo) {
+            throw new DomainException('Este vale fue desactivado por la distribuidora y ya no puede autorizarse.');
+        }
+
         return DB::transaction(function () use ($vale): Vale {
             /** @var Distribuidora $distribuidora */
             $distribuidora = Distribuidora::query()->whereKey($vale->distribuidora_id)->lockForUpdate()->firstOrFail();
 
-            if ((float) $vale->monto > $distribuidora->credito_disponible) {
+            // La caución del primer vale (regla_50_pct) solo se revisaba al SOLICITAR, no aquí.
+            // Una distribuidora sin historial podía solicitar varios vales en paralelo, cada uno
+            // por debajo del tope individual (todos "primer vale" porque ninguno había llegado a
+            // autorizarse todavía), y autorizarlos uno por uno sin que esta caución volviera a
+            // aplicar -- terminando con el 100% de su crédito comprometido en su primer ciclo.
+            // Se vuelve a evaluar "primer vale" aquí, en el momento real en que el crédito se
+            // compromete, excluyendo el vale que se está autorizando ahora mismo.
+            $esPrimerVale = ! Vale::query()
+                ->where('distribuidora_id', $distribuidora->id)
+                ->whereKeyNot($vale->id)
+                ->whereNotIn('estado', ['solicitado', 'validado'])
+                ->exists();
+
+            if ((float) $vale->monto > $distribuidora->montoMaximoDisponible($esPrimerVale)) {
                 throw new DomainException('La distribuidora ya no tiene crédito disponible suficiente para autorizar este vale.');
             }
 

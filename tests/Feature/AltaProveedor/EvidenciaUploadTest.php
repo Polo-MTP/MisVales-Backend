@@ -66,3 +66,30 @@ it('un coordinador sube el archivo real de una evidencia y queda con URL públic
     $rutaRelativa = preg_replace('#^storage/#', '', ltrim((string) parse_url((string) $evidencia->url_archivo, PHP_URL_PATH), '/'));
     Storage::disk($disco)->assertExists($rutaRelativa);
 });
+
+it('un coordinador no puede subir evidencia a una solicitud de otra sucursal', function (): void {
+    Storage::fake(discoEvidenciasReal());
+
+    $sucursalA = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-A-'.uniqid(), 'es_matriz' => true, 'is_active' => true]);
+    $sucursalB = Sucursal::create(['nombre' => 'Otra', 'codigo' => 'SUC-B-'.uniqid(), 'is_active' => true]);
+    $role = Role::firstOrCreate(['name' => 'Coordinador']);
+    $coordinadorDeA = User::factory()->create(['role_id' => $role->id, 'sucursal_id' => $sucursalA->id, 'is_active' => true]);
+
+    $direccion = Direccion::create(['calle' => 'Test', 'colonia' => 'Test', 'numero_ext' => '1', 'codigo_postal' => '00000', 'estado' => 'Coahuila', 'ciudad' => 'Torreón']);
+    $datos = DatosPersonales::create(['nombre' => 'Prospecto', 'apellido_paterno' => 'Nuevo', 'curp' => 'CUPD'.uniqid(), 'direccion_id' => $direccion->id]);
+
+    // La solicitud pertenece a la sucursal B -- el coordinador que intenta subir es de la A.
+    $solicitud = SolicitudProveedor::create([
+        'datos_id' => $datos->id, 'sucursal_id' => $sucursalB->id, 'coordinador_id' => null,
+        'estado' => 'pendiente_verificacion', 'rfc' => 'WXYZ010101ABC',
+    ]);
+
+    Sanctum::actingAs($coordinadorDeA);
+
+    $this->postJson("/api/v1/alta-proveedor/solicitudes/{$solicitud->id}/evidencias", [
+        'archivo' => UploadedFile::fake()->image('fachada.jpg'),
+        'tipo_documento' => 'foto_fachada',
+    ])->assertStatus(403);
+
+    expect(Evidencia::count())->toBe(0);
+});

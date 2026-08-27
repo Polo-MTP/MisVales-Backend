@@ -28,6 +28,15 @@ final class EvidenciaController extends ApiController
         /** @var User $usuario */
         $usuario = $request->user();
 
+        // A diferencia de show()/verificar()/aprobarORechazar(), este endpoint no validaba
+        // sucursal -- cualquier Coordinador/Verificador/Gerente de Sucursal autenticado (el
+        // middleware de rol ya los deja pasar) podía subir evidencia a una solicitud de
+        // CUALQUIER sucursal solo conociendo su ID. Mismo criterio que el resto del flujo:
+        // Gerente General/Administrador ven todas, el resto solo la suya.
+        if ($usuario->role?->name !== 'Gerente General' && $usuario->role?->name !== 'Administrador' && $usuario->sucursal_id !== $solicitud->sucursal_id) {
+            return $this->forbidden('Acceso Denegado. No tienes permisos para subir evidencia a solicitudes de otra sucursal.');
+        }
+
         $disk = (config('filesystems.default') === 's3' || ! empty(config('filesystems.disks.s3.bucket')))
             ? 's3'
             : 'public';

@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Services\Distribuidora\DistribuidoraService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 final class DistribuidoraController extends Controller
 {
@@ -72,11 +73,20 @@ final class DistribuidoraController extends Controller
      * DELETE /api/v1/distribuidoras/{distribuidora}
      * (Desactiva lógicamente, no elimina físicamente)
      */
-    public function destroy(Distribuidora $distribuidora): JsonResponse
+    public function destroy(Request $request, Distribuidora $distribuidora): JsonResponse
     {
         $this->authorize('delete', $distribuidora);
 
-        $distribuidora->update(['estado' => 'INACTIVO']);
+        // Antes actualizaba 'estado' directo al modelo, saltándose DistribuidoraEstadoService:
+        // no quedaba registro en el historial de auditoría, y sobre todo no sincronizaba
+        // usuario->is_active (eso SOLO lo hace el service) -- el usuario de una distribuidora
+        // "desactivada" por esta vía podía seguir iniciando sesión con total normalidad.
+        $this->distribuidoraService->cambiarEstado(
+            $distribuidora,
+            'INACTIVO',
+            'Distribuidora desactivada por gerencia.',
+            $request->user()
+        );
 
         return response()->json(['message' => 'Distribuidora desactivada']);
     }
