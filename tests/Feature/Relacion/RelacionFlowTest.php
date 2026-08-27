@@ -423,6 +423,50 @@ it('penaliza el 20% de los puntos acumulados cuando el pago llega fuera de tiemp
         ->and(PuntoMovimiento::where('tipo', 'penalizado')->count())->toBe(1);
 });
 
+/**
+ * REGRESION: un corte con dos vales (dos AbonoConciliacion distintos) se liquida hasta que
+ * llega el SEGUNDO abono -- pero ese abono, el que completa el saldo, puede tener una fecha
+ * de pago más temprana que el otro si el Excel del banco no viene ordenado cronológicamente
+ * (o uno se concilió manualmente después, con su fecha real de transferencia). Antes del fix,
+ * procesarPuntos() usaba la fecha del abono que causó la transición a 'liquidada', sin
+ * importar si OTRO abono de ese mismo corte había llegado tarde -- aquí el abono tardío se
+ * importa primero (deja la relación 'parcial') y el anticipado se importa después y la
+ * liquida; con el bug esto generaba puntos por "pago anticipado" a pesar de que una parte
+ * del corte sí llegó fuera de tiempo.
+ */
+it('si un corte se liquida con abonos en desorden cronológico, usa la fecha del más tardío para decidir anticipado/tardío', function (): void {
+    $distribuidora = crearDistribuidora();
+    $distribuidora->update(['puntos_acumulados' => 100]);
+    crearVale($distribuidora, 15000, 8, '2026-02-01');
+    crearVale($distribuidora, 8000, 4, '2026-02-01');
+
+    // Ventana anticipada de este corte: 13-15 feb; límite: 16 feb (ver primer test del archivo).
+    $relacion = app(RelacionCalculoService::class)->generarParaDistribuidora($distribuidora, '2026-02-15');
+    $detalleA = $relacion->detalles[0];
+    $detalleB = $relacion->detalles[1];
+    $cajera = User::factory()->create();
+
+    // Abono del vale A: TARDÍO (20 feb, después del límite del 16). Por sí solo no liquida el
+    // corte completo (falta el vale B) -- la relación queda 'parcial'.
+    $archivoTardio = crearExcelBanco([
+        [1, $detalleA->concepto, $relacion->referencia_pago, (float) $detalleA->total, 'F-A', '20/2/2026', '10:00', 'Transferencia'],
+    ]);
+    app(ConciliacionBancariaService::class)->importarArchivo($archivoTardio, null, $cajera);
+    expect($relacion->fresh()->estado)->toBe('parcial');
+
+    // Abono del vale B: ANTICIPADO (14 feb, dentro de la ventana). Este SÍ completa el total y
+    // liquida la relación -- pero el vale A ya había llegado tarde.
+    $archivoAnticipado = crearExcelBanco([
+        [1, $detalleB->concepto, $relacion->referencia_pago, (float) $detalleB->total, 'F-B', '14/2/2026', '10:00', 'Transferencia'],
+    ]);
+    app(ConciliacionBancariaService::class)->importarArchivo($archivoAnticipado, null, $cajera);
+
+    expect($relacion->fresh()->estado)->toBe('liquidada')
+        ->and(PuntoMovimiento::where('tipo', 'generado')->count())->toBe(0)
+        ->and(PuntoMovimiento::where('tipo', 'penalizado')->count())->toBe(1)
+        ->and($distribuidora->fresh()->puntos_acumulados)->toBe(80);
+});
+
 it('marca como vencidas las relaciones cuya fecha límite de pago ya pasó', function (): void {
     $distribuidora = crearDistribuidora();
     crearVale($distribuidora, 15000, 8, '2026-02-01');
