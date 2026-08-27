@@ -50,10 +50,9 @@ return [
     | considered expired. This will override any values set in the token's
     | "expires_at" attribute, but first-party sessions are not affected.
     |
-    | Expiración absoluta (no confundir con el cierre por inactividad, que es
-    | independiente — ver App\Http\Middleware\EnsureTokenNotIdle): 8 horas por
-    | defecto, una jornada laboral. Aunque el usuario siga activo sin parar,
-    | el token deja de servir después de este tiempo desde que se creó.
+    | Expiración absoluta: 8 horas por defecto, una jornada laboral. Aunque el
+    | usuario siga activo sin parar, el token deja de servir después de este
+    | tiempo desde que se creó.
     |
     */
 

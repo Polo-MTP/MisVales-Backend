@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Enums\ApiErrorCode;
 use Illuminate\Auth\Middleware\Authenticate;
 use App\Http\Middleware\CheckRole;
-use App\Http\Middleware\EnsureTokenNotIdle;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\LogApiRequests;
@@ -40,7 +39,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'force.json' => ForceJsonResponse::class,
             'log.api' => LogApiRequests::class,
             'active' => EnsureUserIsActive::class,
-            'idle' => EnsureTokenNotIdle::class,
             'role' => CheckRole::class,
             'security.headers' => SecurityHeaders::class,
             'vpn' => VerifyVpnAccess::class,

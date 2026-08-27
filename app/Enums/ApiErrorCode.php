@@ -19,7 +19,6 @@ enum ApiErrorCode: string
 {
     // Autenticación / sesión
     case UNAUTHENTICATED = 'UNAUTHENTICATED';
-    case SESSION_IDLE_TIMEOUT = 'SESSION_IDLE_TIMEOUT';
     case ACCOUNT_INACTIVE = 'ACCOUNT_INACTIVE';
 
     // Autorización

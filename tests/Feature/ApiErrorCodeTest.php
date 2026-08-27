@@ -94,15 +94,6 @@ it('una petición bloqueada por VPN trae error_code VPN_REQUIRED', function (): 
         ->assertJsonPath('error_code', ApiErrorCode::VPN_REQUIRED->value);
 });
 
-/**
- * NOTA: no hay aquí un test de integración HTTP completo para SESSION_IDLE_TIMEOUT --
- * ese escenario (login -> viajar en el tiempo más allá del límite -> siguiente petición
- * 401) ya tiene cobertura en TokenIdleTimeoutTest, y reproduce ahí una falla preexistente
- * de este entorno de pruebas sin relación con error_code (confirmado: falla igual en la
- * rama sin estos cambios). El código en sí es una sola línea agregada a la respuesta ya
- * existente de EnsureTokenNotIdle -- ver ese archivo.
- */
-
 it('una cuenta desactivada trae error_code ACCOUNT_INACTIVE', function (): void {
     $role = Role::firstOrCreate(['name' => 'Cajera']);
     $user = User::factory()->create(['role_id' => $role->id, 'is_active' => false]);
