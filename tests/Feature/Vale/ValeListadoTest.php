@@ -168,3 +168,45 @@ it('un vale que ya entró a un corte NO trae estimación (ya tiene el desglose r
     expect($valeJson['cortes'])->toHaveCount(1)
         ->and($valeJson['estimacion'])->toBeNull();
 });
+
+it('trae el total acumulado a pagar y pagado sumando todas las cuotas del vale que ya entraron a un corte', function (): void {
+    $sucursal = crearSucursalListado('SUC-A');
+    $distribuidora = crearDistribuidoraValeListado($sucursal, 'DIST-A');
+    $vale = crearValeListado($distribuidora, 5000);
+
+    $relacion1 = Relacion::create([
+        'distribuidora_id' => $distribuidora->id, 'sucursal_id' => $sucursal->id,
+        'referencia_pago' => 'REF-'.uniqid(), 'fecha_corte' => '2026-02-15', 'fecha_limite_pago' => '2026-02-16',
+        'limite_credito_snapshot' => 20000, 'estado' => 'parcial',
+    ]);
+    RelacionDetalle::create([
+        'relacion_id' => $relacion1->id, 'vale_id' => $vale->id, 'concepto' => sprintf('%05d%04d', $vale->id, 1),
+        'cliente_id' => $vale->cliente_id,
+        'cuota_numero' => 1, 'cuotas_totales' => 4, 'capital' => 1250, 'comision' => 125,
+        'interes' => 250, 'seguro' => 0, 'categoria' => 75, 'recargo' => 0, 'pago' => 1000,
+        'total' => 1550, 'estado' => 'parcial',
+    ]);
+
+    $relacion2 = Relacion::create([
+        'distribuidora_id' => $distribuidora->id, 'sucursal_id' => $sucursal->id,
+        'referencia_pago' => 'REF-'.uniqid(), 'fecha_corte' => '2026-03-15', 'fecha_limite_pago' => '2026-03-16',
+        'limite_credito_snapshot' => 20000, 'estado' => 'pendiente',
+    ]);
+    RelacionDetalle::create([
+        'relacion_id' => $relacion2->id, 'vale_id' => $vale->id, 'concepto' => sprintf('%05d%04d', $vale->id, 2),
+        'cliente_id' => $vale->cliente_id,
+        'cuota_numero' => 2, 'cuotas_totales' => 4, 'capital' => 1250, 'comision' => 125,
+        'interes' => 250, 'seguro' => 0, 'categoria' => 75, 'recargo' => 0, 'pago' => 0,
+        'total' => 1550, 'estado' => 'pendiente',
+    ]);
+
+    $cajera = crearUsuarioDeSucursal('Cajera', $sucursal);
+    Sanctum::actingAs($cajera);
+
+    $valeJson = $this->getJson('/api/v1/vales')->json('data.data.0');
+
+    expect((float) $valeJson['total_acumulado_a_pagar'])->toBe(3100.0)
+        ->and((float) $valeJson['total_acumulado_pagado'])->toBe(1000.0)
+        ->and((float) $valeJson['cortes'][0]['pago'])->toBe(1000.0)
+        ->and((float) $valeJson['cortes'][1]['pago'])->toBe(0.0);
+});

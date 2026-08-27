@@ -71,6 +71,12 @@ final class ValeResource extends JsonResource
             // hay ninguna cuota que lo consuma sola (ver SolicitudReembolsoExcedente).
             'saldo_excedente' => (float) $this->saldo_excedente,
             'created_at' => $this->created_at?->toIso8601String(),
+            // Suma de todas las cuotas de este vale que ya entraron a un corte -- lo que
+            // realmente le toca pagar/lo que ya pagó en total, sin tener que sumar "cortes" a
+            // mano en el front. Antes solo se veía el total por cuota individual; para saber si
+            // el vale iba al corriente o atrasado en su conjunto había que sumarlas una por una.
+            'total_acumulado_a_pagar' => round((float) $this->relacionDetalles->sum('total'), 2),
+            'total_acumulado_pagado' => round((float) $this->relacionDetalles->sum('pago'), 2),
             // Cortes (relaciones) donde ya se facturó alguna cuota de este vale -- antes no había
             // forma de rastrear, desde el vale, en qué corte(s) quedó incluido.
             'cortes' => $this->relacionDetalles->map(fn ($detalle) => [
@@ -84,6 +90,7 @@ final class ValeResource extends JsonResource
                 'cuota' => "{$detalle->cuota_numero}/{$detalle->cuotas_totales}",
                 'estado_cuota' => $detalle->estado,
                 'total' => $detalle->total,
+                'pago' => $detalle->pago,
             ])->values(),
             // Mientras el vale no entre a ningún corte, 'cortes' viene vacío y no hay forma de
             // saber cuánto va a tocar pagar por quincena -- ese desglose real recién se calcula
