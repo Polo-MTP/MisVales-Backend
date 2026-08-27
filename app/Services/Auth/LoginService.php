@@ -10,6 +10,7 @@ use App\Models\MfaType;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
@@ -138,20 +139,40 @@ final class LoginService
         ];
     }
 
+    /**
+     * lockForUpdate(): dos intentos de login fallidos casi simultáneos para la misma cuenta
+     * (ej. un ataque de fuerza bruta disparando peticiones en paralelo desde varias IPs, cada
+     * una esquivando el throttle:auth que es por IP) leían el mismo failed_attempts viejo y el
+     * segundo en guardar pisaba el conteo del primero -- se perdían intentos y el bloqueo a
+     * los 5 intentos podía nunca dispararse bajo concurrencia real.
+     */
     private function procesarContrasenaIncorrecta(User $user): void
     {
-        $user->failed_attempts += 1;
+        DB::transaction(function () use ($user): void {
+            /** @var User $usuarioBloqueado */
+            $usuarioBloqueado = User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
 
-        if ($user->failed_attempts >= 5) {
-            $user->is_locked = true;
-            $user->locked_until = now()->addMinutes(15);
-            Log::debug('LoginService: La cuenta ha sido bloqueada por límite de intentos fallidos alcanzado', [
-                'email' => $user->email,
-                'failed_attempts' => $user->failed_attempts,
-            ]);
-        }
+            $usuarioBloqueado->failed_attempts += 1;
 
-        $user->save();
+            if ($usuarioBloqueado->failed_attempts >= 5) {
+                $usuarioBloqueado->is_locked = true;
+                $usuarioBloqueado->locked_until = now()->addMinutes(15);
+                Log::debug('LoginService: La cuenta ha sido bloqueada por límite de intentos fallidos alcanzado', [
+                    'email' => $usuarioBloqueado->email,
+                    'failed_attempts' => $usuarioBloqueado->failed_attempts,
+                ]);
+            }
+
+            $usuarioBloqueado->save();
+
+            // El caller (login()) sigue usando esta misma instancia $user después de esta
+            // llamada (para su propio log y para decidir el mensaje de respuesta) -- se
+            // refleja aquí el resultado real, ya no el que traía antes de la transacción.
+            $user->failed_attempts = $usuarioBloqueado->failed_attempts;
+            $user->is_locked = $usuarioBloqueado->is_locked;
+            $user->locked_until = $usuarioBloqueado->locked_until;
+        });
+
         $this->guardarEnHistorial($user->id, $user->email, 'failed_password');
     }
 
