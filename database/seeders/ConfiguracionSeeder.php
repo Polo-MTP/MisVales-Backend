@@ -6,7 +6,7 @@ namespace Database\Seeders;
 
 use App\Models\Configuracion;
 use App\Models\ConfiguracionFechas;
-use App\Models\Sucursal;
+use App\Models\SeguroTabla;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
@@ -133,23 +133,14 @@ final class ConfiguracionSeeder extends Seeder
             ]
         );
 
-        // 3. Configuración de Fechas específica para Sucursal Gómez Palacio
-        $sucursalGomez = Sucursal::query()->where('codigo', 'SUC-002')->first();
-        if ($sucursalGomez) {
-            ConfiguracionFechas::query()->updateOrCreate(
-                [
-                    'sucursal_id' => $sucursalGomez->id,
-                    'vigente_hasta' => null,
-                ],
-                [
-                    'dia_corte' => 5,
-                    'dia_corte_2' => 20,
-                    'dia_limite_pago' => 22,
-                    'dias_pago_anticipado' => 2,
-                    'vigente_desde' => $fechaInicio,
-                    'modificado_por' => $adminUser->id,
-                ]
-            );
-        }
+        // 3. Tabla de rangos de seguro por monto de vale ("varía según la cantidad", ver
+        // "Analisis de calculo de relacion"). Un solo rango que cubre cualquier monto -- sin
+        // esto, ValeService::solicitar() no puede resolver ningún seguro y ningún vale se
+        // puede generar (ver migración add_seguro_to_vales_table). El Gerente General puede
+        // ajustar o agregar más rangos desde Configuraciones -> Seguros.
+        SeguroTabla::query()->firstOrCreate(
+            ['monto_desde' => 0, 'monto_hasta' => null],
+            ['seguro_monto' => 100, 'activo' => true]
+        );
     }
 }
