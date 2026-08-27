@@ -61,7 +61,13 @@ final class ValeService
         /** @var Producto $producto */
         $producto = Producto::query()->where('activo', true)->findOrFail($data['producto_id']);
 
-        $esPrimerVale = ! $distribuidora->vales()->exists();
+        // "Primer vale" = nunca tuvo uno que de verdad llegara a autorizarse -- uno en
+        // 'solicitado'/'validado' no cuenta contra el crédito (ver
+        // Distribuidora::getCreditoDisponibleAttribute()) y se puede desactivar/reactivar
+        // libremente, así que contarlo aquí dejaba "estrenar" la caución del 50% con un vale de
+        // juguete: se pedía uno chiquito sin autorizar y el siguiente, grande, ya no quedaba
+        // limitado por la regla del primer vale.
+        $esPrimerVale = ! $distribuidora->vales()->whereNotIn('estado', ['solicitado', 'validado'])->exists();
 
         if (! $distribuidora->puedeSolicitarVale((float) $producto->monto, $esPrimerVale)) {
             throw new DomainException('La distribuidora no cumple las condiciones para solicitar este vale (crédito disponible insuficiente o límite del primer vale excedido).');

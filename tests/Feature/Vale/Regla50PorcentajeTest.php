@@ -182,6 +182,60 @@ it('el segundo vale tras el aumento ya no respeta el tope del 50%, solo el dispo
     expect($vale->id)->toBeGreaterThan(0);
 });
 
+it('REGRESION: un vale "de juguete" sin autorizar no cuenta como "primer vale ya estrenado" para saltarse el tope del 50%', function (): void {
+    // esPrimerVale se calculaba como "¿existe ALGÚN vale?", sin importar su estado. Un vale en
+    // 'solicitado' no cuenta contra el crédito (no lo autorizó nadie) y se puede dejar así
+    // indefinidamente -- antes del fix, bastaba con pedir uno chiquito (sin validarlo ni
+    // autorizarlo) para que el SIGUIENTE vale, grande, ya no llevara la caución del 50%.
+    $distribuidora = crearDistribuidoraQA50(10000);
+    $svc = app(ValeService::class);
+
+    // Vale "de juguete": queda en 'solicitado', nunca se valida ni se autoriza.
+    $svc->solicitar(
+        ['cliente_id' => crearClienteQA50($distribuidora)->id, 'producto_id' => productoQA50(50, $distribuidora->usuario_id)->id],
+        usuarioFrescoQA50($distribuidora)
+    );
+
+    // Sigue sin haber ningún vale autorizado -- el tope del primer vale debe seguir aplicando:
+    // 10000 * 50% + margen (500) = 5500. Sin el fix, esto pasaba de largo (esPrimerVale=false).
+    $cliente = crearClienteQA50($distribuidora);
+    $producto = productoQA50(5501, $distribuidora->usuario_id);
+    expect(fn () => $svc->solicitar(['cliente_id' => $cliente->id, 'producto_id' => $producto->id], usuarioFrescoQA50($distribuidora)))
+        ->toThrow(DomainException::class);
+});
+
+it('REGRESION: un vale "de juguete" sin autorizar tras un aumento no cuenta como "aumento ya estrenado"', function (): void {
+    $distribuidora = crearDistribuidoraQA50(10000);
+    $svc = app(ValeService::class);
+    $admin = User::factory()->create();
+
+    darValeCompletoQA50($svc, $distribuidora, crearClienteQA50($distribuidora), 2000);
+
+    SolicitudAumentoCredito::create([
+        'distribuidora_id' => $distribuidora->id, 'solicitado_por' => $distribuidora->usuario_id,
+        'limite_credito_anterior' => 10000, 'monto_solicitado' => 20000, 'monto_otorgado' => 20000,
+        'motivo' => 'test', 'estado' => 'aprobada', 'fecha_decision' => now(), 'decidido_por' => $admin->id,
+    ]);
+    $distribuidora->update(['limite_credito' => 20000]);
+    $distribuidora->refresh();
+
+    // Vale "de juguete" DESPUÉS del aumento: queda en 'solicitado', nunca se autoriza. Antes
+    // del fix, esto bastaba para que aumentoCreditoSinConsumir() diera null (aumento "ya
+    // estrenado") y el vale grande de abajo ya no llevara la caución del 50%.
+    $svc->solicitar(
+        ['cliente_id' => crearClienteQA50($distribuidora)->id, 'producto_id' => productoQA50(50, $distribuidora->usuario_id)->id],
+        usuarioFrescoQA50($distribuidora)
+    );
+
+    expect($distribuidora->aumentoCreditoSinConsumir())->not->toBeNull();
+
+    // Disponible 18000 * 50% + margen 500 = 9500 -- $9501 debe seguir bloqueado.
+    $cliente = crearClienteQA50($distribuidora);
+    $producto = productoQA50(9501, $distribuidora->usuario_id);
+    expect(fn () => $svc->solicitar(['cliente_id' => $cliente->id, 'producto_id' => $producto->id], usuarioFrescoQA50($distribuidora)))
+        ->toThrow(DomainException::class);
+});
+
 it('REGRESION: un vale creado en el mismo segundo que un aumento aprobado no debe saltarse el tope del siguiente vale', function (): void {
     // Antes del fix, comparar con >= hacia que un vale creado justo ANTES del aumento pero
     // dentro del mismo segundo (created_at/fecha_decision solo guardan hasta el segundo) se

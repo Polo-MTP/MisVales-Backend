@@ -31,9 +31,8 @@ final class ClienteService
             'usuario_id' => $usuario->id,
             'numero_distribuidora' => 'DIST-'.mb_str_pad((string) $usuario->id, 5, '0', STR_PAD_LEFT),
             'limite_credito' => 0.00,
-            'credito_disponible' => 0.00,
             'puntos_acumulados' => 0,
-            'estado' => true,
+            'estado' => 'ACTIVO',
         ]);
 
         return $distribuidora;

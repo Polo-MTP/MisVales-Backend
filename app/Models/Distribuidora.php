@@ -281,8 +281,14 @@ final class Distribuidora extends Model
         // completo el tope del 50% en el vale que en realidad debía llevarlo. Ante la duda entre
         // los dos segundos iguales, es más seguro seguir cobrando la caución un tantito de más
         // que dejarla pasar del todo.
+        //
+        // whereNotIn(...): un vale en 'solicitado'/'validado' no cuenta contra el crédito ni
+        // prueba nada -- se puede pedir uno de juguete después del aumento (sin autorizarlo)
+        // solo para que este exists() diera true y el vale grande real ya no llevara la caución
+        // del 50%. Solo un vale que de verdad llegó a autorizarse "estrena" el aumento.
         $yaSeUsoDespuesDelAumento = $this->vales()
             ->where('created_at', '>', $ultimo->fecha_decision)
+            ->whereNotIn('estado', ['solicitado', 'validado'])
             ->exists();
 
         return $yaSeUsoDespuesDelAumento ? null : $ultimo;
