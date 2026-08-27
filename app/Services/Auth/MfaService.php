@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use PragmaRX\Google2FA\Google2FA;
 use Throwable;
 
@@ -92,7 +93,16 @@ final class MfaService
             ]);
 
             $otpCode = mb_str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
-            Cache::put('email_otp_'.$user->id, $otpCode, 300);
+
+            // Token opaco de un solo uso, no el user_id en crudo: user_id es un entero
+            // secuencial adivinable, y antes era lo único que ataba una petición a
+            // mfa/email/verify con el login que de verdad pasó los primeros dos factores --
+            // cualquiera que conociera (o adivinara) el user_id de otra persona podía mandar
+            // sus propios intentos de código directo a ese endpoint, sin haber pasado password
+            // ni TOTP. El token se genera aquí, después de validar el TOTP, así que solo existe
+            // si el primer y segundo factor ya se cumplieron.
+            $otpToken = Str::random(40);
+            Cache::put('email_otp_'.$otpToken, ['user_id' => $user->id, 'code' => $otpCode], 300);
 
             try {
                 Mail::to($user->email)->send(new ThirdFactorMail($otpCode, $user->role?->name ?? 'tu cuenta'));
@@ -116,7 +126,7 @@ final class MfaService
             return [
                 'success' => true,
                 'requires_email_otp' => true,
-                'user_id' => $user->id,
+                'otp_token' => $otpToken,
                 'message' => 'Por favor revisa tu correo. Hemos enviado un código de 6 dígitos.',
                 'code' => 200,
             ];

@@ -119,18 +119,44 @@ it('flujo completo de 3 factores: tras el TOTP pide un código por correo antes 
 
     $codigo = (new Google2FA())->getCurrentOtp($secretKey);
 
-    $this->postJson('/api/v1/mfa/verify', ['mfa_method_id' => $mfaMethodId, 'code' => $codigo, 'recaptcha' => 'bypass-recaptcha'])
+    $verifyResponse = $this->postJson('/api/v1/mfa/verify', ['mfa_method_id' => $mfaMethodId, 'code' => $codigo, 'recaptcha' => 'bypass-recaptcha'])
         ->assertStatus(200)
-        ->assertJson(['success' => true, 'data' => ['requires_email_otp' => true, 'user_id' => $user->id]]);
+        ->assertJson(['success' => true, 'data' => ['requires_email_otp' => true]])
+        ->json('data');
 
-    $codigoCorreo = Cache::get('email_otp_'.$user->id);
-    expect($codigoCorreo)->not->toBeNull();
+    // Ya no se manda el user_id en crudo (adivinable) -- un token opaco de un solo uso es lo
+    // que ata esta petición al login que de verdad pasó los primeros dos factores.
+    expect($verifyResponse)->not->toHaveKey('user_id')
+        ->and($verifyResponse['otp_token'])->toBeString()->not->toBeEmpty();
 
-    $this->postJson('/api/v1/mfa/email/verify', ['user_id' => $user->id, 'code' => $codigoCorreo, 'recaptcha' => 'bypass-recaptcha'])
+    $otpToken = $verifyResponse['otp_token'];
+    $cached = Cache::get('email_otp_'.$otpToken);
+    expect($cached)->not->toBeNull()
+        ->and($cached['user_id'])->toBe($user->id);
+
+    $this->postJson('/api/v1/mfa/email/verify', ['otp_token' => $otpToken, 'code' => $cached['code'], 'recaptcha' => 'bypass-recaptcha'])
         ->assertStatus(200)
         ->assertJsonStructure(['success', 'message', 'data' => ['user' => ['id', 'email']]])
         ->assertJsonMissingPath('data.token')
         ->assertJson(['success' => true]);
+});
+
+it('mfa/email/verify rechaza un user_id adivinado -- ya no basta con conocer el id de otra persona', function (): void {
+    $user = crearUsuarioConRol('Gerente General');
+    [$mfaMethodId, $secretKey] = configurarSegundoFactor($this, $user);
+
+    $this->postJson('/api/v1/login', ['email' => $user->email, 'password' => 'Password123!', 'recaptcha' => 'bypass-recaptcha'])
+        ->assertStatus(200);
+
+    $codigo = (new Google2FA())->getCurrentOtp($secretKey);
+    $this->postJson('/api/v1/mfa/verify', ['mfa_method_id' => $mfaMethodId, 'code' => $codigo, 'recaptcha' => 'bypass-recaptcha'])
+        ->assertStatus(200);
+
+    // Sin el token (mandando algo inventado en su lugar) no hay forma de completar el 3er
+    // factor, aunque se conozca el código de 6 dígitos correcto -- antes bastaba con mandar
+    // 'user_id' => $user->id, que es trivialmente adivinable.
+    $this->postJson('/api/v1/mfa/email/verify', ['otp_token' => 'token-inventado-no-existe', 'code' => '123456', 'recaptcha' => 'bypass-recaptcha'])
+        ->assertStatus(401);
 });
 
 it('rechaza pedir el setup de MFA con solo el email, sin la firma emitida por /login', function (): void {

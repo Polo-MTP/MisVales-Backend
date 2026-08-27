@@ -16,6 +16,7 @@ use App\Models\SolicitudProveedor;
 use App\Models\User;
 use App\Mail\PersonalCredencialesMail;
 use App\Services\Notificacion\NotificacionService;
+use DomainException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -145,6 +146,17 @@ final class SolicitudProveedorService
         ]);
 
         return DB::transaction(function () use ($solicitud, $data, $verificador): SolicitudProveedor {
+            // lockForUpdate() + re-checar el estado aquí adentro, no antes de la transacción --
+            // sin esto, dos peticiones casi simultáneas (doble clic, o dos verificadores)
+            // pasaban ambas cualquier chequeo hecho afuera y las dos alcanzaban a "verificar"
+            // la misma solicitud, la segunda pisando el dictamen de la primera.
+            /** @var SolicitudProveedor $solicitud */
+            $solicitud = SolicitudProveedor::query()->whereKey($solicitud->id)->lockForUpdate()->firstOrFail();
+
+            if (! in_array($solicitud->estado, ['pendiente_verificacion', 'en_verificacion'], true)) {
+                throw new DomainException('Esta solicitud ya no está pendiente de verificación (estado actual: '.$solicitud->estado.').');
+            }
+
             $solicitud->load(['datosPersonales.direccion']);
             $datosPersonales = $solicitud->datosPersonales;
             $direccion = $datosPersonales?->direccion;
@@ -286,7 +298,27 @@ final class SolicitudProveedorService
             'decision' => $data['decision'],
         ]);
 
-        return DB::transaction(function () use ($solicitud, $data, $gerente): SolicitudProveedor {
+        // $distribuidoraUser/$passwordGenerada se llenan dentro de la transacción (solo si se
+        // aprueba) y se leen después de que cierra, para mandar el correo FUERA de ella -- ver
+        // la nota junto a Mail::to() más abajo.
+        $distribuidoraUser = null;
+        $passwordGenerada = null;
+
+        $solicitudProcesada = DB::transaction(function () use ($solicitud, $data, $gerente, &$distribuidoraUser, &$passwordGenerada): SolicitudProveedor {
+            // lockForUpdate() + re-checar el estado aquí adentro: sin esto, dos peticiones casi
+            // simultáneas (doble clic, o dos gerentes) podían pasar ambas la validación de
+            // permisos hecha afuera y las dos alcanzaban a "decidir" la misma solicitud -- una
+            // reaprobación intentaba crear un SEGUNDO User+Distribuidora (el rfc único en
+            // Distribuidora lo tumbaba, pero el correo de credenciales ya se había mandado antes
+            // del rollback, para una cuenta que nunca llegó a existir). Solo se puede decidir
+            // sobre una solicitud que el Verificador ya dictaminó que sí cumple.
+            /** @var SolicitudProveedor $solicitud */
+            $solicitud = SolicitudProveedor::query()->whereKey($solicitud->id)->lockForUpdate()->firstOrFail();
+
+            if ($solicitud->estado !== 'verificado') {
+                throw new DomainException('Solo se puede aprobar o rechazar una solicitud que ya fue verificada por el Verificador (estado actual: '.$solicitud->estado.').');
+            }
+
             $solicitud->load('datosPersonales.direccion');
             $dispositivo = $data['dispositivo'] ?? request()->header('User-Agent');
 
@@ -301,7 +333,6 @@ final class SolicitudProveedorService
                 $passwordGenerada = Str::password(22);
 
                 // Crear la cuenta de usuario para la distribuidora asignada a la sucursal de la solicitud
-                /** @var User $distribuidoraUser */
                 $distribuidoraUser = User::query()->create([
                     'name' => $solicitud->datosPersonales->nombre.' '.$solicitud->datosPersonales->apellido_paterno,
                     'email' => $data['email'],
@@ -318,12 +349,8 @@ final class SolicitudProveedorService
                 $distribuidoraUser->email_verified_at = now();
                 $distribuidoraUser->save();
 
-                Mail::to((string) $distribuidoraUser->email)->send(new PersonalCredencialesMail(
-                    (string) $distribuidoraUser->name,
-                    (string) $distribuidoraUser->email,
-                    (string) $passwordGenerada,
-                    'Distribuidora',
-                ));
+                // El correo YA NO se manda aquí -- ver la nota junto a Mail::to() después de
+                // que cierra la transacción, más abajo en este método.
 
                 $limiteCredito = (float) $data['limite_credito_asignado'];
                 /** @var Distribuidora $distribuidora */
@@ -424,5 +451,21 @@ final class SolicitudProveedorService
 
             return $solicitud->load(['datosPersonales.direccion', 'sucursal', 'coordinador', 'verificador', 'gerente', 'categoria', 'evidencias', 'logs']);
         });
+
+        // Mail::send() es una llamada de red externa que puede tardar segundos -- hacerla DENTRO
+        // de DB::transaction() arriesgaba mandar el correo de credenciales para una cuenta que
+        // luego se revertía por cualquier falla posterior en la misma transacción (ej. una
+        // reaprobación duplicada que revienta por el rfc único). Mandarlo aquí, ya fuera de la
+        // transacción y solo si de verdad se creó la cuenta, evita eso.
+        if ($distribuidoraUser) {
+            Mail::to((string) $distribuidoraUser->email)->send(new PersonalCredencialesMail(
+                (string) $distribuidoraUser->name,
+                (string) $distribuidoraUser->email,
+                (string) $passwordGenerada,
+                'Distribuidora',
+            ));
+        }
+
+        return $solicitudProcesada;
     }
 }

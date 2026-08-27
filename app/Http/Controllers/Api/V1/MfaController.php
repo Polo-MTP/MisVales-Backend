@@ -68,17 +68,14 @@ final class MfaController extends ApiController
      */
     public function verifyEmailOtp(VerifyOtpRequest $request, EmailOtpService $emailOtpService): JsonResponse
     {
-        Log::debug('MfaController: Iniciando verificación de código OTP por correo', [
-            'user_id' => $request->user_id,
-        ]);
+        Log::debug('MfaController: Iniciando verificación de código OTP por correo');
 
         $result = $emailOtpService->verify([
-            'user_id' => (int) $request->user_id,
+            'otp_token' => $request->otp_token,
             'code' => $request->code,
         ]);
 
         Log::debug('MfaController: Verificación de código OTP por correo terminada', [
-            'user_id' => $request->user_id,
             'success' => $result['success'],
             'code' => $result['code'] ?? null,
         ]);

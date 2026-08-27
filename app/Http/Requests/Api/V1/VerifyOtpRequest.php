@@ -9,7 +9,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * @property int $user_id
+ * @property string $otp_token
  * @property string $code
  * @property string $recaptcha
  */
@@ -26,7 +26,7 @@ final class VerifyOtpRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'user_id' => ['required', 'integer'],
+            'otp_token' => ['required', 'string'],
             'code' => ['required', 'numeric', 'digits:6'],
             'recaptcha' => ['required', 'string', new Recaptcha()],
         ];
@@ -38,7 +38,7 @@ final class VerifyOtpRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'user_id.required' => 'El ID de usuario es obligatorio.',
+            'otp_token.required' => 'Falta el token de verificación. Intenta iniciar sesión de nuevo.',
             'code.required' => 'El código OTP es obligatorio.',
             'code.digits' => 'El código OTP debe tener exactamente 6 dígitos.',
         ];

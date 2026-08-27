@@ -15,22 +15,23 @@ final class EmailOtpService
     /**
      * Verifica la validez del código OTP de correo electrónico ingresado por el usuario.
      *
-     * @param  array{user_id: int, code: string}  $data
+     * $otp_token es un token opaco de un solo uso (ver MfaService::verify()), no el user_id en
+     * crudo -- eso es lo que ata esta petición al login que de verdad pasó los primeros dos
+     * factores, en vez de bastar con adivinar/conocer el user_id (entero secuencial) de otra
+     * persona para poder mandarle intentos de código directo a este endpoint.
+     *
+     * @param  array{otp_token: string, code: string}  $data
      * @return array<string, mixed>
      */
     public function verify(array $data): array
     {
-        $userId = $data['user_id'] ?? null;
+        $otpToken = $data['otp_token'] ?? null;
         $code = $data['code'] ?? null;
 
-        Log::debug('EmailOtpService: Iniciando verificación de código OTP del tercer factor', [
-            'user_id' => $userId,
-        ]);
+        Log::debug('EmailOtpService: Iniciando verificación de código OTP del tercer factor');
 
-        if (! $userId || ! $code) {
-            Log::debug('EmailOtpService: Parámetros de verificación OTP inválidos o vacíos', [
-                'user_id' => $userId,
-            ]);
+        if (! $otpToken || ! $code) {
+            Log::debug('EmailOtpService: Parámetros de verificación OTP inválidos o vacíos');
 
             return [
                 'success' => false,
@@ -39,17 +40,10 @@ final class EmailOtpService
             ];
         }
 
-        $cachedCode = Cache::get('email_otp_'.$userId);
+        $cached = Cache::get('email_otp_'.$otpToken);
 
-        if (! $cachedCode) {
-            Log::debug('EmailOtpService: El código OTP ha expirado o no se encuentra en caché', [
-                'user_id' => $userId,
-            ]);
-
-            $user = User::query()->find($userId);
-            if ($user) {
-                LoginAttempt::record($user->id, $user->email, 'failed_otp_expired', 3, 'El código OTP expiró o no existe.');
-            }
+        if (! $cached) {
+            Log::debug('EmailOtpService: El código OTP ha expirado o el token no existe');
 
             return [
                 'success' => false,
@@ -57,6 +51,9 @@ final class EmailOtpService
                 'code' => 401,
             ];
         }
+
+        $userId = $cached['user_id'];
+        $cachedCode = $cached['code'];
 
         if ($cachedCode !== $code) {
             Log::debug('EmailOtpService: Código OTP incorrecto ingresado por el usuario', [
@@ -75,7 +72,7 @@ final class EmailOtpService
             ];
         }
 
-        Cache::forget('email_otp_'.$userId);
+        Cache::forget('email_otp_'.$otpToken);
 
         /** @var User $user */
         $user = User::query()->with('role')->findOrFail($userId);
