@@ -182,3 +182,27 @@ it('POST /relaciones/generar dos veces el mismo día genera dos cortes distintos
         ->and(Relacion::query()->orderBy('id')->get()->map(fn (Relacion $r) => $r->fecha_corte->toDateString())->toArray())
         ->toBe(['2026-02-20', '2026-02-21']);
 });
+
+/**
+ * Regresión: dos clics del botón el mismo día real generaban la cuota 2 con recargo de
+ * inmediato, aunque la fecha límite de pago de la cuota 1 ni siquiera hubiera llegado todavía
+ * -- calcularDetalleVale() solo revisaba si la cuota anterior seguía sin 'pagado', sin
+ * considerar si de verdad ya se venció el plazo. Ahora exige ambas cosas.
+ */
+it('dos clics el mismo día NO le meten recargo a la segunda cuota -- su plazo de pago ni ha llegado', function (): void {
+    $distribuidora = crearDistribuidoraParaCorte('DIST-BOTON-SINRECARGO');
+    crearValeParaCorte($distribuidora, 15000, 8);
+
+    $rolGerenteGeneral = Role::firstOrCreate(['name' => 'Gerente General']);
+    $gerenteGeneral = User::factory()->create(['role_id' => $rolGerenteGeneral->id, 'is_active' => true]);
+    Sanctum::actingAs($gerenteGeneral);
+
+    $this->postJson('/api/v1/relaciones/generar', [])->assertCreated();
+    $this->postJson('/api/v1/relaciones/generar', [])
+        ->assertCreated()
+        ->assertJsonPath('data.relaciones.0.detalles.0.cuota', '2/8')
+        ->assertJsonPath('data.relaciones.0.detalles.0.recargo', '0.00')
+        ->assertJsonPath('data.relaciones.0.totales.recargos', '0.00');
+
+    expect(Relacion::query()->count())->toBe(2);
+});

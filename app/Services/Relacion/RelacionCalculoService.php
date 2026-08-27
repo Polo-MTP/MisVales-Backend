@@ -375,13 +375,21 @@ final class RelacionCalculoService
 
         $cuotaAnterior = RelacionDetalle::query()
             ->where('vale_id', $vale->id)
+            ->with('relacion')
             ->latest('id')
             ->first();
 
         $cuotaNumero = $cuotaAnterior ? $cuotaAnterior->cuota_numero + 1 : 1;
 
-        // Recargo: si la cuota anterior de este mismo vale no quedó liquidada, se suma la multa configurada.
-        $recargo = ($cuotaAnterior && $cuotaAnterior->estado !== 'pagado') ? $multaNoPago : 0.0;
+        // Recargo: solo si la cuota anterior de este mismo vale sigue sin liquidarse Y YA SE LE
+        // VENCIÓ EL PLAZO (fecha_limite_pago de su propio corte, anterior a la fecha de este
+        // corte nuevo) -- no basta con que todavía no esté 'pagado'. Sin esta segunda condición,
+        // dos cortes forzados el mismo día real (botón "Generar Cortes del Día" dado dos veces
+        // seguidas, ver RelacionController::generar()) le metían multa a la segunda cuota aunque
+        // la distribuidora ni siquiera hubiera tenido oportunidad de pagar la primera todavía.
+        $fechaLimiteAnterior = $cuotaAnterior?->relacion?->fecha_limite_pago;
+        $seVencioLaAnterior = $fechaLimiteAnterior !== null && $fechaLimiteAnterior->lt($relacion->fecha_corte);
+        $recargo = ($cuotaAnterior && $cuotaAnterior->estado !== 'pagado' && $seVencioLaAnterior) ? $multaNoPago : 0.0;
 
         // Ganancia de la distribuidora por su categoría (Cobre/Plata/Oro), snapshot al generar el corte.
         $porcentajeCategoria = (float) ($relacion->porcentaje_comision_snapshot ?? 0);
