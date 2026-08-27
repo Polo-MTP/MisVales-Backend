@@ -69,9 +69,10 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
     // Solo da de alta Gerente de Sucursal -- el rol queda fijo en el controller, no lo manda
     // quien hace la petición. Confirmado con el equipo: dar de alta cuentas de staff no debe
     // exigir VPN, a diferencia de las decisiones de autorización (aprobar/rechazar) -- se
-    // necesita poder crear cuentas también desde la red pública.
+    // necesita poder crear cuentas también desde la red pública. Administrador también puede
+    // llegar aquí, igual que Gerente General.
     Route::post('usuarios/gerente-sucursal', [UsuarioController::class, 'crearGerenteSucursal'])
-        ->middleware('role:Gerente General')
+        ->middleware('role:Gerente General,Administrador')
         ->name('api.v1.usuarios.crear_gerente_sucursal');
 
     // Da de alta Gerente General -- solo Administrador, para poder arrancar/reponer la cadena
@@ -84,10 +85,10 @@ Route::middleware(['auth:sanctum', 'idle', 'active', 'throttle:authenticated'])-
 
     // Da de alta Coordinador, Verificador o Cajera -- el rol viene restringido a esas 3
     // opciones desde CrearPersonalSucursalRequest. Gerente de Sucursal solo puede darlos de
-    // alta en su propia sucursal, relacionados a sí mismo; Gerente General puede asignar
-    // cualquier sucursal + Gerente de Sucursal válido.
+    // alta en su propia sucursal, relacionados a sí mismo; Gerente General y Administrador
+    // pueden asignar cualquier sucursal + Gerente de Sucursal válido.
     Route::post('usuarios/personal', [UsuarioController::class, 'crearPersonalSucursal'])
-        ->middleware('role:Gerente General,Gerente de Sucursal')
+        ->middleware('role:Gerente General,Gerente de Sucursal,Administrador')
         ->name('api.v1.usuarios.crear_personal_sucursal');
 
     // Mueve todo el personal de un Gerente de Sucursal a otro (mismo patrón que

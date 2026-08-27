@@ -12,13 +12,13 @@ final class CrearGerenteSucursalRequest extends FormRequest
     use ValidaDatosPersonales;
 
     /**
-     * Solo el Gerente General puede dar de alta Gerentes de Sucursal.
+     * Gerente General y Administrador pueden dar de alta Gerentes de Sucursal.
      */
     public function authorize(): bool
     {
         $user = $this->user();
 
-        return $user && $user->role?->name === 'Gerente General';
+        return $user && in_array($user->role?->name, ['Gerente General', 'Administrador'], true);
     }
 
     /**

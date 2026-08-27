@@ -24,6 +24,13 @@ function crearGerenteGeneralUsr(): User
     return User::factory()->create(['role_id' => $role->id, 'is_active' => true]);
 }
 
+function crearAdministradorUsrGS(): User
+{
+    $role = Role::firstOrCreate(['name' => 'Administrador'], ['factor_count' => 3]);
+
+    return User::factory()->create(['role_id' => $role->id, 'is_active' => true]);
+}
+
 /** Ver nota en CrearAdministradorTest.php -- RFC/CURP exactos porque estos tests SÍ pegan por HTTP. */
 function datosPersonalesValidosGS(array $overrides = []): array
 {
@@ -73,6 +80,23 @@ it('el Gerente General puede dar de alta un Gerente de Sucursal, con contraseña
         ->and($creado->rfc)->not->toBeNull();
 
     Mail::assertSent(PersonalCredencialesMail::class, fn ($mail) => $mail->hasTo('nuevo.gerente@example.com') && strlen($mail->password) >= 22);
+});
+
+it('el Administrador puede dar de alta un Gerente de Sucursal, con contraseña generada y enviada por correo', function (): void {
+    $sucursal = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-001', 'es_matriz' => true, 'is_active' => true]);
+    Sanctum::actingAs(crearAdministradorUsrGS());
+
+    $response = $this->postJson('/api/v1/usuarios/gerente-sucursal', datosPersonalesValidosGS([
+        'nombre' => 'Nuevo', 'apellido_paterno' => 'Gerente', 'apellido_materno' => null,
+        'email' => 'nuevo.gerente.admin@example.com',
+        'sucursal_id' => $sucursal->id,
+    ]));
+
+    $response->assertStatus(201)
+        ->assertJsonPath('data.role.name', 'Gerente de Sucursal')
+        ->assertJsonPath('data.sucursal_id', $sucursal->id);
+
+    Mail::assertSent(PersonalCredencialesMail::class, fn ($mail) => $mail->hasTo('nuevo.gerente.admin@example.com'));
 });
 
 it('no se puede colar otro rol -- el endpoint siempre crea Gerente de Sucursal, ignora cualquier role_id que manden', function (): void {

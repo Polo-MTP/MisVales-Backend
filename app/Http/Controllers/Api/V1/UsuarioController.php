@@ -85,9 +85,10 @@ final class UsuarioController extends ApiController
 
     /**
      * Da de alta un Gerente de Sucursal — el rol queda fijo aquí, no lo elige quien manda la
-     * petición, precisamente para que este endpoint no sirva para crear ningún otro rol
-     * (Administrador incluido). La cuenta nace activa y con el correo ya verificado, igual
-     * que el resto de altas hechas por staff (ver SolicitudProveedorService).
+     * petición, precisamente para que este endpoint no sirva para crear ningún otro rol.
+     * Puede llegar Gerente General o Administrador (ver CrearGerenteSucursalRequest). La
+     * cuenta nace activa y con el correo ya verificado, igual que el resto de altas hechas
+     * por staff (ver SolicitudProveedorService).
      *
      * La contraseña la genera el sistema y se manda por correo, igual que en
      * crearPersonalSucursal() -- quien da de alta nunca conoce la contraseña de otra persona.
@@ -227,9 +228,9 @@ final class UsuarioController extends ApiController
      * a esas 3 opciones por CrearPersonalSucursalRequest), pero sucursal_id/gerente_id NUNCA
      * se toman tal cual del request cuando quien pide es Gerente de Sucursal: se sobreescriben
      * con su propia sucursal y su propio id, para que no pueda darse de alta personal fuera de
-     * su sucursal ni asignárselo a otro gerente. Cuando es Gerente General sí manda ambos
-     * explícitamente, y se valida que el gerente indicado sea realmente Gerente de Sucursal de
-     * esa misma sucursal.
+     * su sucursal ni asignárselo a otro gerente. Cuando es Gerente General o Administrador sí
+     * manda ambos explícitamente, y se valida que el gerente indicado sea realmente Gerente de
+     * Sucursal de esa misma sucursal.
      *
      * La contraseña la genera el sistema (no la elige quien da de alta) y se manda por correo
      * al nuevo usuario -- así nadie más que él llega a conocerla. Si quien asigna es distinto

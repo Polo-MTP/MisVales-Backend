@@ -19,8 +19,14 @@ beforeEach(function (): void {
     Role::firstOrCreate(['name' => 'Coordinador']);
     Role::firstOrCreate(['name' => 'Verificador']);
     Role::firstOrCreate(['name' => 'Cajera']);
+    Role::firstOrCreate(['name' => 'Administrador'], ['factor_count' => 3]);
     Mail::fake();
 });
+
+function crearAdministradorPersonal(): User
+{
+    return User::factory()->create(['role_id' => Role::where('name', 'Administrador')->first()->id, 'is_active' => true]);
+}
 
 function crearSucursalPersonal(): Sucursal
 {
@@ -90,6 +96,28 @@ it('el Gerente General puede dar de alta Coordinador, Verificador o Cajera indic
 
     // El Gerente General no es el gerente asignado -- el gerente debe enterarse de que tiene personal nuevo.
     expect(Notificacion::where('destinatario_id', $gerente->id)->where('accion', 'personal_asignado')->exists())->toBeTrue();
+})->with(['Coordinador', 'Verificador', 'Cajera']);
+
+it('el Administrador puede dar de alta Coordinador, Verificador o Cajera indicando sucursal y gerente', function (string $rol): void {
+    $sucursal = crearSucursalPersonal();
+    $gerente = crearGerenteDeSucursalPersonal($sucursal);
+    Sanctum::actingAs(crearAdministradorPersonal());
+
+    $email = 'nuevo.personal.admin.'.strtolower($rol).'@example.com';
+
+    $response = $this->postJson('/api/v1/usuarios/personal', datosPersonalesValidosPersonal([
+        'rol' => $rol,
+        'email' => $email,
+        'sucursal_id' => $sucursal->id,
+        'gerente_id' => $gerente->id,
+    ]));
+
+    $response->assertStatus(201)
+        ->assertJsonPath('data.role.name', $rol)
+        ->assertJsonPath('data.sucursal_id', $sucursal->id)
+        ->assertJsonPath('data.gerente_id', $gerente->id);
+
+    Mail::assertSent(PersonalCredencialesMail::class, fn ($mail) => $mail->hasTo($email));
 })->with(['Coordinador', 'Verificador', 'Cajera']);
 
 it('el Gerente General no puede asignar un gerente que no es Gerente de Sucursal de esa sucursal', function (): void {
