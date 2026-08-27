@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1\AltaProveedor;
 
+use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class CrearSolicitudProveedorRequest extends FormRequest
@@ -50,8 +51,25 @@ final class CrearSolicitudProveedorRequest extends FormRequest
             'datos_vivienda' => ['nullable', 'array'],
             'referencia_laboral' => ['nullable', 'string', 'max:255'],
 
-            // Asignación opcional de Verificador por el Coordinador
-            'verificador_id' => ['nullable', 'integer', 'exists:users,id'],
+            // Asignación opcional de Verificador por el Coordinador -- 'exists' por sí solo
+            // solo comprueba que el id exista en 'users', sin importar su rol ni su sucursal:
+            // el Coordinador podía "asignar" como verificador a cualquier cuenta del sistema
+            // (incluida una Distribuidora). closure() valida que de verdad sea Verificador y
+            // de la misma sucursal que quien está capturando la solicitud.
+            'verificador_id' => ['nullable', 'integer', 'exists:users,id', function (string $attribute, mixed $value, \Closure $fail): void {
+                /** @var User|null $verificador */
+                $verificador = User::query()->with('role')->find($value);
+
+                if (! $verificador || $verificador->role?->name !== 'Verificador') {
+                    $fail('El usuario indicado no tiene el rol de Verificador.');
+
+                    return;
+                }
+
+                if ($verificador->sucursal_id !== $this->user()?->sucursal_id) {
+                    $fail('El Verificador indicado no pertenece a tu sucursal.');
+                }
+            }],
 
             // Categoría (Bronce, Plata, Oro, etc.) opcional -- se traslada a la Distribuidora
             // si Gerencia aprueba la solicitud (ver SolicitudProveedorService).

@@ -104,25 +104,33 @@ final class UsuarioController extends ApiController
             ]);
         }
 
-        // Como mucho un Gerente de Sucursal activo por sucursal -- si el actual se va, primero
-        // hay que desactivarlo (o moverlo a otra sucursal) antes de poder dar de alta uno
-        // nuevo aquí. Uno inactivo no cuenta: ya dejó el puesto, la sucursal queda libre.
-        $yaTieneGerente = User::query()
-            ->where('role_id', $rolGerenteSucursal->id)
-            ->where('sucursal_id', $sucursal->id)
-            ->where('is_active', true)
-            ->exists();
-
-        if ($yaTieneGerente) {
-            throw ValidationException::withMessages([
-                'sucursal_id' => 'Esta sucursal ya tiene un Gerente de Sucursal activo asignado.',
-            ]);
-        }
-
         $data = $request->validated();
         $passwordGenerada = Str::password(22);
 
         $usuario = DB::transaction(function () use ($data, $rolGerenteSucursal, $sucursal, $request, $passwordGenerada): User {
+            // lockForUpdate() sobre la sucursal serializa dos altas casi simultáneas hacia la
+            // misma sucursal -- sin esto, dos peticiones podían pasar AMBAS el exists() de abajo
+            // antes de que cualquiera guardara su usuario, violando "como mucho un Gerente de
+            // Sucursal activo por sucursal" a pesar de la validación (no hay constraint único en
+            // BD que lo impida por sí solo).
+            Sucursal::query()->whereKey($sucursal->id)->lockForUpdate()->first();
+
+            // Como mucho un Gerente de Sucursal activo por sucursal -- si el actual se va,
+            // primero hay que desactivarlo (o moverlo a otra sucursal) antes de poder dar de
+            // alta uno nuevo aquí. Uno inactivo no cuenta: ya dejó el puesto, la sucursal queda
+            // libre.
+            $yaTieneGerente = User::query()
+                ->where('role_id', $rolGerenteSucursal->id)
+                ->where('sucursal_id', $sucursal->id)
+                ->where('is_active', true)
+                ->exists();
+
+            if ($yaTieneGerente) {
+                throw ValidationException::withMessages([
+                    'sucursal_id' => 'Esta sucursal ya tiene un Gerente de Sucursal activo asignado.',
+                ]);
+            }
+
             $datosId = $this->crearDatosPersonalesYDireccion($data);
 
             $usuario = User::query()->create([
@@ -344,20 +352,28 @@ final class UsuarioController extends ApiController
             ]);
         }
 
-        $yaTieneGerente = User::query()
-            ->where('role_id', $usuario->role_id)
-            ->where('sucursal_id', $sucursalDestino->id)
-            ->where('is_active', true)
-            ->exists();
+        DB::transaction(function () use ($usuario, $sucursalDestino): void {
+            // lockForUpdate() sobre la sucursal destino: sin esto, dos "mover" (o un "mover" y
+            // un "crear") casi simultáneos hacia la misma sucursal podían pasar ambos el
+            // exists() de abajo antes de que cualquiera guardara, dejando dos Gerentes de
+            // Sucursal activos ahí. Este método ni siquiera estaba envuelto en una transacción.
+            Sucursal::query()->whereKey($sucursalDestino->id)->lockForUpdate()->first();
 
-        if ($yaTieneGerente) {
-            throw ValidationException::withMessages([
-                'sucursal_id' => 'La sucursal destino ya tiene un Gerente de Sucursal activo asignado.',
-            ]);
-        }
+            $yaTieneGerente = User::query()
+                ->where('role_id', $usuario->role_id)
+                ->where('sucursal_id', $sucursalDestino->id)
+                ->where('is_active', true)
+                ->exists();
 
-        $usuario->sucursal_id = $sucursalDestino->id;
-        $usuario->save();
+            if ($yaTieneGerente) {
+                throw ValidationException::withMessages([
+                    'sucursal_id' => 'La sucursal destino ya tiene un Gerente de Sucursal activo asignado.',
+                ]);
+            }
+
+            $usuario->sucursal_id = $sucursalDestino->id;
+            $usuario->save();
+        });
 
         return $this->success(new UserResource($usuario->load(['role', 'sucursal'])));
     }

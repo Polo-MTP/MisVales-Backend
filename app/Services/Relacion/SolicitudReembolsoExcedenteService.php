@@ -43,25 +43,32 @@ final class SolicitudReembolsoExcedenteService
             throw new DomainException('Este vale no tiene saldo a favor pendiente de reembolsar.');
         }
 
-        $yaTienePendiente = SolicitudReembolsoExcedente::query()
-            ->where('vale_id', $vale->id)
-            ->where('estado', 'pendiente')
-            ->exists();
+        $solicitud = DB::transaction(function () use ($vale, $distribuidora, $cajera, $motivo): SolicitudReembolsoExcedente {
+            // lockForUpdate() sobre el vale: sin esto, dos clics casi simultáneos podían pasar
+            // ambos el exists() de abajo antes de que cualquiera guardara, colando dos
+            // solicitudes 'pendiente' para el mismo vale.
+            Vale::query()->whereKey($vale->id)->lockForUpdate()->first();
 
-        if ($yaTienePendiente) {
-            throw new DomainException('Ya hay una solicitud de reembolso pendiente para este vale.');
-        }
+            $yaTienePendiente = SolicitudReembolsoExcedente::query()
+                ->where('vale_id', $vale->id)
+                ->where('estado', 'pendiente')
+                ->exists();
 
-        /** @var SolicitudReembolsoExcedente $solicitud */
-        $solicitud = SolicitudReembolsoExcedente::query()->create([
-            'vale_id' => $vale->id,
-            'distribuidora_id' => $distribuidora->id,
-            'sucursal_id' => $cajera->sucursal_id,
-            'monto' => $vale->saldo_excedente,
-            'solicitado_por' => $cajera->id,
-            'motivo' => $motivo,
-            'estado' => 'pendiente',
-        ]);
+            if ($yaTienePendiente) {
+                throw new DomainException('Ya hay una solicitud de reembolso pendiente para este vale.');
+            }
+
+            /** @var SolicitudReembolsoExcedente $solicitud */
+            return SolicitudReembolsoExcedente::query()->create([
+                'vale_id' => $vale->id,
+                'distribuidora_id' => $distribuidora->id,
+                'sucursal_id' => $cajera->sucursal_id,
+                'monto' => $vale->saldo_excedente,
+                'solicitado_por' => $cajera->id,
+                'motivo' => $motivo,
+                'estado' => 'pendiente',
+            ]);
+        });
 
         // Mueve dinero real -- quien autoriza necesita enterarse de que hay algo esperando, no
         // descubrirlo entrando a la pantalla de solicitudes por su cuenta.

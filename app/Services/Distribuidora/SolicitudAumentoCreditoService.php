@@ -38,23 +38,32 @@ final class SolicitudAumentoCreditoService
             throw new DomainException('El monto solicitado debe ser mayor a cero.');
         }
 
-        $yaTienePendiente = SolicitudAumentoCredito::query()
-            ->where('distribuidora_id', $distribuidora->id)
-            ->where('estado', 'pendiente')
-            ->exists();
+        $solicitud = DB::transaction(function () use ($distribuidora, $usuario, $montoSolicitado, $motivo): SolicitudAumentoCredito {
+            // lockForUpdate() sobre la distribuidora: sin esto, dos solicitudes casi
+            // simultáneas (ej. la distribuidora y su coordinador, a la vez) podían pasar ambas
+            // el exists() de abajo antes de que cualquiera guardara la suya, colando dos
+            // 'pendiente' para la misma distribuidora -- no hay constraint único en BD que lo
+            // impida por sí solo.
+            Distribuidora::query()->whereKey($distribuidora->id)->lockForUpdate()->first();
 
-        if ($yaTienePendiente) {
-            throw new DomainException('Esta distribuidora ya tiene una solicitud de aumento de crédito pendiente.');
-        }
+            $yaTienePendiente = SolicitudAumentoCredito::query()
+                ->where('distribuidora_id', $distribuidora->id)
+                ->where('estado', 'pendiente')
+                ->exists();
 
-        /** @var SolicitudAumentoCredito $solicitud */
-        $solicitud = SolicitudAumentoCredito::query()->create([
-            'distribuidora_id' => $distribuidora->id,
-            'solicitado_por' => $usuario->id,
-            'limite_credito_anterior' => $distribuidora->limite_credito,
-            'monto_solicitado' => $montoSolicitado,
-            'motivo' => $motivo,
-        ]);
+            if ($yaTienePendiente) {
+                throw new DomainException('Esta distribuidora ya tiene una solicitud de aumento de crédito pendiente.');
+            }
+
+            /** @var SolicitudAumentoCredito $solicitud */
+            return SolicitudAumentoCredito::query()->create([
+                'distribuidora_id' => $distribuidora->id,
+                'solicitado_por' => $usuario->id,
+                'limite_credito_anterior' => $distribuidora->limite_credito,
+                'monto_solicitado' => $montoSolicitado,
+                'motivo' => $motivo,
+            ]);
+        });
 
         // Quien decide (Gerente de Sucursal) no tenía forma de saber que llegó una solicitud:
         // debía entrar a la pantalla de aumentos a ver "por si acaso".
@@ -104,6 +113,21 @@ final class SolicitudAumentoCreditoService
         }
 
         return DB::transaction(function () use ($solicitud, $montoOtorgado, $comentario, $gerente, $distribuidora): SolicitudAumentoCredito {
+            // lockForUpdate() + re-checar 'pendiente' aquí adentro: sin esto, dos aprobaciones
+            // casi simultáneas (doble clic, o dos gerentes) sobre esta MISMA solicitud podían
+            // pasar ambas el chequeo de estado hecho afuera y las dos escribir limite_credito,
+            // la segunda pisando el resultado de la primera con un monto ya obsoleto ("lost
+            // update"). Se relee la distribuidora bajo el lock -- no se usa la instancia de
+            // afuera, que pudo quedar desactualizada mientras se esperaba el lock.
+            $solicitud = SolicitudAumentoCredito::query()->whereKey($solicitud->id)->lockForUpdate()->firstOrFail();
+
+            if ($solicitud->estado !== 'pendiente') {
+                throw new DomainException('Esta solicitud ya fue resuelta.');
+            }
+
+            /** @var Distribuidora $distribuidora */
+            $distribuidora = Distribuidora::query()->whereKey($distribuidora->id)->lockForUpdate()->firstOrFail();
+
             // monto_otorgado es el LÍMITE TOTAL nuevo, no un incremento a sumar -- la
             // distribuidora pide "de $25,000 a $75,000" (ver limite_credito_anterior, guardado
             // como snapshot al solicitar, y la etiqueta "De X a Y" en el frontend). Sumarlo al

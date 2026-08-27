@@ -37,36 +37,44 @@ final class SolicitudTransferenciaClienteService
 
         $distribuidoraDestino = $usuario->distribuidora;
 
-        $historialActivo = HistorialClienteDistr::query()
-            ->where('cliente_id', $cliente->id)
-            ->whereNull('fecha_fin')
-            ->first();
+        $solicitud = DB::transaction(function () use ($cliente, $distribuidoraDestino, $usuario, $motivo): SolicitudTransferenciaCliente {
+            // lockForUpdate() sobre el cliente: sin esto, dos distribuidoras pidiendo la
+            // transferencia del mismo cliente casi al mismo tiempo podían pasar ambas el
+            // exists() de abajo antes de que cualquiera guardara, colando dos solicitudes en
+            // curso hacia destinos distintos sobre el mismo cliente.
+            Cliente::query()->whereKey($cliente->id)->lockForUpdate()->first();
 
-        if (! $historialActivo) {
-            throw new DomainException('Este cliente no tiene una distribuidora activa asignada.');
-        }
+            $historialActivo = HistorialClienteDistr::query()
+                ->where('cliente_id', $cliente->id)
+                ->whereNull('fecha_fin')
+                ->first();
 
-        if ($historialActivo->distribuidor_id === $distribuidoraDestino->id) {
-            throw new DomainException('Este cliente ya pertenece a tu distribuidora.');
-        }
+            if (! $historialActivo) {
+                throw new DomainException('Este cliente no tiene una distribuidora activa asignada.');
+            }
 
-        $yaTienePendiente = SolicitudTransferenciaCliente::query()
-            ->where('cliente_id', $cliente->id)
-            ->whereIn('estado', ['pendiente_autorizacion', 'autorizada'])
-            ->exists();
+            if ($historialActivo->distribuidor_id === $distribuidoraDestino->id) {
+                throw new DomainException('Este cliente ya pertenece a tu distribuidora.');
+            }
 
-        if ($yaTienePendiente) {
-            throw new DomainException('Ya existe una solicitud de transferencia en curso para este cliente.');
-        }
+            $yaTienePendiente = SolicitudTransferenciaCliente::query()
+                ->where('cliente_id', $cliente->id)
+                ->whereIn('estado', ['pendiente_autorizacion', 'autorizada'])
+                ->exists();
 
-        /** @var SolicitudTransferenciaCliente $solicitud */
-        $solicitud = SolicitudTransferenciaCliente::query()->create([
-            'cliente_id' => $cliente->id,
-            'distribuidora_origen_id' => $historialActivo->distribuidor_id,
-            'distribuidora_destino_id' => $distribuidoraDestino->id,
-            'solicitado_por' => $usuario->id,
-            'motivo' => $motivo,
-        ]);
+            if ($yaTienePendiente) {
+                throw new DomainException('Ya existe una solicitud de transferencia en curso para este cliente.');
+            }
+
+            /** @var SolicitudTransferenciaCliente $solicitud */
+            return SolicitudTransferenciaCliente::query()->create([
+                'cliente_id' => $cliente->id,
+                'distribuidora_origen_id' => $historialActivo->distribuidor_id,
+                'distribuidora_destino_id' => $distribuidoraDestino->id,
+                'solicitado_por' => $usuario->id,
+                'motivo' => $motivo,
+            ]);
+        });
 
         $solicitud = $solicitud->fresh(['cliente.datosPersonales', 'distribuidoraOrigen.usuario.datosPersonales', 'distribuidoraOrigen.coordinador', 'distribuidoraDestino.usuario.datosPersonales', 'solicitante']);
 
