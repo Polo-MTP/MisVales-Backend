@@ -46,9 +46,11 @@ use Laravel\Sanctum\HasApiTokens;
     'rfc',
     'referencia_laboral',
     'is_active',
-    'is_locked',
-    'failed_attempts',
-    'locked_until',
+    // is_locked/failed_attempts/locked_until a propósito NO están aquí: son estado de
+    // seguridad que solo LoginService debe tocar (vía asignación directa + save(), que no
+    // pasa por $fillable). Dejarlos mass-assignable es un riesgo dormido -- el día que alguien
+    // escriba un endpoint de "editar perfil" con $user->update($request->validated()), esos
+    // tres campos quedarían editables por cualquiera que sepa mandarlos en el body.
 ])]
 #[Hidden([
     'password',
