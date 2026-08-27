@@ -6,9 +6,13 @@ namespace App\Http\Controllers\Api\V1\Reporte;
 
 use App\Http\Controllers\Api\ApiController;
 use App\Models\Distribuidora;
+use App\Models\Relacion;
 use App\Models\User;
+use App\Services\Reporte\ReportePagosQuincenaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class ReporteController extends ApiController
 {
@@ -62,5 +66,45 @@ final class ReporteController extends ApiController
             data: $distribuidoras->values(),
             message: 'Reporte de distribuidoras morosas obtenido exitosamente.'
         );
+    }
+
+    /**
+     * Descarga en Excel el desglose de pagos por quincena de una distribuidora, hasta el corte
+     * que se indique (?hasta_relacion_id=; si se omite, usa el corte más reciente de esa
+     * distribuidora). Ver ReportePagosQuincenaService para el criterio de qué cuotas incluye.
+     */
+    public function pagosQuincena(Request $request, ReportePagosQuincenaService $service): StreamedResponse
+    {
+        $request->validate([
+            'distribuidora_id' => ['required', 'integer', 'exists:distribuidoras,id'],
+            'hasta_relacion_id' => ['nullable', 'integer'],
+        ]);
+
+        /** @var Distribuidora $distribuidora */
+        $distribuidora = Distribuidora::query()->findOrFail($request->integer('distribuidora_id'));
+
+        if ($request->filled('hasta_relacion_id')) {
+            $hastaRelacion = Relacion::query()
+                ->where('distribuidora_id', $distribuidora->id)
+                ->findOrFail($request->integer('hasta_relacion_id'));
+        } else {
+            $hastaRelacion = Relacion::query()
+                ->where('distribuidora_id', $distribuidora->id)
+                ->latest('fecha_corte')
+                ->first();
+
+            if (! $hastaRelacion) {
+                abort(404, 'Esta distribuidora todavía no tiene ningún corte generado.');
+            }
+        }
+
+        $spreadsheet = $service->generarExcel($distribuidora, $hastaRelacion);
+        $nombreArchivo = 'pagos-'.$distribuidora->numero_distribuidora.'-hasta-'.$hastaRelacion->fecha_corte->toDateString().'.xlsx';
+
+        return response()->streamDownload(function () use ($spreadsheet): void {
+            (new Xlsx($spreadsheet))->save('php://output');
+        }, $nombreArchivo, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
     }
 }

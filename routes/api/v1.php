@@ -565,6 +565,12 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
         Route::get('morosos', [ReporteController::class, 'morosos'])
             ->middleware('role:Cajera,Coordinador,Gerente de Sucursal,Gerente General')
             ->name('api.v1.reportes.morosos');
+
+        // Descarga del desglose de pagos por quincena de una distribuidora (Excel) -- pedido
+        // explícitamente para Gerente General, no se abre a otros roles por ahora.
+        Route::get('pagos-quincena', [ReporteController::class, 'pagosQuincena'])
+            ->middleware('role:Gerente General')
+            ->name('api.v1.reportes.pagos_quincena');
     });
 
     // ============================================================
