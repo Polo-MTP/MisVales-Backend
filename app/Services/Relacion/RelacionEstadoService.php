@@ -68,9 +68,16 @@ final class RelacionEstadoService
      * 'pagada', se salta -- necesario porque una relación 'vencida' puede recibir un abono
      * parcial después (ConciliacionBancariaService::aplicarAbono() la regresa a 'parcial' si no
      * la liquida del todo), volviendo a calificar para este método en la siguiente corrida sin
-     * que eso duplique la multa ya cobrada.
+     * que eso duplique la multa ya cobrada. Esa misma idempotencia es la que permite que
+     * RelacionCalculoService::calcularDetalleVale() también la llame -- de ahí que sea pública:
+     * cobra la multa de inmediato al generar el siguiente corte de un vale sin esperar a que
+     * marcarVencidas() corra en la noche, sin riesgo de cobrarla dos veces si de todos modos
+     * el barrido nocturno se adelanta.
+     *
+     * No guarda $relacion -- quien llama decide cuándo hacer save() (marcarVencidas() lo hace
+     * junto con el cambio de estado a 'vencida'; calcularDetalleVale() no toca ese estado).
      */
-    private function aplicarMultaPorVencimiento(Relacion $relacion, float $multaNoPago): void
+    public function aplicarMultaPorVencimiento(Relacion $relacion, float $multaNoPago): void
     {
         $recargoAgregado = 0.0;
         $categoriaPerdida = 0.0;

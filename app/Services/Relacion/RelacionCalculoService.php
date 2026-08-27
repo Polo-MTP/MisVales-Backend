@@ -40,6 +40,7 @@ final class RelacionCalculoService
         private readonly NotificacionService $notificacionService,
         private readonly ExcedenteConciliacionService $excedenteConciliacionService,
         private readonly RelacionLiquidacionService $relacionLiquidacionService,
+        private readonly RelacionEstadoService $relacionEstadoService,
     ) {}
 
     /**
@@ -178,6 +179,7 @@ final class RelacionCalculoService
 
         $comisionBasePct = (float) ($this->configuracionService->obtenerValorVigente('comision_base_pct') ?? 10);
         $interesPctQuincena = (float) ($this->configuracionService->obtenerValorVigente('interes_pct_quincena') ?? 5);
+        $multaNoPago = (float) ($this->configuracionService->obtenerValorVigente('multa_no_pago') ?? 300);
 
         return DB::transaction(function () use (
             $distribuidora,
@@ -185,6 +187,7 @@ final class RelacionCalculoService
             $valesPendientes,
             $comisionBasePct,
             $interesPctQuincena,
+            $multaNoPago,
         ): Relacion {
             // Serializa el acceso a esta distribuidora: dos llamadas casi simultáneas (dos
             // clics seguidos del gerente, o un reintento manual que choca con el job
@@ -220,7 +223,7 @@ final class RelacionCalculoService
             $totalAbonadoPorExcedente = 0.0;
 
             foreach ($valesPendientes as $vale) {
-                $detalle = $this->calcularDetalleVale($relacion, $vale, $comisionBasePct, $interesPctQuincena);
+                $detalle = $this->calcularDetalleVale($relacion, $vale, $comisionBasePct, $interesPctQuincena, $multaNoPago);
 
                 // Si este vale tiene saldo a favor de un excedente de un corte anterior (pagó
                 // de más y todavía no se le aplicó a ninguna cuota suya), se descuenta aquí
@@ -369,25 +372,36 @@ final class RelacionCalculoService
 
     /**
      * Una cuota recién generada siempre nace limpia: sin recargo y con su descuento de
-     * categoría completo. La multa por atraso ya no se calcula aquí -- vive en la quincena que
-     * de verdad se atrasó, no en la que se genera después (ver
-     * RelacionEstadoService::marcarVencidas()).
+     * categoría completo. La multa por atraso no se calcula sobre ESTA cuota -- si la anterior
+     * del mismo vale sigue sin pagar, se le cobra a ELLA misma de inmediato aquí abajo (decisión
+     * del negocio: cualquier corte nuevo con la cuota previa sin liquidar debe reflejar la multa
+     * al momento, sin esperar a que venza su plazo formal). El barrido nocturno
+     * (RelacionEstadoService::marcarVencidas()) hace lo mismo para cuotas que nadie vuelve a
+     * generar (ej. la última quincena de un vale) -- aplicarMultaPorVencimiento() es idempotente,
+     * así que no importa cuál de los dos llegue primero.
      */
     private function calcularDetalleVale(
         Relacion $relacion,
         Vale $vale,
         float $comisionBasePct,
         float $interesPctQuincena,
+        float $multaNoPago,
     ): RelacionDetalle {
         $quincenas = max(1, (int) ($vale->quincenas ?? $vale->producto?->quincenas ?? 1));
         $monto = (float) $vale->monto;
 
         $cuotaAnterior = RelacionDetalle::query()
             ->where('vale_id', $vale->id)
+            ->with('relacion')
             ->latest('id')
             ->first();
 
         $cuotaNumero = $cuotaAnterior ? $cuotaAnterior->cuota_numero + 1 : 1;
+
+        if ($cuotaAnterior && $cuotaAnterior->estado !== 'pagado' && $cuotaAnterior->relacion) {
+            $this->relacionEstadoService->aplicarMultaPorVencimiento($cuotaAnterior->relacion, $multaNoPago);
+            $cuotaAnterior->relacion->save();
+        }
 
         // Ganancia de la distribuidora por su categoría (Cobre/Plata/Oro), snapshot al generar el corte.
         $porcentajeCategoria = (float) ($relacion->porcentaje_comision_snapshot ?? 0);

@@ -176,6 +176,39 @@ it('aplica el recargo a la propia cuota vencida cuando se marca la relación com
         ->and($segundaRelacion->detalles->first()->cuota_numero)->toBe(2);
 });
 
+/**
+ * Decisión del negocio: cualquier corte nuevo de un vale con la cuota anterior sin pagar debe
+ * reflejar la multa DE INMEDIATO, sin esperar a que corra el barrido nocturno
+ * (RelacionEstadoService::marcarVencidas()) ni a que venza formalmente su fecha límite de pago
+ * -- útil para adelantar quincenas a propósito (botón "Generar Cortes del Día" dado dos veces
+ * seguidas) sin tener que esperar el ciclo real. La multa se le cobra a la cuota que de verdad
+ * se atrasó (no a la nueva, que sigue naciendo limpia); si el barrido nocturno se adelanta a
+ * esto, aplicarMultaPorVencimiento() es idempotente y no la cobra dos veces.
+ */
+it('generar el siguiente corte cobra la multa de inmediato sobre la cuota anterior sin pagar, sin esperar a que venza su plazo', function (): void {
+    $distribuidora = crearDistribuidora();
+    crearVale($distribuidora, 15000, 8);
+
+    $service = app(RelacionCalculoService::class);
+    $primeraRelacion = $service->generarParaDistribuidora($distribuidora, '2026-02-15');
+    expect((float) $primeraRelacion->detalles->first()->recargo)->toBe(0.0)
+        ->and($primeraRelacion->fecha_limite_pago->toDateString())->toBe('2026-02-16');
+
+    // Un día después del corte -- su fecha límite (2026-02-16) NI HA LLEGADO todavía, y nadie
+    // corrió marcarVencidas(). Aun así, al generar el siguiente corte para el mismo vale, la
+    // multa debe aparecer YA en la primera relación.
+    $segundaRelacion = $service->generarParaDistribuidora($distribuidora, '2026-02-16');
+
+    expect((float) $primeraRelacion->fresh()->detalles->first()->recargo)->toBe(300.0)
+        ->and($primeraRelacion->fresh()->total_recargos)->toBe('300.00')
+        ->and((float) $segundaRelacion->detalles->first()->recargo)->toBe(0.0)
+        ->and($segundaRelacion->detalles->first()->cuota_numero)->toBe(2);
+
+    // Si el barrido nocturno se adelanta después, no debe cobrar la multa una segunda vez.
+    app(RelacionEstadoService::class)->marcarVencidas('2026-03-01');
+    expect((float) $primeraRelacion->fresh()->detalles->first()->recargo)->toBe(300.0);
+});
+
 it('no aplica recargo si la cuota anterior del mismo vale ya se liquidó puntual', function (): void {
     $distribuidora = crearDistribuidora();
     crearVale($distribuidora, 15000, 8);
