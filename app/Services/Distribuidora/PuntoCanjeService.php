@@ -33,13 +33,21 @@ final class PuntoCanjeService
             throw new DomainException('La cantidad a canjear debe ser mayor a cero.');
         }
 
-        if ($cantidad > $distribuidora->puntos_acumulados) {
-            throw new DomainException('La distribuidora no cuenta con puntos suficientes para este canje.');
-        }
-
         $valorPunto = (float) ($this->configuracionService->obtenerValorVigente('valor_punto') ?? 0);
 
         return DB::transaction(function () use ($distribuidora, $cantidad, $motivo, $cajera, $valorPunto): PuntoMovimiento {
+            // lockForUpdate(): sin esto, dos canjes casi simultáneos de la misma distribuidora
+            // (dos cajeras, o un doble-clic) leen el mismo puntos_acumulados y ambos pasan la
+            // validación de "hay suficientes" antes de que ninguno descuente -- decrement() es
+            // atómico a nivel SQL (no se pierde ningún descuento), pero nada impedía que el
+            // saldo terminara en negativo si la suma de los dos canjes excedía lo disponible.
+            /** @var Distribuidora $distribuidoraBloqueada */
+            $distribuidoraBloqueada = Distribuidora::query()->whereKey($distribuidora->id)->lockForUpdate()->firstOrFail();
+
+            if ($cantidad > $distribuidoraBloqueada->puntos_acumulados) {
+                throw new DomainException('La distribuidora no cuenta con puntos suficientes para este canje.');
+            }
+
             /** @var PuntoMovimiento $movimiento */
             $movimiento = PuntoMovimiento::query()->create([
                 'distribuidora_id' => $distribuidora->id,
@@ -50,7 +58,7 @@ final class PuntoCanjeService
                 'registrado_por' => $cajera->id,
             ]);
 
-            $distribuidora->decrement('puntos_acumulados', $cantidad);
+            $distribuidoraBloqueada->decrement('puntos_acumulados', $cantidad);
 
             return $movimiento->fresh();
         });
