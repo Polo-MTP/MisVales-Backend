@@ -136,6 +136,36 @@ it('el gerente de sucursal puede listar por HTTP las solicitudes de edición pen
         ->assertJsonPath('data.data.0.cliente_id', $cliente->id);
 });
 
+/**
+ * Antes, la solicitud solo traía 'campos_propuestos' (el "después") -- quien autoriza no tenía
+ * forma de ver el valor ACTUAL del cliente sin salirse a buscarlo a mano en su perfil. Ahora
+ * el recurso también trae 'antes' con esos mismos campos, leído en vivo del cliente.
+ */
+it('la solicitud trae el valor actual del cliente ("antes") junto a lo propuesto, para poder compararlos', function (): void {
+    ['cajera' => $cajera, 'gerenteSucursal' => $gerenteSucursal] = crearUsuariosSucursalEdicion();
+    $cliente = crearClienteParaEdicion();
+
+    app(SolicitudEdicionClienteService::class)->solicitar(
+        $cliente,
+        ['nombre' => 'Juan Corregido'],
+        ['calle' => 'Calle Nueva'],
+        'Nombre y calle mal capturados',
+        $cajera
+    );
+
+    Sanctum::actingAs($gerenteSucursal->fresh());
+
+    $this->getJson('/api/v1/distribuidora/clientes/ediciones')
+        ->assertStatus(200)
+        ->assertJsonPath('data.data.0.campos_propuestos.datos_personales.nombre', 'Juan Corregido')
+        ->assertJsonPath('data.data.0.antes.datos_personales.nombre', 'Juan')
+        ->assertJsonPath('data.data.0.campos_propuestos.direccion.calle', 'Calle Nueva')
+        ->assertJsonPath('data.data.0.antes.direccion.calle', 'Calle Vieja')
+        // El snapshot interno (updated_at para detectar ediciones concurrentes) es un detalle
+        // de implementación de aplicar() -- no debe salir en la respuesta que ve el gerente.
+        ->assertJsonMissingPath('data.data.0.campos_propuestos._snapshot');
+});
+
 it('la cajera solo ve por HTTP sus propias solicitudes de edición', function (): void {
     ['cajera' => $cajera] = crearUsuariosSucursalEdicion();
     $otraCajera = User::factory()->create(['role_id' => $cajera->role_id, 'sucursal_id' => $cajera->sucursal_id, 'is_active' => true]);

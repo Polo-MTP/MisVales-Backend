@@ -7,6 +7,7 @@ namespace App\Http\Resources\Distribuidora;
 use App\Models\SolicitudEdicionCliente;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Arr;
 
 /**
  * @mixin SolicitudEdicionCliente
@@ -29,7 +30,22 @@ final class SolicitudEdicionClienteResource extends JsonResource
             'solicitado_por' => $this->solicitado_por,
             'solicitante' => $this->whenLoaded('solicitante', fn () => $this->solicitante?->name),
             'sucursal_id' => $this->sucursal_id,
-            'campos_propuestos' => $this->campos_propuestos,
+            'campos_propuestos' => Arr::except($this->campos_propuestos, ['_snapshot']),
+            // Valor ACTUAL del cliente para esos mismos campos, para que quien autoriza vea el
+            // antes/después uno junto al otro sin tener que ir a comparar a mano contra el
+            // perfil del cliente. Se lee en vivo (no un snapshot guardado al solicitar) porque
+            // es justo lo que aplicar() también compara para detectar ediciones concurrentes --
+            // el "antes" que importa es el de ahora mismo, no el de cuando la cajera pidió esto.
+            'antes' => $this->whenLoaded('cliente', fn () => [
+                'datos_personales' => Arr::only(
+                    $this->cliente?->datosPersonales?->toArray() ?? [],
+                    array_keys($this->campos_propuestos['datos_personales'] ?? [])
+                ),
+                'direccion' => Arr::only(
+                    $this->cliente?->datosPersonales?->direccion?->toArray() ?? [],
+                    array_keys($this->campos_propuestos['direccion'] ?? [])
+                ),
+            ]),
             'motivo' => $this->motivo,
             'estado' => $this->estado,
             'autorizado_por' => $this->autorizado_por,

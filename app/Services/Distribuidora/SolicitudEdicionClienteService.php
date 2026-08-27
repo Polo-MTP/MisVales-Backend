@@ -56,7 +56,7 @@ final class SolicitudEdicionClienteService
             'estado' => 'pendiente',
         ]);
 
-        $solicitud = $solicitud->fresh(['cliente.datosPersonales', 'solicitante']);
+        $solicitud = $solicitud->fresh(['cliente.datosPersonales.direccion', 'solicitante']);
 
         // Sin esto, el Gerente de Sucursal tenía que entrar a "Ediciones Pendientes" a ciegas
         // para descubrir que una cajera está esperando su autorización para corregir un dato.
@@ -90,7 +90,7 @@ final class SolicitudEdicionClienteService
             'fecha_decision' => now(),
         ]);
 
-        $solicitud = $solicitud->fresh(['cliente.datosPersonales', 'solicitante', 'autorizador']);
+        $solicitud = $solicitud->fresh(['cliente.datosPersonales.direccion', 'solicitante', 'autorizador']);
 
         // La cajera es quien tiene que APLICAR la corrección una vez aprobada: si no se entera
         // de la decisión, la solicitud se queda aprobada pero sin aplicar indefinidamente.
@@ -178,7 +178,7 @@ final class SolicitudEdicionClienteService
      */
     public function listar(User $usuario, array $filters = []): LengthAwarePaginator
     {
-        $query = SolicitudEdicionCliente::query()->with(['cliente.datosPersonales', 'solicitante', 'autorizador']);
+        $query = SolicitudEdicionCliente::query()->with(['cliente.datosPersonales.direccion', 'solicitante', 'autorizador']);
 
         $role = $usuario->role?->name;
 
