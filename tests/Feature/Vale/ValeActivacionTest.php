@@ -119,6 +119,31 @@ it('un vale desactivado por la distribuidora ya no se puede validar ni autorizar
     expect($vale->fresh()->estado)->toBe('solicitado');
 });
 
+it('REGRESION: una segunda autorización casi simultánea del mismo vale no pisa la fecha_autorizacion en silencio', function (): void {
+    $distribuidora = crearDistribuidoraActivacion();
+    $vale = crearValeSolicitado($distribuidora, 5000, 4);
+    $svc = app(ValeService::class);
+
+    $vale->estado = 'validado';
+    $vale->save();
+
+    // Simula dos peticiones casi simultáneas: ambas leen el vale en 'validado' antes de que
+    // cualquiera guarde (aquí, dos referencias PHP distintas al mismo estado inicial).
+    $valeParaPrimeraLlamada = $vale->fresh();
+    $valeParaSegundaLlamada = $vale->fresh();
+
+    $svc->autorizar($valeParaPrimeraLlamada, $distribuidora->usuario);
+    $primeraFecha = $vale->fresh()->fecha_autorizacion;
+
+    expect(fn () => $svc->autorizar($valeParaSegundaLlamada, $distribuidora->usuario))
+        ->toThrow(DomainException::class);
+
+    // La fecha de la primera autorización debe seguir intacta -- la segunda no debe haber
+    // alcanzado a pisarla.
+    expect($vale->fresh()->fecha_autorizacion->eq($primeraFecha))->toBeTrue();
+    expect($vale->fresh()->estado)->toBe('autorizado');
+});
+
 it('un vale solicitado desactivado no cuenta en el crédito disponible ni entra a un nuevo corte', function (): void {
     $distribuidora = crearDistribuidoraActivacion();
     $vale = crearValeSolicitado($distribuidora, 5000, 4);

@@ -7,7 +7,9 @@ use App\Models\DatosPersonales;
 use App\Models\Direccion;
 use App\Models\Distribuidora;
 use App\Models\HistorialClienteDistr;
+use App\Models\Notificacion;
 use App\Models\Role;
+use App\Models\SolicitudTransferenciaCliente;
 use App\Models\Sucursal;
 use App\Models\User;
 use App\Services\Distribuidora\ClienteService;
@@ -83,6 +85,38 @@ it('un coordinador no puede reasignar clientes de una distribuidora que no coord
 
     expect(fn () => app(ClienteService::class)->reasignarTodos($origen, $destino, $otroCoordinador))
         ->toThrow(Symfony\Component\HttpKernel\Exception\HttpException::class, 'Solo puedes reasignar clientes entre distribuidoras que tú coordinas.');
+});
+
+/**
+ * reasignarTodos() mueve al cliente por una vía distinta a SolicitudTransferenciaCliente (que
+ * exige confirmación de la destino). Antes, una solicitud individual en curso para uno de estos
+ * clientes quedaba huérfana: nunca se resolvía y nadie se enteraba. Confirma que ahora se
+ * cancela automáticamente y se notifica a las partes.
+ */
+it('REGRESION: cancela y notifica cualquier solicitud de transferencia individual en curso para los clientes reasignados masivamente', function (): void {
+    ['coordinador' => $coordinador, 'origen' => $origen, 'destino' => $destino] = crearCoordinadorConDosDistribuidoras();
+    $cliente = crearClienteEnDistribuidora($origen);
+
+    $otraDistribuidora = Distribuidora::create([
+        'usuario_id' => User::factory()->create(['is_active' => true])->id, 'numero_distribuidora' => 'DIST-X-'.uniqid(),
+        'limite_credito' => 10000, 'puntos_acumulados' => 0, 'estado' => 'ACTIVO', 'sucursal_id' => $origen->sucursal_id,
+    ]);
+
+    $solicitudEnCurso = SolicitudTransferenciaCliente::create([
+        'cliente_id' => $cliente->id,
+        'distribuidora_origen_id' => $origen->id,
+        'distribuidora_destino_id' => $otraDistribuidora->id,
+        'solicitado_por' => $otraDistribuidora->usuario_id,
+        'motivo' => 'Quiero a este cliente',
+        'estado' => 'autorizada',
+    ]);
+
+    app(ClienteService::class)->reasignarTodos($origen, $destino, $coordinador);
+
+    expect($solicitudEnCurso->fresh()->estado)->toBe('rechazada');
+    expect(
+        Notificacion::query()->where('destinatario_id', $otraDistribuidora->usuario_id)->where('accion', 'transferencia_cliente_rechazada')->exists()
+    )->toBeTrue();
 });
 
 it('no se puede reasignar hacia una distribuidora que no está activa', function (): void {

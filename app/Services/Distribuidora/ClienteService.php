@@ -9,7 +9,9 @@ use App\Models\DatosPersonales;
 use App\Models\Direccion;
 use App\Models\Distribuidora;
 use App\Models\HistorialClienteDistr;
+use App\Models\SolicitudTransferenciaCliente;
 use App\Models\User;
+use App\Services\Notificacion\NotificacionService;
 use DomainException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +19,10 @@ use Illuminate\Support\Facades\Log;
 
 final class ClienteService
 {
+    public function __construct(
+        private readonly NotificacionService $notificacionService,
+    ) {}
+
     /**
      * Obtiene o asegura la existencia de la Distribuidora asociada a un usuario.
      */
@@ -280,12 +286,35 @@ final class ClienteService
             throw new DomainException('La distribuidora destino no puede recibir clientes en su estado actual.');
         }
 
-        return DB::transaction(function () use ($origen, $destino): int {
+        [$totalReasignados, $solicitudesCanceladas] = DB::transaction(function () use ($origen, $destino): array {
             $historiales = HistorialClienteDistr::query()
                 ->where('distribuidor_id', $origen->id)
                 ->whereNull('fecha_fin')
                 ->lockForUpdate()
                 ->get();
+
+            $clienteIds = $historiales->pluck('cliente_id');
+
+            // Esta reasignación mueve al cliente por una vía distinta a
+            // SolicitudTransferenciaCliente (que exige que la destino confirme). Sin esto,
+            // cualquier solicitud individual todavía en curso para uno de estos clientes
+            // (pendiente de autorización, o ya autorizada y esperando que la destino de ESA
+            // solicitud confirme) quedaba huérfana: nunca se resolvía, y si alguien intentaba
+            // confirmarla, chocaba con "el cliente ya no pertenece a la distribuidora de
+            // origen" sin que nadie se hubiera enterado de que la solicitud quedó obsoleta.
+            $solicitudesObsoletas = SolicitudTransferenciaCliente::query()
+                ->where('distribuidora_origen_id', $origen->id)
+                ->whereIn('cliente_id', $clienteIds)
+                ->whereIn('estado', ['pendiente_autorizacion', 'autorizada'])
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($solicitudesObsoletas as $solicitud) {
+                $solicitud->update([
+                    'estado' => 'rechazada',
+                    'comentario_autorizacion' => 'Cancelada automáticamente: el cliente fue reasignado por el coordinador mediante reasignación masiva.',
+                ]);
+            }
 
             foreach ($historiales as $historial) {
                 $historial->fecha_fin = now();
@@ -303,10 +332,25 @@ final class ClienteService
                 'origen_id' => $origen->id,
                 'destino_id' => $destino->id,
                 'total' => $historiales->count(),
+                'solicitudes_canceladas' => $solicitudesObsoletas->count(),
             ]);
 
-            return $historiales->count();
+            return [$historiales->count(), $solicitudesObsoletas];
         });
+
+        foreach ($solicitudesCanceladas->load(['cliente.datosPersonales', 'distribuidoraDestino.usuario', 'solicitante']) as $solicitud) {
+            $nombreCliente = $solicitud->cliente?->datosPersonales?->nombre ?? 'Cliente #'.$solicitud->cliente_id;
+
+            if ($destinoUsuario = $solicitud->distribuidoraDestino?->usuario) {
+                $this->notificacionService->crear($destinoUsuario, 'transferencia_cliente_rechazada', $nombreCliente);
+            }
+
+            if ($solicitante = $solicitud->solicitante) {
+                $this->notificacionService->crear($solicitante, 'transferencia_cliente_rechazada', $nombreCliente);
+            }
+        }
+
+        return $totalReasignados;
     }
 
     /**

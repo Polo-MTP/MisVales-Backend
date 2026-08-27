@@ -167,6 +167,18 @@ final class ValeService
         }
 
         return DB::transaction(function () use ($vale): Vale {
+            // lockForUpdate() + re-checar el estado del vale aquí adentro: sin esto, un doble
+            // clic (dos autorizaciones casi simultáneas del mismo vale) pasaba ambas el chequeo
+            // de estado hecho afuera y las dos llegaban a guardar -- no duplicaba crédito (es
+            // la misma fila), pero la segunda pisaba fecha_autorizacion de la primera en
+            // silencio, sin ningún error ni indicio de que hubo doble autorización.
+            /** @var Vale $vale */
+            $vale = Vale::query()->whereKey($vale->id)->lockForUpdate()->firstOrFail();
+
+            if ($vale->estado !== 'validado') {
+                throw new DomainException("Solo se pueden autorizar vales ya validados (actual: {$vale->estado}). Valida los datos del cliente primero.");
+            }
+
             /** @var Distribuidora $distribuidora */
             $distribuidora = Distribuidora::query()->whereKey($vale->distribuidora_id)->lockForUpdate()->firstOrFail();
 

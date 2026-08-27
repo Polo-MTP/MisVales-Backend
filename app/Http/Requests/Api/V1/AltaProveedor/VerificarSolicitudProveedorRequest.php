@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1\AltaProveedor;
 
+use App\Models\SolicitudProveedor;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 final class VerificarSolicitudProveedorRequest extends FormRequest
 {
@@ -33,7 +35,19 @@ final class VerificarSolicitudProveedorRequest extends FormRequest
             'datos_personales.nombre' => ['nullable', 'string', 'max:255'],
             'datos_personales.apellido_paterno' => ['nullable', 'string', 'max:255'],
             'datos_personales.apellido_materno' => ['nullable', 'string', 'max:255'],
-            'datos_personales.curp' => ['nullable', 'string', 'size:18'],
+            // Sin 'unique' aquí, el Verificador podía editar la CURP a un valor ya usado por
+            // otra persona: el guardado en el servicio tronaba con un 500 crudo (violación de
+            // constraint de BD) en vez de un 422 limpio. ignore() excluye los datos_personales
+            // de esta MISMA solicitud (si no cambió la CURP, no debe fallar contra sí misma).
+            'datos_personales.curp' => [
+                'nullable',
+                'string',
+                'size:18',
+                Rule::unique('datos_personales', 'curp')->ignore(
+                    $this->route('solicitud') instanceof SolicitudProveedor ? $this->route('solicitud')->datos_id : null,
+                    'id'
+                ),
+            ],
             'datos_personales.fecha_nacimiento' => ['nullable', 'date'],
             'datos_personales.lugar_nacimiento' => ['nullable', 'string', 'max:255'],
 

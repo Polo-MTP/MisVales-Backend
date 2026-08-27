@@ -61,3 +61,36 @@ it('sí permite asignar a un Verificador real de la misma sucursal', function ()
     $this->postJson('/api/v1/alta-proveedor/solicitudes', datosSolicitudConVerificador($verificador->id))
         ->assertStatus(201);
 });
+
+/**
+ * verificar() dejaba que el Verificador editara la CURP a un valor ya usado por otra persona
+ * (datos_personales.curp no tenía 'unique') -- el guardado en el servicio tronaba con un 500
+ * crudo (violación de constraint de BD) en vez de un 422 limpio con el mensaje de validación.
+ */
+it('rechaza con 422 que el Verificador edite la CURP a una ya usada por otra persona', function (): void {
+    $sucursal = Sucursal::create(['nombre' => 'Matriz', 'codigo' => 'SUC-'.uniqid(), 'es_matriz' => true, 'is_active' => true]);
+    $coordinador = User::factory()->create(['role_id' => Role::firstOrCreate(['name' => 'Coordinador'])->id, 'sucursal_id' => $sucursal->id, 'is_active' => true]);
+    $verificador = User::factory()->create(['role_id' => Role::firstOrCreate(['name' => 'Verificador'])->id, 'sucursal_id' => $sucursal->id, 'is_active' => true]);
+
+    Sanctum::actingAs($coordinador);
+
+    // Una CURP que ya existe en el sistema (de otra solicitud distinta).
+    $this->postJson('/api/v1/alta-proveedor/solicitudes', array_merge(
+        datosSolicitudConVerificador($verificador->id),
+        ['curp' => 'PEGJ850101HDGRZN05', 'rfc' => 'PEGJ850101XXX']
+    ))->assertStatus(201);
+
+    $this->postJson('/api/v1/alta-proveedor/solicitudes', array_merge(
+        datosSolicitudConVerificador($verificador->id),
+        ['curp' => 'PEGJ850101HDGRZN06', 'rfc' => 'PEGJ850101YYY']
+    ))->assertStatus(201);
+
+    $solicitud = \App\Models\SolicitudProveedor::query()->latest('id')->first();
+
+    Sanctum::actingAs($verificador);
+    $this->postJson("/api/v1/alta-proveedor/solicitudes/{$solicitud->id}/verificar", [
+        'cumple' => true,
+        'comentario_verificador' => 'Todo en orden.',
+        'datos_personales' => ['curp' => 'PEGJ850101HDGRZN05'],
+    ])->assertStatus(422)->assertJsonValidationErrors('datos_personales.curp');
+});
