@@ -425,6 +425,14 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:authenticated'])->group(f
         Route::post('{distribuidora}/puntos/canjear', [App\Http\Controllers\Api\V1\Distribuidora\PuntoCanjeController::class, 'canjear'])
             ->middleware('role:Cajera')
             ->name('api.v1.distribuidoras.puntos.canjear');
+
+        // Estado de cuenta acumulado por cliente (ver EstadoCuentaService) -- vista en vivo,
+        // se actualiza sola en cuanto existe un corte nuevo (automático o "Generar Corte del
+        // Día"), sin ninguna acción aparte. La Distribuidora solo ve el suyo (chequeo en el
+        // controller, mismo patrón que saldo-disponible).
+        Route::get('{distribuidora}/estado-cuenta', [App\Http\Controllers\Api\V1\Relacion\EstadoCuentaController::class, 'index'])
+            ->middleware('role:Cajera,Distribuidora,Coordinador,Gerente de Sucursal,Gerente General')
+            ->name('api.v1.distribuidoras.estado_cuenta');
     });
 
     // ============================================================
