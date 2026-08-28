@@ -586,10 +586,13 @@ it('perdonar condona el recargo y el interés, y reduce el total a pagar (no toc
     app(RelacionEstadoService::class)->marcarVencidas('2026-03-01');
     $primeraRelacion->refresh();
 
-    // 2712 (total original) + 300 (recargo) + 112.5 (descuento de categoría que se pierde) = 3124.5
+    // Al perder el descuento de categoría, el total se recalcula desde capital+comisión+
+    // interés+seguro SIN el descuento (1875+187.5+750+12.5 = 2825, sin centavos que perder en
+    // el ROUNDDOWN) + 300 de multa = 3125 -- no "2712 (ya redondeado con descuento) + 300 +
+    // 112.5", que dejaba faltando $0.50 (ver RelacionEstadoService::aplicarMultaPorVencimiento()).
     expect((float) $primeraRelacion->total_recargos)->toBe(300.0)
         ->and((float) $primeraRelacion->total_interes)->toBe(750.0)
-        ->and((float) $primeraRelacion->total_a_pagar)->toBe(3124.5)
+        ->and((float) $primeraRelacion->total_a_pagar)->toBe(3125.0)
         ->and($primeraRelacion->estado)->toBe('vencida');
 
     $gerente = User::factory()->create();
@@ -598,11 +601,11 @@ it('perdonar condona el recargo y el interés, y reduce el total a pagar (no toc
     expect($perdonada->estado)->toBe('perdonada')
         ->and((float) $perdonada->total_recargos)->toBe(0.0)
         ->and((float) $perdonada->total_interes)->toBe(0.0)
-        // 3124.5 - 300 (recargo) - 750 (interés) = 2074.5; capital+comisión+seguro se quedan igual.
-        ->and((float) $perdonada->total_a_pagar)->toBe(2074.5)
+        // 3125 - 300 (recargo) - 750 (interés) = 2075; capital+comisión+seguro se quedan igual.
+        ->and((float) $perdonada->total_a_pagar)->toBe(2075.0)
         ->and((float) $perdonada->detalles->first()->recargo)->toBe(0.0)
         ->and((float) $perdonada->detalles->first()->interes)->toBe(0.0)
-        ->and((float) $perdonada->detalles->first()->total)->toBe(2074.5);
+        ->and((float) $perdonada->detalles->first()->total)->toBe(2075.0);
 });
 
 it('perdona la primera y segunda relación vencida, y marca la tercera como pérdida', function (): void {

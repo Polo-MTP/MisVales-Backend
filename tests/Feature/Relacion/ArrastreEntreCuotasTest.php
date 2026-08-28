@@ -100,11 +100,12 @@ it('REGRESION: la quincena 2 absorbe el saldo de la 1 (con multa) y queda como u
         ->and((float) $corte1->saldo_pendiente)->toBe(0.0)
         ->and($corte1->detalles->first()->absorbida_en_detalle_id)->toBe($corte2->detalles->first()->id);
 
-    // El estado de cuenta solo debe mostrar los $1,300 acumulados una vez, no 800 + 1300.
+    // El estado de cuenta acumula solo $1,300 (no 800 + 1300), pero SÍ muestra las 2 quincenas
+    // por separado -- la 1 (arrastrada, histórica) y la 2 (la que de verdad se puede pagar).
     $estadoCuenta = app(EstadoCuentaService::class)->obtenerPorDistribuidora($distribuidora);
     expect($estadoCuenta['total_pendiente'])->toBe(1300.0)
         ->and($estadoCuenta['clientes'])->toHaveCount(1)
-        ->and($estadoCuenta['clientes']->first()['cuotas'])->toHaveCount(1);
+        ->and($estadoCuenta['clientes']->first()['cuotas'])->toHaveCount(2);
 });
 
 it('REGRESION: si la quincena 2 tampoco se paga, la 3 arrastra su total ya con su propia multa (500+300, 800+500+300, 1600+500)', function (): void {
@@ -133,10 +134,11 @@ it('REGRESION: si la quincena 2 tampoco se paga, la 3 arrastra su total ya con s
         ->and((float) $corte3->detalles->first()->arrastre)->toBe(1600.0)
         ->and($corte3->detalles->first()->cuota_numero)->toBe(3);
 
+    // 3 quincenas visibles (1 y 2 arrastradas, 3 la vigente), acumulado sigue siendo $2,100.
     $estadoCuenta = app(EstadoCuentaService::class)->obtenerPorDistribuidora($distribuidora);
     expect($estadoCuenta['total_pendiente'])->toBe(2100.0)
         ->and($estadoCuenta['clientes'])->toHaveCount(1)
-        ->and($estadoCuenta['clientes']->first()['cuotas'])->toHaveCount(1);
+        ->and($estadoCuenta['clientes']->first()['cuotas'])->toHaveCount(3);
 });
 
 it('REGRESION: un solo pago del monto acumulado liquida ambas quincenas de un golpe', function (): void {

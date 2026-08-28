@@ -81,6 +81,7 @@ final class RelacionEstadoService
     {
         $recargoAgregado = 0.0;
         $categoriaPerdida = 0.0;
+        $deltaTotal = 0.0;
 
         foreach ($relacion->detalles as $detalle) {
             $saldoCuota = (float) $detalle->total - (float) $detalle->pago;
@@ -89,21 +90,36 @@ final class RelacionEstadoService
                 continue;
             }
 
+            $totalAnterior = (float) $detalle->total;
             $categoriaDeEstaCuota = (float) $detalle->categoria;
+
+            // Se recalcula desde capital+comisión+interés+seguro (sin el descuento de categoría,
+            // que se pierde aquí) en vez de sumarle el descuento exacto a un 'total' que ya
+            // perdió sus centavos en el ROUNDDOWN al piso de calcularMontosBase() -- ese total
+            // YA venía redondeado hacia abajo con el descuento adentro, así que sumarle el
+            // descuento completo después no reconstruye el monto real sin descuento, deja
+            // faltando hasta $0.99 por cuota (ver vale de $15,000 a 8 quincenas: "perdiendo un
+            // peso" en la segunda multa). 'arrastre' se respeta tal cual porque ya es exacto.
+            $sinDescuento = floor((float) $detalle->capital + (float) $detalle->comision + (float) $detalle->interes + (float) $detalle->seguro);
 
             $detalle->recargo = $multaNoPago;
             $detalle->categoria = 0.0;
-            $detalle->total = round((float) $detalle->total + $multaNoPago + $categoriaDeEstaCuota, 2);
+            $detalle->total = round($sinDescuento + $multaNoPago + (float) $detalle->arrastre, 2);
             $detalle->save();
 
             $recargoAgregado += $multaNoPago;
             $categoriaPerdida += $categoriaDeEstaCuota;
+            $deltaTotal += round((float) $detalle->total - $totalAnterior, 2);
         }
 
         if ($recargoAgregado > 0.0) {
             $relacion->total_recargos = round((float) $relacion->total_recargos + $recargoAgregado, 2);
             $relacion->total_categoria = round((float) $relacion->total_categoria - $categoriaPerdida, 2);
-            $relacion->total_a_pagar = round((float) $relacion->total_a_pagar + $recargoAgregado + $categoriaPerdida, 2);
+            // El incremento real de cada detalle (no "multa + categoría perdida" asumido): con
+            // el recálculo de arriba, la diferencia real puede no coincidir exacto con esa suma
+            // por los mismos centavos que el ROUNDDOWN se había comido -- sumar el delta real
+            // evita que total_a_pagar (nivel relación) se desalinee de la suma de sus detalles.
+            $relacion->total_a_pagar = round((float) $relacion->total_a_pagar + $deltaTotal, 2);
         }
     }
 

@@ -225,6 +225,14 @@ final class RelacionCalculoService
             foreach ($valesPendientes as $vale) {
                 $detalle = $this->calcularDetalleVale($relacion, $vale, $comisionBasePct, $interesPctQuincena, $multaNoPago);
 
+                // null: este vale ya agotó sus cuotas de capital (tope) -- no le tocó ninguna
+                // cuota nueva en ESTE corte, solo se actualizó su última cuota en su relación
+                // original (ver calcularDetalleVale()). Nada que sumar aquí ni excedente que
+                // aplicarle: no hay ningún detalle nuevo al que aplicárselo.
+                if (! $detalle) {
+                    continue;
+                }
+
                 // Si este vale tiene saldo a favor de un excedente de un corte anterior (pagó
                 // de más y todavía no se le aplicó a ninguna cuota suya), se descuenta aquí
                 // mismo contra la cuota que se le acaba de generar -- antes de que nadie vea
@@ -388,10 +396,11 @@ final class RelacionCalculoService
      * multa) y esa es la que se arrastra: quincena 3 = $1,600 + $500 = $2,100.
      *
      * Tope: un vale a N quincenas ya facturó todo su capital (+comisión+seguro+categoría) en
-     * esas N cuotas -- si sigue sin liquidarse después de la última, las cuotas EXTRA (N+1, N+2,
-     * ...) ya no le vuelven a cobrar capital/comisión/seguro/categoría (eso duplicaría lo que ya
-     * se facturó), solo el interés de esa quincena (ver calcularMontosSoloInteres()) más lo que
-     * traiga de arrastre.
+     * esas N cuotas -- si sigue sin liquidarse después de la última, NO se crea una cuota N+1
+     * nueva (eso duplicaría capital/comisión/seguro/categoría que ya se facturaron completos).
+     * En vez de eso, la ÚLTIMA cuota (la N) se actualiza EN SU LUGAR en cada corte que siga sin
+     * pagarse: se le suma OTRA multa (ver más abajo, rama de tope) -- sigue siendo la misma
+     * cuota N/N, con su recargo y su total creciendo cada corte, no una N+1/N+2/... nueva.
      */
     private function calcularDetalleVale(
         Relacion $relacion,
@@ -399,7 +408,7 @@ final class RelacionCalculoService
         float $comisionBasePct,
         float $interesPctQuincena,
         float $multaNoPago,
-    ): RelacionDetalle {
+    ): ?RelacionDetalle {
         $quincenas = max(1, (int) ($vale->quincenas ?? $vale->producto?->quincenas ?? 1));
         $monto = (float) $vale->monto;
 
@@ -408,6 +417,32 @@ final class RelacionCalculoService
             ->with('relacion')
             ->latest('id')
             ->first();
+
+        if ($cuotaAnterior && $cuotaAnterior->cuota_numero >= $quincenas && $cuotaAnterior->estado !== 'pagado' && $cuotaAnterior->relacion) {
+            // Si ya tenía recargo, su primera multa por vencerse ya se cobró en un corte
+            // anterior (aplicarMultaPorVencimiento es idempotente, no la vuelve a tocar) --
+            // este corte le toca OTRA multa encima. Si todavía no tenía, es la primera vez que
+            // entra en zona de tope: aplicarMultaPorVencimiento le cobra esa primera multa y
+            // aquí no se le suma ninguna extra todavía.
+            $yaTeniaRecargo = (float) $cuotaAnterior->recargo > 0.0;
+
+            $this->relacionEstadoService->aplicarMultaPorVencimiento($cuotaAnterior->relacion, $multaNoPago);
+            $cuotaAnterior->relacion->save();
+            $cuotaAnterior->refresh();
+
+            if ($yaTeniaRecargo) {
+                $cuotaAnterior->recargo = round((float) $cuotaAnterior->recargo + $multaNoPago, 2);
+                $cuotaAnterior->total = round((float) $cuotaAnterior->total + $multaNoPago, 2);
+                $cuotaAnterior->save();
+
+                $viejaRelacion = $cuotaAnterior->relacion;
+                $viejaRelacion->total_recargos = round((float) $viejaRelacion->total_recargos + $multaNoPago, 2);
+                $viejaRelacion->total_a_pagar = round((float) $viejaRelacion->total_a_pagar + $multaNoPago, 2);
+                $viejaRelacion->save();
+            }
+
+            return null;
+        }
 
         $cuotaNumero = $cuotaAnterior ? $cuotaAnterior->cuota_numero + 1 : 1;
         $arrastre = 0.0;
@@ -426,9 +461,7 @@ final class RelacionCalculoService
         // -- no cambia si la tabla de seguros cambia después. Solo un vale de ANTES de ese
         // cambio (seguro_monto null) cae de vuelta al cálculo en vivo por rango de monto.
         $seguroMonto = $vale->seguro_monto !== null ? (float) $vale->seguro_monto : null;
-        $base = $cuotaNumero > $quincenas
-            ? $this->calcularMontosSoloInteres($monto, $interesPctQuincena)
-            : $this->calcularMontosBase($monto, $quincenas, $comisionBasePct, $interesPctQuincena, $porcentajeCategoria, $seguroMonto);
+        $base = $this->calcularMontosBase($monto, $quincenas, $comisionBasePct, $interesPctQuincena, $porcentajeCategoria, $seguroMonto);
 
         /** @var RelacionDetalle $detalle */
         $detalle = RelacionDetalle::query()->create([
@@ -498,29 +531,6 @@ final class RelacionCalculoService
             'seguro' => $seguro,
             'categoria' => $categoria,
             'pago_quincenal' => $pagoQuincenal,
-        ];
-    }
-
-    /**
-     * Cuota EXTRA, más allá del plazo original del vale (cuota_numero > quincenas): el capital,
-     * comisión, seguro y descuento de categoría ya se facturaron por completo en las N cuotas
-     * del plazo -- volver a cobrarlos aquí los duplicaría. Solo se sigue sumando el interés de
-     * esa quincena (misma fórmula, ya es un monto plano que no depende de cuántas quincenas
-     * tenga el vale) mientras siga sin liquidarse.
-     *
-     * @return array{capital: float, comision: float, interes: float, seguro: float, categoria: float, pago_quincenal: float}
-     */
-    private function calcularMontosSoloInteres(float $monto, float $interesPctQuincena): array
-    {
-        $interes = round($monto * $interesPctQuincena / 100, 2);
-
-        return [
-            'capital' => 0.0,
-            'comision' => 0.0,
-            'interes' => $interes,
-            'seguro' => 0.0,
-            'categoria' => 0.0,
-            'pago_quincenal' => floor($interes),
         ];
     }
 
