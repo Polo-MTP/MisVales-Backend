@@ -69,7 +69,8 @@ final class ReportePagosQuincenaService
             $producto = $detalle->producto?->descripcion ?? "Vale #{$detalle->vale_id}";
 
             $sheet->fromArray([
-                $detalle->concepto,
+                // 'arrastrada': ya no es una referencia de pago válida, no se le da concepto.
+                $detalle->estado === 'arrastrada' ? '' : $detalle->concepto,
                 $nombreCliente,
                 $producto,
                 "{$detalle->cuota_numero}/{$detalle->cuotas_totales}",

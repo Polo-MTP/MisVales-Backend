@@ -20,8 +20,9 @@ final class RelacionDetalleResource extends JsonResource
             'vale_id' => $this->vale_id,
             // Identificador único de esta cuota dentro del corte -- lo que la distribuidora
             // pone en "Concepto" de su transferencia si paga este vale por separado de los
-            // demás que compartan el mismo referencia_pago del corte.
-            'concepto' => $this->concepto,
+            // demás que compartan el mismo referencia_pago del corte. null si 'arrastrada': ya
+            // no es una referencia de pago válida, pagarla por separado ya no es posible.
+            'concepto' => $this->estado === 'arrastrada' ? null : $this->concepto,
             'cliente' => [
                 'id' => $this->cliente?->id,
                 'nombre' => trim(($this->cliente?->datosPersonales?->nombre ?? '').' '.($this->cliente?->datosPersonales?->apellido_paterno ?? '')),

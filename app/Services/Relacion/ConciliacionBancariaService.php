@@ -110,6 +110,7 @@ final class ConciliacionBancariaService
             $detalle = RelacionDetalle::query()
                 ->where('relacion_id', $relacion->id)
                 ->where('concepto', $abono->referencia_leida)
+                ->where('estado', '!=', 'arrastrada')
                 ->first();
 
             $abono->update([
@@ -219,8 +220,12 @@ final class ConciliacionBancariaService
         // de los detalles de la relación ya encontrada (el concepto no es global, es por vale).
         // Se calcula ANTES del chequeo de duplicados de abajo porque el respaldo sin folio lo
         // necesita (ver comentario ahí).
+        // 'arrastrada' queda fuera: su concepto ya no es una referencia de pago válida (su
+        // saldo se movió a la cuota siguiente del mismo vale) -- si igual matcheara aquí, el
+        // pago se aplicaría a una cuota que ya no cuenta en ningún saldo pendiente y se
+        // "perdería" sin liquidar nada real.
         $detalle = ($relacion && $datos['concepto'] !== '')
-            ? RelacionDetalle::query()->where('relacion_id', $relacion->id)->where('concepto', $datos['concepto'])->first()
+            ? RelacionDetalle::query()->where('relacion_id', $relacion->id)->where('concepto', $datos['concepto'])->where('estado', '!=', 'arrastrada')->first()
             : null;
 
         // Sin concepto que matchee (no vino, o no encontró nada), pero si la relación tiene UN

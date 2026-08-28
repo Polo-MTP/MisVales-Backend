@@ -88,7 +88,8 @@ final class ValeResource extends JsonResource
                 // Si el corte junta más de un vale y se paga cada uno por separado, esto es lo
                 // que va en "Concepto" de la transferencia para que se aplique a este vale y
                 // no a otro del mismo corte (ver RelacionCalculoService::construirConceptoVale).
-                'concepto' => $detalle->concepto,
+                // null si 'arrastrada': ya no se puede pagar por separado, no hay concepto que dar.
+                'concepto' => $detalle->estado === 'arrastrada' ? null : $detalle->concepto,
                 'fecha_corte' => $detalle->relacion?->fecha_corte?->toDateString(),
                 'cuota' => "{$detalle->cuota_numero}/{$detalle->cuotas_totales}",
                 'estado_cuota' => $detalle->estado,

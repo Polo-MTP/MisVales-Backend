@@ -57,7 +57,9 @@ final class EstadoCuentaService
                         'relacion_detalle_id' => $d->id,
                         'relacion_id' => $d->relacion_id,
                         'referencia_pago' => $d->relacion?->referencia_pago,
-                        'concepto' => $d->concepto,
+                        // null si 'arrastrada': ya no es una referencia de pago válida, esa
+                        // quincena ya no se puede pagar por separado.
+                        'concepto' => $d->estado === 'arrastrada' ? null : $d->concepto,
                         'vale_id' => $d->vale_id,
                         'producto' => $d->vale?->producto?->descripcion,
                         'cuota' => "{$d->cuota_numero}/{$d->cuotas_totales}",

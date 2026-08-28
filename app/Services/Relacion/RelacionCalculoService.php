@@ -386,6 +386,12 @@ final class RelacionCalculoService
      * la quincena 2: absorbe esos $800 (arrastre) más su propio pago de $500 -> la quincena 2
      * queda en $1,300. Si la 2 tampoco se paga, al generarse la 3 la 2 sube a $1,600 (su propia
      * multa) y esa es la que se arrastra: quincena 3 = $1,600 + $500 = $2,100.
+     *
+     * Tope: un vale a N quincenas ya facturó todo su capital (+comisión+seguro+categoría) en
+     * esas N cuotas -- si sigue sin liquidarse después de la última, las cuotas EXTRA (N+1, N+2,
+     * ...) ya no le vuelven a cobrar capital/comisión/seguro/categoría (eso duplicaría lo que ya
+     * se facturó), solo el interés de esa quincena (ver calcularMontosSoloInteres()) más lo que
+     * traiga de arrastre.
      */
     private function calcularDetalleVale(
         Relacion $relacion,
@@ -420,7 +426,9 @@ final class RelacionCalculoService
         // -- no cambia si la tabla de seguros cambia después. Solo un vale de ANTES de ese
         // cambio (seguro_monto null) cae de vuelta al cálculo en vivo por rango de monto.
         $seguroMonto = $vale->seguro_monto !== null ? (float) $vale->seguro_monto : null;
-        $base = $this->calcularMontosBase($monto, $quincenas, $comisionBasePct, $interesPctQuincena, $porcentajeCategoria, $seguroMonto);
+        $base = $cuotaNumero > $quincenas
+            ? $this->calcularMontosSoloInteres($monto, $interesPctQuincena)
+            : $this->calcularMontosBase($monto, $quincenas, $comisionBasePct, $interesPctQuincena, $porcentajeCategoria, $seguroMonto);
 
         /** @var RelacionDetalle $detalle */
         $detalle = RelacionDetalle::query()->create([
@@ -490,6 +498,29 @@ final class RelacionCalculoService
             'seguro' => $seguro,
             'categoria' => $categoria,
             'pago_quincenal' => $pagoQuincenal,
+        ];
+    }
+
+    /**
+     * Cuota EXTRA, más allá del plazo original del vale (cuota_numero > quincenas): el capital,
+     * comisión, seguro y descuento de categoría ya se facturaron por completo en las N cuotas
+     * del plazo -- volver a cobrarlos aquí los duplicaría. Solo se sigue sumando el interés de
+     * esa quincena (misma fórmula, ya es un monto plano que no depende de cuántas quincenas
+     * tenga el vale) mientras siga sin liquidarse.
+     *
+     * @return array{capital: float, comision: float, interes: float, seguro: float, categoria: float, pago_quincenal: float}
+     */
+    private function calcularMontosSoloInteres(float $monto, float $interesPctQuincena): array
+    {
+        $interes = round($monto * $interesPctQuincena / 100, 2);
+
+        return [
+            'capital' => 0.0,
+            'comision' => 0.0,
+            'interes' => $interes,
+            'seguro' => 0.0,
+            'categoria' => 0.0,
+            'pago_quincenal' => floor($interes),
         ];
     }
 
