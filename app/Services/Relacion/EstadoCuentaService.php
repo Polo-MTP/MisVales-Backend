@@ -31,7 +31,10 @@ final class EstadoCuentaService
     {
         $detalles = RelacionDetalle::query()
             ->whereHas('relacion', fn ($q) => $q->where('distribuidora_id', $distribuidora->id))
-            ->where('estado', '!=', 'pagado')
+            // 'arrastrada': su saldo ya se movió a la cuota siguiente del mismo vale (ver
+            // RelacionCalculoService::calcularDetalleVale()) -- contarla aquí duplicaría esa
+            // deuda (ya viene sumada dentro del total de la cuota que la absorbió).
+            ->whereNotIn('estado', ['pagado', 'arrastrada'])
             ->with(['cliente.datosPersonales', 'vale.producto', 'relacion'])
             ->get();
 

@@ -34,9 +34,16 @@ final class RelacionDetalleResource extends JsonResource
             'seguro' => $this->seguro,
             'categoria' => $this->categoria,
             'recargo' => $this->recargo,
+            // Saldo de la cuota ANTERIOR de este mismo vale, absorbido aquí por seguir sin
+            // liquidarse cuando se generó esta -- ya viene incluido en 'total'. 0 si esta cuota
+            // no absorbió nada. Ver RelacionCalculoService::calcularDetalleVale().
+            'arrastre' => $this->arrastre,
             'pago' => $this->pago,
             'total' => $this->total,
+            // 'arrastrada': esta cuota ya no se puede pagar por separado, su saldo se movió a
+            // la cuota que apunta absorbida_en_detalle_id.
             'estado' => $this->estado,
+            'absorbida_en_detalle_id' => $this->absorbida_en_detalle_id,
         ];
     }
 }

@@ -91,6 +91,10 @@ final class ValeResource extends JsonResource
                 'estado_cuota' => $detalle->estado,
                 'total' => $detalle->total,
                 'pago' => $detalle->pago,
+                // Si esta cuota estaba sin liquidar cuando se generó la siguiente del mismo
+                // vale, su saldo se movió allá (estado_cuota='arrastrada', total ya en 0) --
+                // este es cuánto absorbió ESTA cuota de la que la precedió, ya incluido en 'total'.
+                'arrastre' => $detalle->arrastre,
             ])->values(),
             // Mientras el vale no entre a ningún corte, 'cortes' viene vacío y no hay forma de
             // saber cuánto va a tocar pagar por quincena -- ese desglose real recién se calcula

@@ -23,9 +23,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'seguro',
     'categoria',
     'recargo',
+    'arrastre',
     'pago',
     'total',
     'estado',
+    'absorbida_en_detalle_id',
 ])]
 final class RelacionDetalle extends Model
 {
@@ -42,6 +44,7 @@ final class RelacionDetalle extends Model
         'seguro' => 'decimal:2',
         'categoria' => 'decimal:2',
         'recargo' => 'decimal:2',
+        'arrastre' => 'decimal:2',
         'pago' => 'decimal:2',
         'total' => 'decimal:2',
     ];
@@ -76,5 +79,15 @@ final class RelacionDetalle extends Model
     public function producto(): BelongsTo
     {
         return $this->belongsTo(Producto::class);
+    }
+
+    /**
+     * Si esta cuota se quedó sin liquidar y ya se generó la siguiente del mismo vale, su saldo
+     * se absorbió ahí (ver RelacionCalculoService::calcularDetalleVale()) -- esta cuota ya no
+     * se puede pagar por separado, su deuda vive en la que apunta aquí.
+     */
+    public function absorbidaEn(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'absorbida_en_detalle_id');
     }
 }

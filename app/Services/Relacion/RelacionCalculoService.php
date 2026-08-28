@@ -371,14 +371,18 @@ final class RelacionCalculoService
     }
 
     /**
-     * Una cuota recién generada siempre nace limpia: sin recargo y con su descuento de
-     * categoría completo. La multa por atraso no se calcula sobre ESTA cuota -- si la anterior
-     * del mismo vale sigue sin pagar, se le cobra a ELLA misma de inmediato aquí abajo (decisión
-     * del negocio: cualquier corte nuevo con la cuota previa sin liquidar debe reflejar la multa
-     * al momento, sin esperar a que venza su plazo formal). El barrido nocturno
-     * (RelacionEstadoService::marcarVencidas()) hace lo mismo para cuotas que nadie vuelve a
-     * generar (ej. la última quincena de un vale) -- aplicarMultaPorVencimiento() es idempotente,
-     * así que no importa cuál de los dos llegue primero.
+     * Si la cuota ANTERIOR del mismo vale sigue sin liquidarse cuando se genera esta, su saldo
+     * (ya con la multa que se le aplica aquí mismo, sin esperar al barrido nocturno) se absorbe
+     * dentro de la cuota nueva -- no quedan como dos deudas independientes. La cuota vieja deja
+     * de poder pagarse por separado: su 'total' se reduce a lo que ya se le abonó (saldo 0, sin
+     * fingir un pago que nunca llegó) y queda marcada 'arrastrada', apuntando a la cuota que se
+     * queda con su saldo (ver RelacionDetalle::absorbidaEn()). Su relación de origen SÍ
+     * conserva su estado 'vencida' (es un hecho histórico real que se atrasó), solo se le resta
+     * el monto que se movió para no contarlo dos veces en el saldo pendiente de la distribuidora.
+     *
+     * Ejemplo: quincena 1 de $500 sin pagar -> $800 con multa. Se genera la quincena 2: absorbe
+     * esos $800 (arrastre) más su propio pago de $500 -> la quincena 2 queda en $1,300, y la 1
+     * ya no aparece como algo pendiente por su cuenta.
      */
     private function calcularDetalleVale(
         Relacion $relacion,
@@ -397,10 +401,14 @@ final class RelacionCalculoService
             ->first();
 
         $cuotaNumero = $cuotaAnterior ? $cuotaAnterior->cuota_numero + 1 : 1;
+        $arrastre = 0.0;
 
         if ($cuotaAnterior && $cuotaAnterior->estado !== 'pagado' && $cuotaAnterior->relacion) {
             $this->relacionEstadoService->aplicarMultaPorVencimiento($cuotaAnterior->relacion, $multaNoPago);
             $cuotaAnterior->relacion->save();
+            $cuotaAnterior->refresh();
+
+            $arrastre = round((float) $cuotaAnterior->total - (float) $cuotaAnterior->pago, 2);
         }
 
         // Ganancia de la distribuidora por su categoría (Cobre/Plata/Oro), snapshot al generar el corte.
@@ -411,7 +419,8 @@ final class RelacionCalculoService
         $seguroMonto = $vale->seguro_monto !== null ? (float) $vale->seguro_monto : null;
         $base = $this->calcularMontosBase($monto, $quincenas, $comisionBasePct, $interesPctQuincena, $porcentajeCategoria, $seguroMonto);
 
-        return RelacionDetalle::query()->create([
+        /** @var RelacionDetalle $detalle */
+        $detalle = RelacionDetalle::query()->create([
             'relacion_id' => $relacion->id,
             'vale_id' => $vale->id,
             'concepto' => $this->construirConceptoVale($vale->id, $cuotaNumero),
@@ -425,10 +434,24 @@ final class RelacionCalculoService
             'seguro' => $base['seguro'],
             'categoria' => $base['categoria'],
             'recargo' => 0.0,
+            'arrastre' => $arrastre,
             'pago' => 0,
-            'total' => $base['pago_quincenal'],
+            'total' => round($base['pago_quincenal'] + $arrastre, 2),
             'estado' => 'pendiente',
         ]);
+
+        if ($arrastre > 0.0 && $cuotaAnterior && $cuotaAnterior->relacion) {
+            $viejaRelacion = $cuotaAnterior->relacion;
+            $viejaRelacion->total_a_pagar = round((float) $viejaRelacion->total_a_pagar - $arrastre, 2);
+            $viejaRelacion->save();
+
+            $cuotaAnterior->total = (float) $cuotaAnterior->pago;
+            $cuotaAnterior->estado = 'arrastrada';
+            $cuotaAnterior->absorbida_en_detalle_id = $detalle->id;
+            $cuotaAnterior->save();
+        }
+
+        return $detalle;
     }
 
     /**

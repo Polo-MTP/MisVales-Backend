@@ -311,25 +311,26 @@ final class ConciliacionBancariaService
      * Suma el abono al total de la relación y actualiza su estado (parcial/liquidada); si
      * queda liquidada, dispara puntos/penalización.
      *
-     * Si $detalle viene (el concepto identificó a cuál vele corresponde), el abono se aplica
+     * Si $detalle viene (el concepto identificó a cuál vale corresponde), el abono se aplica
      * a ESE detalle primero (su propio 'pago'/'estado'), y el total_abonado de la relación se
      * recalcula sumando todos sus detalles -- así un corte con varios vales pagados por
-     * separado, en distintos momentos, refleja bien cuánto falta en cada uno. Sin $detalle
-     * (corte de un solo vale, o pago sin concepto), se suma directo al total de la relación,
-     * igual que siempre.
+     * separado, en distintos momentos, refleja bien cuánto falta en cada uno.
+     *
+     * Sin $detalle, el pago es "acumulado de la distribuidora": se reparte entre TODAS sus
+     * cuotas sin liquidar (de cualquier corte, no solo $relacion), de la más antigua a la más
+     * nueva -- una sola transferencia salda lo más viejo primero, sin importar en cuántos
+     * cortes ni de cuántos clientes esté repartida la deuda. Antes esto solo sumaba al total
+     * de $relacion sin tocar los detalles individuales, dejando fuera cualquier saldo de OTRO
+     * corte ya vencido de la misma distribuidora -- la distribuidora no tenía forma de pagar
+     * "todo lo que debe" de un solo golpe, tenía que ir corte por corte o vale por vale.
      */
     private function aplicarAbono(Relacion $relacion, float $monto, Carbon $fechaAbono, ?RelacionDetalle $detalle = null): void
     {
         DB::transaction(function () use ($relacion, $monto, $fechaAbono, $detalle): void {
-            // lockForUpdate(): dos abonos aplicándose casi al mismo tiempo sobre la misma
-            // Relacion (dos importaciones de Excel encimadas, o una importación que choca con
-            // una conciliación manual) no deben pisarse -- sin esto, ambas leen el mismo
-            // total_abonado viejo y la segunda en guardar borra silenciosamente el abono de la
-            // primera del total, aunque el registro de AbonoConciliacion sí quede guardado.
-            // Mismo patrón que ya usa RelacionCalculoService::generarParaDistribuidora().
-            $relacion = Relacion::query()->whereKey($relacion->id)->lockForUpdate()->firstOrFail();
-
             if ($detalle) {
+                // lockForUpdate(): mismo motivo que en la rama de abajo -- dos abonos casi
+                // simultáneos sobre la misma relación no deben pisarse.
+                $relacion = Relacion::query()->whereKey($relacion->id)->lockForUpdate()->firstOrFail();
                 $detalle = RelacionDetalle::query()->whereKey($detalle->id)->lockForUpdate()->firstOrFail();
                 $detalle->pago = (float) $detalle->pago + $monto;
                 $saldoCuota = (float) $detalle->total - (float) $detalle->pago;
@@ -337,47 +338,104 @@ final class ConciliacionBancariaService
                 $detalle->save();
 
                 $relacion->total_abonado = (float) RelacionDetalle::query()->where('relacion_id', $relacion->id)->sum('pago');
-            } else {
-                $relacion->total_abonado = (float) $relacion->total_abonado + $monto;
-            }
+                $this->finalizarRelacion($relacion, $fechaAbono);
 
-            $saldoPendiente = (float) $relacion->total_a_pagar - (float) $relacion->total_abonado;
-
-            if ($saldoPendiente <= self::EPSILON_LIQUIDACION) {
-                $relacion->estado = 'liquidada';
-            } elseif ((float) $relacion->total_abonado > 0) {
-                $relacion->estado = 'parcial';
-            }
-
-            $relacion->save();
-
-            // Si esto acaba de liquidar la relación, la fecha que decide "anticipado vs.
-            // tardío" (RelacionLiquidacionService::procesarPuntos()) NO debe ser la de ESTE
-            // abono en particular -- si hicieron falta varios abonos para completar el total y
-            // llegaron en un orden distinto al cronológico (el Excel del banco no viene
-            // ordenado por fecha, o un abono se conció manualmente después con su fecha
-            // original de transferencia), el que por casualidad complete el saldo podría ser
-            // uno que sí llegó a tiempo aunque OTRO de los abonos que forman ese mismo total
-            // haya llegado tarde. La relación solo queda de verdad "liquidada a tiempo" hasta
-            // que llega el ÚLTIMO abono (por fecha) de todos los que la componen.
-            $fechaEfectiva = $relacion->estado === 'liquidada'
-                ? Carbon::parse(AbonoConciliacion::query()->where('relacion_id', $relacion->id)->max('fecha_pago') ?? $fechaAbono)
-                : $fechaAbono;
-
-            $this->relacionLiquidacionService->procesarLiquidacion($relacion, $fechaEfectiva);
-
-            // Si el banco reportó más de lo que se debía (o dos abonos distintos matchearon el
-            // mismo concepto por error), el excedente se registra en el saldo a favor del VALE
-            // específico que lo generó (ExcedenteConciliacionService) -- nunca de la
-            // distribuidora en general, para que el excedente de un cliente no termine pagando
-            // la deuda de otro. Se descuenta solo de las cuotas futuras de ESE mismo vale.
-            if ($detalle) {
+                // Si el banco reportó más de lo que se debía esta cuota, el excedente se
+                // registra en el saldo a favor del VALE específico que lo generó -- nunca de
+                // la distribuidora en general, para que el excedente de un cliente no termine
+                // pagando la deuda de otro.
                 $this->excedenteConciliacionService->registrarParaDetalle($relacion, $detalle);
-            } else {
-                $excedente = (float) $relacion->total_abonado - (float) $relacion->total_a_pagar;
-                $this->excedenteConciliacionService->registrarParaRelacion($relacion, $excedente);
+
+                return;
+            }
+
+            $distribuidoraId = $relacion->distribuidora_id;
+
+            // 'arrastrada' (ver RelacionCalculoService::calcularDetalleVale()) queda fuera: su
+            // saldo ya se movió a la cuota siguiente del mismo vale, pagarla aquí duplicaría
+            // esa deuda. 'estado'/'relacion_detalles.relacion_id' van calificados con el nombre
+            // de tabla -- relaciones y relacion_detalles TIENEN AMBAS una columna 'estado', sin
+            // calificar el join la resuelve contra la tabla equivocada según el motor de BD.
+            $pendientes = RelacionDetalle::query()
+                ->join('relaciones', 'relaciones.id', '=', 'relacion_detalles.relacion_id')
+                ->where('relaciones.distribuidora_id', $distribuidoraId)
+                ->whereNotIn('relacion_detalles.estado', ['pagado', 'arrastrada'])
+                ->orderBy('relaciones.fecha_corte')
+                ->orderBy('relacion_detalles.cuota_numero')
+                ->select('relacion_detalles.*')
+                ->lockForUpdate()
+                ->get();
+
+            $restante = $monto;
+            $relacionIdsTocadas = [];
+
+            foreach ($pendientes as $pendiente) {
+                if ($restante <= self::EPSILON_LIQUIDACION) {
+                    break;
+                }
+
+                $saldo = round((float) $pendiente->total - (float) $pendiente->pago, 2);
+
+                if ($saldo <= 0.0) {
+                    continue;
+                }
+
+                $aplicado = min($restante, $saldo);
+                $pendiente->pago = (float) $pendiente->pago + $aplicado;
+                $pendiente->estado = ((float) $pendiente->total - (float) $pendiente->pago) <= self::EPSILON_LIQUIDACION ? 'pagado' : 'parcial';
+                $pendiente->save();
+
+                $restante = round($restante - $aplicado, 2);
+                $relacionIdsTocadas[$pendiente->relacion_id] = true;
+            }
+
+            foreach (array_keys($relacionIdsTocadas) as $relacionIdTocada) {
+                /** @var Relacion $relacionTocada */
+                $relacionTocada = Relacion::query()->whereKey($relacionIdTocada)->lockForUpdate()->firstOrFail();
+                $relacionTocada->total_abonado = (float) RelacionDetalle::query()->where('relacion_id', $relacionTocada->id)->sum('pago');
+                $this->finalizarRelacion($relacionTocada, $fechaAbono);
+            }
+
+            // Sobrante después de saldar TODO lo que la distribuidora debía -- se registra
+            // como excedente contra la relación que disparó el pago (misma lógica de siempre,
+            // ExcedenteConciliacionService reparte entre los vales de esa relación).
+            if ($restante > self::EPSILON_LIQUIDACION) {
+                $this->excedenteConciliacionService->registrarParaRelacion($relacion->fresh(), $restante);
             }
         });
+    }
+
+    /**
+     * Actualiza el estado (parcial/liquidada) de una relación ya con total_abonado
+     * recalculado, y dispara puntos/penalización si quedó liquidada. Compartido entre el pago
+     * de un vale puntual (por concepto) y el reparto acumulado entre varias relaciones.
+     */
+    private function finalizarRelacion(Relacion $relacion, Carbon $fechaAbono): void
+    {
+        $saldoPendiente = (float) $relacion->total_a_pagar - (float) $relacion->total_abonado;
+
+        if ($saldoPendiente <= self::EPSILON_LIQUIDACION) {
+            $relacion->estado = 'liquidada';
+        } elseif ((float) $relacion->total_abonado > 0) {
+            $relacion->estado = 'parcial';
+        }
+
+        $relacion->save();
+
+        // Si esto acaba de liquidar la relación, la fecha que decide "anticipado vs. tardío"
+        // (RelacionLiquidacionService::procesarPuntos()) NO debe ser la de ESTE abono en
+        // particular -- si hicieron falta varios abonos para completar el total y llegaron en
+        // un orden distinto al cronológico (el Excel del banco no viene ordenado por fecha, o
+        // un abono se concilió manualmente después con su fecha original de transferencia), el
+        // que por casualidad complete el saldo podría ser uno que sí llegó a tiempo aunque OTRO
+        // de los abonos que forman ese mismo total haya llegado tarde. La relación solo queda
+        // de verdad "liquidada a tiempo" hasta que llega el ÚLTIMO abono (por fecha) de todos
+        // los que la componen.
+        $fechaEfectiva = $relacion->estado === 'liquidada'
+            ? Carbon::parse(AbonoConciliacion::query()->where('relacion_id', $relacion->id)->max('fecha_pago') ?? $fechaAbono)
+            : $fechaAbono;
+
+        $this->relacionLiquidacionService->procesarLiquidacion($relacion, $fechaEfectiva);
     }
 
     /**

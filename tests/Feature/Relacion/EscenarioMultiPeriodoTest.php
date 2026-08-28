@@ -111,11 +111,20 @@ it('escenario real: vale + corte + abono parcial + corte con recargo + segundo v
         ->and((float) $corte1->total_recargos)->toBe(300.0)
         ->and($corte1->estado)->toBe('vencida');
 
-    // Corte 2/8: nace limpio -- el atraso de la cuota 1 ya quedó cobrado en su propio corte.
+    // Corte 2/8: absorbe el saldo sin liquidar de la cuota 1 ($2,187 - $1,000 ya abonado =
+    // $1,187 de arrastre) -- 1,812 (propio de esta quincena) + 1,187 (arrastre) = 2,999. La
+    // cuota 1 deja de poder pagarse por separado: su propio saldo pasa a 0 y queda 'arrastrada'.
     $corte2 = $calculoService->generarParaDistribuidora($d1, '2026-03-15');
-    expect((float) $corte2->total_a_pagar)->toBe(1812.0)
-        ->and((float) $corte2->total_recargos)->toBe(0.0)
+    expect((float) $corte2->total_a_pagar)->toBe(2999.0)
+        ->and((float) $corte2->detalles->first()->arrastre)->toBe(1187.0)
         ->and($corte2->detalles->first()->cuota_numero)->toBe(2);
+
+    $corte1->refresh();
+    expect((float) $corte1->total_a_pagar)->toBe(1000.0)
+        ->and((float) $corte1->saldo_pendiente)->toBe(0.0)
+        ->and($corte1->detalles->first()->estado)->toBe('arrastrada')
+        ->and((float) $corte1->detalles->first()->total)->toBe(1000.0)
+        ->and($corte1->detalles->first()->absorbida_en_detalle_id)->toBe($corte2->detalles->first()->id);
 
     // --- Distribuidora 2 (ORO 10%): vale de $8,000 a 4 quincenas, no le abonan nada ---
     $d2 = crearDistribuidoraEscenario('DIST-2', 'ORO', 10);
@@ -134,7 +143,7 @@ it('escenario real: vale + corte + abono parcial + corte con recargo + segundo v
                 'abonado' => (float) $corte1->total_abonado,
                 'estado' => $corte1->estado,
             ],
-            'Corte 2 (cuota 2 de 8) - nace limpio, el atraso quedó en el corte 1' => [
+            'Corte 2 (cuota 2 de 8) - absorbió el saldo de la cuota 1 (arrastre)' => [
                 'a_pagar' => (float) $corte2->total_a_pagar,
                 'recargo' => (float) $corte2->total_recargos,
                 'abonado' => (float) $corte2->total_abonado,

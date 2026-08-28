@@ -35,6 +35,10 @@ final class ReportePagosQuincenaService
             ->whereHas('relacion', fn ($q) => $q
                 ->where('distribuidora_id', $distribuidora->id)
                 ->whereDate('fecha_corte', '<=', $hastaRelacion->fecha_corte))
+            // 'arrastrada': su saldo ya se movió a la cuota siguiente del mismo vale (ver
+            // RelacionCalculoService::calcularDetalleVale()) -- nunca se muestra, ni siquiera
+            // como primera/última cuota, para no duplicar esa deuda en el reporte.
+            ->where('estado', '!=', 'arrastrada')
             ->where(fn ($q) => $q
                 ->where('estado', '!=', 'pagado')
                 ->orWhere('cuota_numero', 1)
