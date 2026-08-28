@@ -13,11 +13,10 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 
 /**
  * Exporta, para una distribuidora, el desglose de pagos por quincena (cuota) de todos sus
- * vales hasta el corte que elija el Gerente General ("hasta esa quincena"). Usa los datos
- * reales tal como los calcula RelacionCalculoService -- no inventa ningún concepto de
- * "arrastre": cada corte genera la cuota que sigue sin importar si la anterior se pagó, y el
- * atraso se cobra aparte sobre la cuota que de verdad se atrasó (ver
- * RelacionEstadoService::marcarVencidas()).
+ * vales hasta el corte que elija el Gerente General ("hasta esa quincena"). Muestra cada
+ * quincena por separado -- incluidas las 'arrastrada' (una que se quedó sin pagar y cuyo saldo
+ * ya se movió a la siguiente, ver RelacionCalculoService::calcularDetalleVale()) -- para que se
+ * vea la historia completa del vale, no solo el monto acumulado vigente.
  */
 final class ReportePagosQuincenaService
 {
@@ -25,7 +24,10 @@ final class ReportePagosQuincenaService
      * Cuotas de la distribuidora hasta (inclusive) el corte indicado, ordenadas por cliente y
      * fecha de corte. Se omiten las cuotas ya liquidadas ('pagado') salvo que sean la primera o
      * la última del vale -- dan contexto de inicio/cierre sin llenar el archivo de cuotas ya
-     * resueltas que no aportan nada a un reporte pensado para ver pendientes/atrasos.
+     * resueltas que no aportan nada a un reporte pensado para ver pendientes/atrasos. Las
+     * 'arrastrada' SÍ se incluyen siempre -- quieren ver cada quincena por separado, no solo la
+     * acumulada (ver generarExcel(), que las excluye del total sumado del pie para no duplicar
+     * esa deuda, ya que vive dentro del total de la cuota que la absorbió).
      *
      * @return Collection<int, RelacionDetalle>
      */
@@ -35,10 +37,6 @@ final class ReportePagosQuincenaService
             ->whereHas('relacion', fn ($q) => $q
                 ->where('distribuidora_id', $distribuidora->id)
                 ->whereDate('fecha_corte', '<=', $hastaRelacion->fecha_corte))
-            // 'arrastrada': su saldo ya se movió a la cuota siguiente del mismo vale (ver
-            // RelacionCalculoService::calcularDetalleVale()) -- nunca se muestra, ni siquiera
-            // como primera/última cuota, para no duplicar esa deuda en el reporte.
-            ->where('estado', '!=', 'arrastrada')
             ->where(fn ($q) => $q
                 ->where('estado', '!=', 'pagado')
                 ->orWhere('cuota_numero', 1)
@@ -81,8 +79,16 @@ final class ReportePagosQuincenaService
                 (float) $detalle->total,
             ], null, "A{$fila}");
 
-            // Resalta la cuota que se atrasó -- misma señal visual que "Pago atrasado" en pantalla.
-            if ((float) $detalle->recargo > 0.0) {
+            // 'arrastrada': gris, para distinguirla de un atraso normal -- su 'total' ya viene
+            // arrastrado dentro de la cuota siguiente del mismo vale, así que NO entra a la suma
+            // del pie (evita duplicar esa deuda), pero se deja visible en el archivo como el
+            // monto real que llegó a deber esa quincena.
+            if ($detalle->estado === 'arrastrada') {
+                $sheet->getStyle("A{$fila}:H{$fila}")->getFill()
+                    ->setFillType(Fill::FILL_SOLID)
+                    ->getStartColor()->setRGB('E2E3E5');
+            } elseif ((float) $detalle->recargo > 0.0) {
+                // Resalta la cuota que se atrasó -- misma señal visual que "Pago atrasado" en pantalla.
                 $sheet->getStyle("A{$fila}:H{$fila}")->getFill()
                     ->setFillType(Fill::FILL_SOLID)
                     ->getStartColor()->setRGB('FFF3CD');
@@ -91,7 +97,9 @@ final class ReportePagosQuincenaService
             $totales['pago'] += (float) $detalle->pago;
             $totales['comision'] += (float) $detalle->comision;
             $totales['recargo'] += (float) $detalle->recargo;
-            $totales['total'] += (float) $detalle->total;
+            if ($detalle->estado !== 'arrastrada') {
+                $totales['total'] += (float) $detalle->total;
+            }
 
             $fila++;
         }

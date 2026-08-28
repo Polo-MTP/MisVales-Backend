@@ -31,10 +31,11 @@ final class EstadoCuentaService
     {
         $detalles = RelacionDetalle::query()
             ->whereHas('relacion', fn ($q) => $q->where('distribuidora_id', $distribuidora->id))
-            // 'arrastrada': su saldo ya se movió a la cuota siguiente del mismo vale (ver
-            // RelacionCalculoService::calcularDetalleVale()) -- contarla aquí duplicaría esa
-            // deuda (ya viene sumada dentro del total de la cuota que la absorbió).
-            ->whereNotIn('estado', ['pagado', 'arrastrada'])
+            // Ya liquidadas no aportan a un estado de cuenta de pendientes. Las 'arrastrada' SÍ
+            // se muestran (quieren ver cada quincena, no solo la acumulada) -- solo se excluyen
+            // de la suma de saldo_pendiente más abajo, porque su deuda ya vive dentro del total
+            // de la cuota que la absorbió (ver RelacionCalculoService::calcularDetalleVale()).
+            ->where('estado', '!=', 'pagado')
             ->with(['cliente.datosPersonales', 'vale.producto', 'relacion'])
             ->get();
 
@@ -44,11 +45,14 @@ final class EstadoCuentaService
                 /** @var RelacionDetalle $primero */
                 $primero = $detallesDelCliente->first();
                 $cliente = $primero->cliente;
+                $detallesDelCliente = $detallesDelCliente->sortBy('cuota_numero')->values();
 
                 return [
                     'cliente_id' => $primero->cliente_id,
                     'nombre' => trim(($cliente?->datosPersonales?->nombre ?? '').' '.($cliente?->datosPersonales?->apellido_paterno ?? '')),
-                    'saldo_pendiente' => round((float) $detallesDelCliente->sum(fn (RelacionDetalle $d) => (float) $d->total - (float) $d->pago), 2),
+                    'saldo_pendiente' => round((float) $detallesDelCliente
+                        ->where('estado', '!=', 'arrastrada')
+                        ->sum(fn (RelacionDetalle $d) => (float) $d->total - (float) $d->pago), 2),
                     'cuotas' => $detallesDelCliente->map(fn (RelacionDetalle $d) => [
                         'relacion_detalle_id' => $d->id,
                         'relacion_id' => $d->relacion_id,
