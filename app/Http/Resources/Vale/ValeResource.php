@@ -75,7 +75,10 @@ final class ValeResource extends JsonResource
             // realmente le toca pagar/lo que ya pagó en total, sin tener que sumar "cortes" a
             // mano en el front. Antes solo se veía el total por cuota individual; para saber si
             // el vale iba al corriente o atrasado en su conjunto había que sumarlas una por una.
-            'total_acumulado_a_pagar' => round((float) $this->relacionDetalles->sum('total'), 2),
+            // Se excluyen las 'arrastrada': su saldo ya vive dentro del 'total' de la cuota que
+            // las absorbió (ver RelacionCalculoService::calcularDetalleVale()) -- sumarlas
+            // también aquí lo contaría dos veces.
+            'total_acumulado_a_pagar' => round((float) $this->relacionDetalles->where('estado', '!=', 'arrastrada')->sum('total'), 2),
             'total_acumulado_pagado' => round((float) $this->relacionDetalles->sum('pago'), 2),
             // Cortes (relaciones) donde ya se facturó alguna cuota de este vale -- antes no había
             // forma de rastrear, desde el vale, en qué corte(s) quedó incluido.

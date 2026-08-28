@@ -93,13 +93,48 @@ it('REGRESION: la quincena 2 absorbe el saldo de la 1 (con multa) y queda como u
 
     $corte1->refresh();
     expect($corte1->detalles->first()->estado)->toBe('arrastrada')
-        ->and((float) $corte1->detalles->first()->total)->toBe(0.0)
+        // El 'total' NO se borra: se queda mostrando el monto real que llegó a deber esa
+        // quincena (500 capital + 300 multa), como registro histórico -- solo deja de poder
+        // pagarse por separado (saldo_pendiente de su relación sí baja a 0).
+        ->and((float) $corte1->detalles->first()->total)->toBe(800.0)
         ->and((float) $corte1->saldo_pendiente)->toBe(0.0)
         ->and($corte1->detalles->first()->absorbida_en_detalle_id)->toBe($corte2->detalles->first()->id);
 
     // El estado de cuenta solo debe mostrar los $1,300 acumulados una vez, no 800 + 1300.
     $estadoCuenta = app(EstadoCuentaService::class)->obtenerPorDistribuidora($distribuidora);
     expect($estadoCuenta['total_pendiente'])->toBe(1300.0)
+        ->and($estadoCuenta['clientes'])->toHaveCount(1)
+        ->and($estadoCuenta['clientes']->first()['cuotas'])->toHaveCount(1);
+});
+
+it('REGRESION: si la quincena 2 tampoco se paga, la 3 arrastra su total ya con su propia multa (500+300, 800+500+300, 1600+500)', function (): void {
+    $distribuidora = crearDistribuidoraArrastre();
+    $vale = crearValeArrastre($distribuidora, 1500, 3);
+    $calculoService = app(RelacionCalculoService::class);
+
+    $corte1 = $calculoService->generarParaDistribuidora($distribuidora, '2026-01-15');
+    expect((float) $corte1->total_a_pagar)->toBe(500.0);
+
+    // Nadie paga la 1 -> la 2 la absorbe con multa: 500 + 300 = 800.
+    $corte2 = $calculoService->generarParaDistribuidora($distribuidora, '2026-01-31');
+    expect((float) $corte2->total_a_pagar)->toBe(1300.0);
+    $corte1->refresh();
+    expect((float) $corte1->detalles->first()->total)->toBe(800.0);
+
+    // Nadie paga la 2 tampoco -> al generarse la 3, la 2 recibe SU PROPIA multa (queda en
+    // 1,300 + 300 = 1,600) y ESE es el monto que se arrastra a la 3: 1,600 + 500 = 2,100.
+    $corte3 = $calculoService->generarParaDistribuidora($distribuidora, '2026-02-15');
+
+    $corte2->refresh();
+    expect((float) $corte2->detalles->first()->total)->toBe(1600.0)
+        ->and($corte2->detalles->first()->estado)->toBe('arrastrada');
+
+    expect((float) $corte3->total_a_pagar)->toBe(2100.0)
+        ->and((float) $corte3->detalles->first()->arrastre)->toBe(1600.0)
+        ->and($corte3->detalles->first()->cuota_numero)->toBe(3);
+
+    $estadoCuenta = app(EstadoCuentaService::class)->obtenerPorDistribuidora($distribuidora);
+    expect($estadoCuenta['total_pendiente'])->toBe(2100.0)
         ->and($estadoCuenta['clientes'])->toHaveCount(1)
         ->and($estadoCuenta['clientes']->first()['cuotas'])->toHaveCount(1);
 });

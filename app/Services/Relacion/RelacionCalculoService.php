@@ -374,15 +374,18 @@ final class RelacionCalculoService
      * Si la cuota ANTERIOR del mismo vale sigue sin liquidarse cuando se genera esta, su saldo
      * (ya con la multa que se le aplica aquí mismo, sin esperar al barrido nocturno) se absorbe
      * dentro de la cuota nueva -- no quedan como dos deudas independientes. La cuota vieja deja
-     * de poder pagarse por separado: su 'total' se reduce a lo que ya se le abonó (saldo 0, sin
-     * fingir un pago que nunca llegó) y queda marcada 'arrastrada', apuntando a la cuota que se
-     * queda con su saldo (ver RelacionDetalle::absorbidaEn()). Su relación de origen SÍ
-     * conserva su estado 'vencida' (es un hecho histórico real que se atrasó), solo se le resta
-     * el monto que se movió para no contarlo dos veces en el saldo pendiente de la distribuidora.
+     * de poder pagarse por separado y queda marcada 'arrastrada', apuntando a la cuota que se
+     * queda con su saldo (ver RelacionDetalle::absorbidaEn()) -- pero su 'total' NO se toca: se
+     * queda mostrando el monto real que llegó a deber (capital + multa), como registro histórico
+     * de esa quincena. Su relación de origen SÍ conserva su estado 'vencida' (es un hecho
+     * histórico real que se atrasó), solo se le resta el monto que se movió de total_a_pagar
+     * para no contarlo dos veces en el saldo pendiente de la distribuidora (ver
+     * EstadoCuentaService, que además excluye 'arrastrada' de sus sumas por completo).
      *
-     * Ejemplo: quincena 1 de $500 sin pagar -> $800 con multa. Se genera la quincena 2: absorbe
-     * esos $800 (arrastre) más su propio pago de $500 -> la quincena 2 queda en $1,300, y la 1
-     * ya no aparece como algo pendiente por su cuenta.
+     * Ejemplo: quincena 1 de $500 sin pagar -> $800 con multa (se queda así, visible). Se genera
+     * la quincena 2: absorbe esos $800 (arrastre) más su propio pago de $500 -> la quincena 2
+     * queda en $1,300. Si la 2 tampoco se paga, al generarse la 3 la 2 sube a $1,600 (su propia
+     * multa) y esa es la que se arrastra: quincena 3 = $1,600 + $500 = $2,100.
      */
     private function calcularDetalleVale(
         Relacion $relacion,
@@ -445,7 +448,6 @@ final class RelacionCalculoService
             $viejaRelacion->total_a_pagar = round((float) $viejaRelacion->total_a_pagar - $arrastre, 2);
             $viejaRelacion->save();
 
-            $cuotaAnterior->total = (float) $cuotaAnterior->pago;
             $cuotaAnterior->estado = 'arrastrada';
             $cuotaAnterior->absorbida_en_detalle_id = $detalle->id;
             $cuotaAnterior->save();

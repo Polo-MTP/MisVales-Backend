@@ -123,7 +123,9 @@ it('escenario real: vale + corte + abono parcial + corte con recargo + segundo v
     expect((float) $corte1->total_a_pagar)->toBe(1000.0)
         ->and((float) $corte1->saldo_pendiente)->toBe(0.0)
         ->and($corte1->detalles->first()->estado)->toBe('arrastrada')
-        ->and((float) $corte1->detalles->first()->total)->toBe(1000.0)
+        // El 'total' se queda en lo que de verdad llegó a deber esa quincena (2,187, con la
+        // multa ya aplicada), no se reduce a lo que ya se le había abonado -- eso sigue en 'pago'.
+        ->and((float) $corte1->detalles->first()->total)->toBe(2187.0)
         ->and($corte1->detalles->first()->absorbida_en_detalle_id)->toBe($corte2->detalles->first()->id);
 
     // --- Distribuidora 2 (ORO 10%): vale de $8,000 a 4 quincenas, no le abonan nada ---
