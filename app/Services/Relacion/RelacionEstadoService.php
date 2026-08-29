@@ -99,12 +99,16 @@ final class RelacionEstadoService
             // YA venía redondeado hacia abajo con el descuento adentro, así que sumarle el
             // descuento completo después no reconstruye el monto real sin descuento, deja
             // faltando hasta $0.99 por cuota (ver vale de $15,000 a 8 quincenas: "perdiendo un
-            // peso" en la segunda multa). 'arrastre' se respeta tal cual porque ya es exacto.
-            $sinDescuento = floor((float) $detalle->capital + (float) $detalle->comision + (float) $detalle->interes + (float) $detalle->seguro);
+            // peso" en la segunda multa).
+            //
+            // El piso se aplica hasta sumar TODO (capital+comisión+interés+seguro + multa +
+            // arrastre), no antes por separado -- el arrastre llega con sus centavos exactos
+            // (nunca se trunca al traerlo), solo se trunca la suma final.
+            $sinDescuento = (float) $detalle->capital + (float) $detalle->comision + (float) $detalle->interes + (float) $detalle->seguro;
 
             $detalle->recargo = $multaNoPago;
             $detalle->categoria = 0.0;
-            $detalle->total = round($sinDescuento + $multaNoPago + (float) $detalle->arrastre, 2);
+            $detalle->total = floor($sinDescuento + $multaNoPago + (float) $detalle->arrastre);
             $detalle->save();
 
             $recargoAgregado += $multaNoPago;

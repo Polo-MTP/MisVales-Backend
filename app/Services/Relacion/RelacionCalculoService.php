@@ -480,7 +480,10 @@ final class RelacionCalculoService
             'recargo' => 0.0,
             'arrastre' => $arrastre,
             'pago' => 0,
-            'total' => round($base['pago_quincenal'] + $arrastre, 2),
+            // El arrastre llega con sus centavos exactos (no se trunca al traerlo) -- el piso
+            // se aplica hasta este punto, sobre la suma completa (lo propio de esta quincena +
+            // el arrastre), no por separado antes de sumarlos.
+            'total' => floor($base['suma_sin_piso'] + $arrastre),
             'estado' => 'pendiente',
         ]);
 
@@ -508,7 +511,7 @@ final class RelacionCalculoService
      * para vales de antes de que el seguro quedara congelado al solicitarse, o para una
      * simulación sin vale detrás.
      *
-     * @return array{capital: float, comision: float, interes: float, seguro: float, categoria: float, pago_quincenal: float}
+     * @return array{capital: float, comision: float, interes: float, seguro: float, categoria: float, pago_quincenal: float, suma_sin_piso: float}
      */
     private function calcularMontosBase(float $monto, int $quincenas, float $comisionBasePct, float $interesPctQuincena, float $porcentajeCategoria, ?float $seguroMonto = null): array
     {
@@ -521,8 +524,14 @@ final class RelacionCalculoService
         $seguro = round(($seguroMonto ?? $this->calcularSeguro($monto)) / $quincenas, 2);
         $categoria = round(($monto * $porcentajeCategoria / 100) / $quincenas, 2);
 
+        $sumaSinPiso = $capital + $comision + $interes + $seguro - $categoria;
+
         // ROUNDDOWN al piso (no round()) tal como el documento fuente calcula el "Pago Distribuidora".
-        $pagoQuincenal = floor($capital + $comision + $interes + $seguro - $categoria);
+        // Esta versión ya con el piso aplicado es la que se usa cuando NO hay arrastre que sumarle
+        // (una cuota recién nacida sin nada pendiente detrás, o el estimado de simularPagoQuincenal).
+        // Cuando SÍ hay arrastre, calcularDetalleVale() usa 'suma_sin_piso' en su lugar -- el piso
+        // se aplica hasta sumar ambos, no antes por separado (ver calcularDetalleVale()).
+        $pagoQuincenal = floor($sumaSinPiso);
 
         return [
             'capital' => $capital,
@@ -531,6 +540,7 @@ final class RelacionCalculoService
             'seguro' => $seguro,
             'categoria' => $categoria,
             'pago_quincenal' => $pagoQuincenal,
+            'suma_sin_piso' => $sumaSinPiso,
         ];
     }
 
