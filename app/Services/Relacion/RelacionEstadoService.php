@@ -101,14 +101,20 @@ final class RelacionEstadoService
             // faltando hasta $0.99 por cuota (ver vale de $15,000 a 8 quincenas: "perdiendo un
             // peso" en la segunda multa).
             //
-            // El piso se aplica hasta sumar TODO (capital+comisión+interés+seguro + multa +
-            // arrastre), no antes por separado -- el arrastre llega con sus centavos exactos
-            // (nunca se trunca al traerlo), solo se trunca la suma final.
+            // 'total' (lo que se muestra/cobra) sigue llevando el piso -- eso no cambia, una
+            // cuota vencida sigue mostrando un monto limpio. Lo que cambia es DE DÓNDE sale: ya
+            // no se le suma el descuento de categoría a un total que ya lo había perdido en el
+            // ROUNDDOWN de calcularMontosBase() (eso dejaba faltando hasta $0.99, ver vale de
+            // $15,000 a 8 quincenas: "perdiendo un peso" en la segunda multa) -- se recalcula
+            // desde capital+comisión+interés+seguro SIN el descuento. Y 'monto_exacto' guarda
+            // esa misma suma SIN el piso, para que si esta cuota se absorbe en la siguiente (o
+            // sigue de tope), el arrastre no pierda los centavos que el piso descartó aquí.
             $sinDescuento = (float) $detalle->capital + (float) $detalle->comision + (float) $detalle->interes + (float) $detalle->seguro;
 
             $detalle->recargo = $multaNoPago;
             $detalle->categoria = 0.0;
-            $detalle->total = floor($sinDescuento + $multaNoPago + (float) $detalle->arrastre);
+            $detalle->monto_exacto = round($sinDescuento + $multaNoPago + (float) $detalle->arrastre, 2);
+            $detalle->total = floor((float) $detalle->monto_exacto);
             $detalle->save();
 
             $recargoAgregado += $multaNoPago;

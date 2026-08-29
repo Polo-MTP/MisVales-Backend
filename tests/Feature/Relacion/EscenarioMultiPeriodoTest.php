@@ -111,12 +111,15 @@ it('escenario real: vale + corte + abono parcial + corte con recargo + segundo v
         ->and((float) $corte1->total_recargos)->toBe(300.0)
         ->and($corte1->estado)->toBe('vencida');
 
-    // Corte 2/8: absorbe el saldo sin liquidar de la cuota 1 ($2,187 - $1,000 ya abonado =
-    // $1,187 de arrastre) -- 1,812 (propio de esta quincena) + 1,187 (arrastre) = 2,999. La
-    // cuota 1 deja de poder pagarse por separado: su propio saldo pasa a 0 y queda 'arrastrada'.
+    // Corte 2/8: absorbe el saldo sin liquidar de la cuota 1. El monto EXACTO (sin el piso) que
+    // se le vencía a la cuota 1 era $2,187.50, no $2,187 -- ese piso solo se aplica para
+    // mostrarlo, no se pierde al arrastrarlo. $2,187.50 - $1,000 ya abonado = $1,187.50 de
+    // arrastre -- 1,812 (propio de esta quincena) + 1,187.50 = 2,999.50, PISO = $3,000 (el medio
+    // peso de la quincena 2 y el medio peso arrastrado se completan justo en uno). La cuota 1
+    // deja de poder pagarse por separado: su propio saldo pasa a 0 y queda 'arrastrada'.
     $corte2 = $calculoService->generarParaDistribuidora($d1, '2026-03-15');
-    expect((float) $corte2->total_a_pagar)->toBe(2999.0)
-        ->and((float) $corte2->detalles->first()->arrastre)->toBe(1187.0)
+    expect((float) $corte2->total_a_pagar)->toBe(3000.0)
+        ->and((float) $corte2->detalles->first()->arrastre)->toBe(1187.5)
         ->and($corte2->detalles->first()->cuota_numero)->toBe(2);
 
     $corte1->refresh();

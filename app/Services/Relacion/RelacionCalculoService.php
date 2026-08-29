@@ -432,13 +432,27 @@ final class RelacionCalculoService
 
             if ($yaTeniaRecargo) {
                 $cuotaAnterior->recargo = round((float) $cuotaAnterior->recargo + $multaNoPago, 2);
-                $cuotaAnterior->total = round((float) $cuotaAnterior->total + $multaNoPago, 2);
+                $cuotaAnterior->monto_exacto = round((float) $cuotaAnterior->monto_exacto + $multaNoPago, 2);
                 $cuotaAnterior->save();
 
                 $viejaRelacion = $cuotaAnterior->relacion;
                 $viejaRelacion->total_recargos = round((float) $viejaRelacion->total_recargos + $multaNoPago, 2);
-                $viejaRelacion->total_a_pagar = round((float) $viejaRelacion->total_a_pagar + $multaNoPago, 2);
                 $viejaRelacion->save();
+            }
+
+            // Esta cuota ya no se va a absorber en ninguna otra (no nace una N+1) -- es la que
+            // de verdad se le sigue cobrando a la distribuidora cada corte, así que aquí SÍ se
+            // le aplica el piso al terminar de sumar, sobre 'monto_exacto' (que ya trae la suma
+            // completa y exacta -- aplicarMultaPorVencimiento() ya no aplica el piso, ver ahí).
+            $totalAnteriorMostrado = (float) $cuotaAnterior->total;
+            $piso = floor((float) $cuotaAnterior->monto_exacto);
+            $ajusteAlPiso = round($piso - $totalAnteriorMostrado, 2);
+            if ($ajusteAlPiso !== 0.0) {
+                $cuotaAnterior->total = $piso;
+                $cuotaAnterior->save();
+
+                $cuotaAnterior->relacion->total_a_pagar = round((float) $cuotaAnterior->relacion->total_a_pagar + $ajusteAlPiso, 2);
+                $cuotaAnterior->relacion->save();
             }
 
             return null;
@@ -452,7 +466,10 @@ final class RelacionCalculoService
             $cuotaAnterior->relacion->save();
             $cuotaAnterior->refresh();
 
-            $arrastre = round((float) $cuotaAnterior->total - (float) $cuotaAnterior->pago, 2);
+            // 'monto_exacto', no 'total': ese ya viene con el piso aplicado (lo que se le
+            // mostró/cobró mientras existió por su cuenta) -- el arrastre debe llevarse el
+            // monto real sin redondear, o esos centavos se pierden en cada traspaso.
+            $arrastre = round((float) $cuotaAnterior->monto_exacto - (float) $cuotaAnterior->pago, 2);
         }
 
         // Ganancia de la distribuidora por su categoría (Cobre/Plata/Oro), snapshot al generar el corte.
@@ -480,16 +497,25 @@ final class RelacionCalculoService
             'recargo' => 0.0,
             'arrastre' => $arrastre,
             'pago' => 0,
-            // El arrastre llega con sus centavos exactos (no se trunca al traerlo) -- el piso
-            // se aplica hasta este punto, sobre la suma completa (lo propio de esta quincena +
-            // el arrastre), no por separado antes de sumarlos.
+            // El arrastre llega con sus centavos exactos (no se trunca al traerlo) -- 'total'
+            // (lo que se muestra/cobra) lleva el piso aplicado hasta este punto, sobre la suma
+            // completa (lo propio de esta quincena + el arrastre), no por separado antes de
+            // sumarlos. 'monto_exacto' guarda esa misma suma SIN el piso, para que si esta
+            // cuota también se queda sin pagar, lo que arrastre a la siguiente sea exacto.
             'total' => floor($base['suma_sin_piso'] + $arrastre),
+            'monto_exacto' => round($base['suma_sin_piso'] + $arrastre, 2),
             'estado' => 'pendiente',
         ]);
 
         if ($arrastre > 0.0 && $cuotaAnterior && $cuotaAnterior->relacion) {
+            // Se resta el saldo que de verdad quedaba pendiente en 'total_a_pagar' de la
+            // relación vieja -- su 'total' (con el piso, como se venía mostrando) menos lo que
+            // ya se le había abonado -- para que su saldo_pendiente quede en 0 exacto (todo lo
+            // que faltaba se acaba de mover a la cuota nueva). No es lo mismo que el arrastre
+            // (que lleva los centavos exactos SIN el piso, para no perderlos en el camino).
             $viejaRelacion = $cuotaAnterior->relacion;
-            $viejaRelacion->total_a_pagar = round((float) $viejaRelacion->total_a_pagar - $arrastre, 2);
+            $saldoQueSeMueve = round((float) $cuotaAnterior->total - (float) $cuotaAnterior->pago, 2);
+            $viejaRelacion->total_a_pagar = round((float) $viejaRelacion->total_a_pagar - $saldoQueSeMueve, 2);
             $viejaRelacion->save();
 
             $cuotaAnterior->estado = 'arrastrada';

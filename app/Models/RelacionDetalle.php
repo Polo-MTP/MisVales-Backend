@@ -26,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'arrastre',
     'pago',
     'total',
+    'monto_exacto',
     'estado',
     'absorbida_en_detalle_id',
 ])]
@@ -47,6 +48,7 @@ final class RelacionDetalle extends Model
         'arrastre' => 'decimal:2',
         'pago' => 'decimal:2',
         'total' => 'decimal:2',
+        'monto_exacto' => 'decimal:2',
     ];
 
     /**
