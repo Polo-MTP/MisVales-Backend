@@ -40,7 +40,10 @@ final class SucursalDurangoSeeder extends Seeder
             $sucursal = Sucursal::query()->firstOrCreate(
                 ['nombre' => 'Sucursal Durango'],
                 [
-                    'codigo' => 'SUC-003',
+                    // 'codigo' tiene restricción unique -- un valor fijo ('SUC-003') puede
+                    // chocar en un ambiente donde otra sucursal ya lo tenga (ej. alguien más
+                    // ya llegó a ese número). Se calcula el siguiente disponible en el momento.
+                    'codigo' => $this->siguienteCodigoSucursal(),
                     'es_matriz' => false,
                     'is_active' => true,
                 ]
@@ -213,5 +216,20 @@ final class SucursalDurangoSeeder extends Seeder
                 );
             }
         });
+    }
+
+    /**
+     * 'SUC-' + el siguiente número libre, calculado del máximo ya usado en la base (no fijo)
+     * -- evita chocar contra la restricción unique de 'codigo' en un ambiente donde ya exista
+     * una sucursal con el número que este seeder traía hardcodeado antes.
+     */
+    private function siguienteCodigoSucursal(): string
+    {
+        $maximo = Sucursal::query()
+            ->where('codigo', 'like', 'SUC-%')
+            ->get()
+            ->max(fn (Sucursal $s) => (int) substr((string) $s->codigo, 4));
+
+        return 'SUC-'.mb_str_pad((string) (($maximo ?? 0) + 1), 3, '0', STR_PAD_LEFT);
     }
 }
