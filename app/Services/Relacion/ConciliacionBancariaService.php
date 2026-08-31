@@ -224,20 +224,33 @@ final class ConciliacionBancariaService
         // saldo se movió a la cuota siguiente del mismo vale) -- si igual matcheara aquí, el
         // pago se aplicaría a una cuota que ya no cuenta en ningún saldo pendiente y se
         // "perdería" sin liquidar nada real.
+        //
+        // Se busca por TODA la distribuidora (join a relaciones), no solo dentro de $relacion --
+        // desde que referencia_pago es fija por distribuidora (no por corte), $relacion es
+        // apenas UNA de sus varias Relacion posibles, el concepto puede pertenecer a cualquier
+        // otro de sus cortes. concepto ya es único globalmente (vale_id+cuota_numero), así que
+        // esto no corre riesgo de encontrar el vale de otra distribuidora.
         $detalle = ($relacion && $datos['concepto'] !== '')
-            ? RelacionDetalle::query()->where('relacion_id', $relacion->id)->where('concepto', $datos['concepto'])->where('estado', '!=', 'arrastrada')->first()
+            ? RelacionDetalle::query()
+                ->join('relaciones', 'relaciones.id', '=', 'relacion_detalles.relacion_id')
+                ->where('relaciones.distribuidora_id', $relacion->distribuidora_id)
+                ->where('relacion_detalles.concepto', $datos['concepto'])
+                ->where('relacion_detalles.estado', '!=', 'arrastrada')
+                ->select('relacion_detalles.*')
+                ->first()
             : null;
 
-        // Sin concepto que matchee (no vino, o no encontró nada), pero si la relación tiene UN
-        // solo vale no hay ninguna ambigüedad real -- el pago solo puede ser de ese detalle.
-        // Cuando el abono cubre el total, RelacionLiquidacionService::marcarValesPagados() ya
-        // corrige esto por su cuenta (fuerza 'pagado' en todos los detalles de una Relacion que
-        // queda 'liquidada', tenga o no concepto). Pero un abono PARCIAL nunca deja la Relacion
-        // en 'liquidada', así que esa red de seguridad no corre: sin esto, el RelacionDetalle.pago
-        // se quedaba en 0 (y su estado en 'pendiente') aunque Relacion.total_abonado sí reflejara
-        // el abono parcial -- inconsistente entre el total del corte y su único detalle.
+        // Sin concepto que matchee (no vino, o no encontró nada), pero si la distribuidora
+        // tiene UN solo vale pendiente en TODOS sus cortes no hay ninguna ambigüedad real -- el
+        // pago solo puede ser de ese detalle. Cuando el abono cubre el total,
+        // RelacionLiquidacionService::marcarValesPagados() ya corrige esto por su cuenta (fuerza
+        // 'pagado' en todos los detalles de una Relacion que queda 'liquidada', tenga o no
+        // concepto). Pero un abono PARCIAL nunca deja la Relacion en 'liquidada', así que esa
+        // red de seguridad no corre: sin esto, el RelacionDetalle.pago se quedaba en 0 (y su
+        // estado en 'pendiente') aunque Relacion.total_abonado sí reflejara el abono parcial --
+        // inconsistente entre el total del corte y su único detalle.
         if (! $detalle && $relacion) {
-            $detalle = $this->detalleUnicoSiAplica($relacion);
+            $detalle = $this->detalleUnicoSiAplica($relacion->distribuidora_id);
         }
 
         // El folio de pago es el identificador único que da el banco a esa transferencia --
@@ -333,9 +346,13 @@ final class ConciliacionBancariaService
     {
         DB::transaction(function () use ($relacion, $monto, $fechaAbono, $detalle): void {
             if ($detalle) {
-                // lockForUpdate(): mismo motivo que en la rama de abajo -- dos abonos casi
-                // simultáneos sobre la misma relación no deben pisarse.
-                $relacion = Relacion::query()->whereKey($relacion->id)->lockForUpdate()->firstOrFail();
+                // $detalle->relacion_id, NO $relacion->id: desde que referencia_pago es fija por
+                // distribuidora (no por corte), $relacion (la que matcheó la referencia) puede
+                // ser CUALQUIERA de los cortes de la distribuidora -- si el concepto o
+                // detalleUnicoSiAplica() resolvieron un detalle de OTRO corte, hay que liquidar
+                // la relación a la que ese detalle de verdad pertenece, no la que matcheó la
+                // referencia por casualidad.
+                $relacion = Relacion::query()->whereKey($detalle->relacion_id)->lockForUpdate()->firstOrFail();
                 $detalle = RelacionDetalle::query()->whereKey($detalle->id)->lockForUpdate()->firstOrFail();
                 $detalle->pago = (float) $detalle->pago + $monto;
                 $saldoCuota = (float) $detalle->total - (float) $detalle->pago;
@@ -444,14 +461,26 @@ final class ConciliacionBancariaService
     }
 
     /**
-     * Si la relación tiene un solo RelacionDetalle (un solo vale en ese corte), lo regresa --
-     * sin ambigüedad posible, un pago sin concepto (o con concepto que no matcheó nada) solo
-     * puede ser de ese vale. Con más de un detalle no hay forma de saber cuál es, se regresa
-     * null (el abono se sigue aplicando solo al total de la relación, como siempre).
+     * Si la distribuidora tiene un solo RelacionDetalle en TODOS sus cortes, lo regresa -- sin
+     * ambigüedad posible, un pago sin concepto (o con concepto que no matcheó nada) solo puede
+     * ser de ese vale. Con más de uno no hay forma de saber cuál es, se regresa null (el abono
+     * se sigue aplicando solo al total de la relación, como siempre). Antes esto miraba solo la
+     * Relacion que matcheó la referencia; ahora que la referencia es fija por distribuidora (no
+     * por corte), la comparación tiene que ser contra TODOS sus cortes.
+     *
+     * A propósito NO filtra por estado (aunque ya esté 'pagado'): tiene que devolver el MISMO
+     * detalle sin importar si ya se le aplicó un abono antes o no, para que la huella de
+     * deduplicación sin folio (ver procesarFila()) sea estable al reimportar el mismo Excel --
+     * si aquí cambiara de "el único detalle" a null solo porque ya quedó pagado, un reintento
+     * dejaría de reconocerse como duplicado.
      */
-    private function detalleUnicoSiAplica(Relacion $relacion): ?RelacionDetalle
+    private function detalleUnicoSiAplica(int $distribuidoraId): ?RelacionDetalle
     {
-        $detalles = RelacionDetalle::query()->where('relacion_id', $relacion->id)->get();
+        $detalles = RelacionDetalle::query()
+            ->join('relaciones', 'relaciones.id', '=', 'relacion_detalles.relacion_id')
+            ->where('relaciones.distribuidora_id', $distribuidoraId)
+            ->select('relacion_detalles.*')
+            ->get();
 
         return $detalles->count() === 1 ? $detalles->first() : null;
     }

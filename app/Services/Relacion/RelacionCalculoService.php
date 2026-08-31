@@ -206,7 +206,7 @@ final class RelacionCalculoService
             $relacion = Relacion::query()->create([
                 'distribuidora_id' => $distribuidora->id,
                 'sucursal_id' => $distribuidora->sucursal_id,
-                'referencia_pago' => $this->construirReferenciaPago($distribuidora, $fechaCorte),
+                'referencia_pago' => $this->construirReferenciaPago($distribuidora),
                 'fecha_corte' => $fechaCorte->toDateString(),
                 'fecha_limite_pago' => $fechaLimitePago->toDateString(),
                 'fecha_pago_anticipado_desde' => $fechaAnticipadoDesde->toDateString(),
@@ -364,15 +364,15 @@ final class RelacionCalculoService
         return [
             'fecha_corte' => $proximaFechaCorte->toDateString(),
             'fecha_limite_pago' => $fechaLimitePago->toDateString(),
-            // La referencia es una fórmula pura (distribuidora_id + fecha_corte, ver
-            // construirReferenciaPago()), no depende de que el corte ya exista como registro --
-            // se puede calcular y mostrar desde antes para que la distribuidora prepare su
-            // transferencia con la referencia correcta sin tener que esperar al corte real. PERO
-            // solo si ya hay algo autorizado que la respalde: sin vales autorizados/parciales/
-            // vencidos no hay nada que vaya a cobrarse en ese corte, y mostrar una referencia sin
-            // nada detrás es engañoso (lo único que existe en ese caso son solicitudes que la
-            // distribuidora todavía puede cancelar).
-            'referencia_pago' => empty($vales) ? null : $this->construirReferenciaPago($distribuidora, $proximaFechaCorte),
+            // La referencia es fija por distribuidora (ver construirReferenciaPago()), no
+            // depende de que el corte ya exista como registro -- se puede calcular y mostrar
+            // desde antes para que la distribuidora prepare su transferencia con la referencia
+            // correcta sin tener que esperar al corte real. PERO solo si ya hay algo autorizado
+            // que la respalde: sin vales autorizados/parciales/vencidos no hay nada que vaya a
+            // cobrarse en ese corte, y mostrar una referencia sin nada detrás es engañoso (lo
+            // único que existe en ese caso son solicitudes que la distribuidora todavía puede
+            // cancelar).
+            'referencia_pago' => empty($vales) ? null : $this->construirReferenciaPago($distribuidora),
             'monto_estimado' => round($montoEstimado, 2),
             'vales' => $vales,
         ];
@@ -581,19 +581,26 @@ final class RelacionCalculoService
     }
 
     /**
-     * Referencia única por distribuidora+corte (formato: 9 dígitos de distribuidora + 9 dígitos de fecha de corte).
+     * Referencia fija por distribuidora (formato: 18 dígitos, el id relleno de ceros a la
+     * izquierda) -- la MISMA para todos sus cortes, no cambia de una quincena a otra. Antes
+     * incluía la fecha del corte y era única por fila (con restricción unique en la base de
+     * datos); ahora varias Relacion de la misma distribuidora comparten el mismo valor a
+     * propósito, así la distribuidora usa siempre el mismo número para pagar sin importar qué
+     * quincena sea -- un pago sin concepto se reparte entre todas sus cuotas pendientes de
+     * cualquier corte de todas formas (ver ConciliacionBancariaService::aplicarAbono()), así
+     * que no hace falta una referencia distinta por corte para identificar a cuál corresponde.
      */
-    private function construirReferenciaPago(Distribuidora $distribuidora, CarbonInterface $fechaCorte): string
+    private function construirReferenciaPago(Distribuidora $distribuidora): string
     {
-        return sprintf('%09d%09d', $distribuidora->id, (int) $fechaCorte->format('Ymd'));
+        return sprintf('%018d', $distribuidora->id);
     }
 
     /**
      * Identificador único por vale/cuota (formato: 5 dígitos de vale_id + 4 de cuota_numero).
-     * A diferencia de referencia_pago (por distribuidora+corte, compartida si el corte junta
-     * varios vales), esto es lo que distingue, DENTRO de un mismo corte, a cuál vale
-     * corresponde cada abono -- la distribuidora lo pone en el campo "Concepto" de su
-     * transferencia cuando paga cada vale por separado (ver ConciliacionBancariaService).
+     * A diferencia de referencia_pago (fija por distribuidora, la misma en todos sus cortes),
+     * esto es lo que distingue, entre TODOS sus cortes, a cuál vale corresponde cada abono --
+     * la distribuidora lo pone en el campo "Concepto" de su transferencia cuando paga un vale
+     * por separado del resto de lo que debe (ver ConciliacionBancariaService).
      */
     private function construirConceptoVale(int $valeId, int $cuotaNumero): string
     {
@@ -602,9 +609,10 @@ final class RelacionCalculoService
 
     /**
      * Recorre día por día desde $fechaCorte hasta encontrar una fecha sin relación ya generada
-     * para esta distribuidora. fecha_corte es la base de referencia_pago (ver
-     * construirReferenciaPago()), así que cada corte adicional el mismo día real necesita una
-     * fecha propia para no compartir referencia con el anterior.
+     * para esta distribuidora -- un corte por fecha, para que fecha_corte identifique sin
+     * ambigüedad a cuál quincena pertenece cada Relacion (reportes, orden del arrastre, etc.),
+     * aunque el gerente genere dos cortes el mismo día real (botón "Generar Cortes del Día"
+     * dado dos veces seguidas).
      */
     private function siguienteFechaCorteLibre(int $distribuidoraId, Carbon $fechaCorte): Carbon
     {

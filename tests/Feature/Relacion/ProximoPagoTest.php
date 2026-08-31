@@ -52,7 +52,9 @@ it('calcula la próxima fecha de corte de este mes si el día de corte todavía 
     $response->assertStatus(200)
         ->assertJsonPath('data.fecha_corte', '2026-02-15')
         ->assertJsonPath('data.fecha_limite_pago', '2026-02-16')
-        ->assertJsonPath('data.referencia_pago', sprintf('%09d%09d', $distribuidora->id, 20260215));
+        // Fija por distribuidora (no cambia de una quincena a otra) -- ver
+        // RelacionCalculoService::construirReferenciaPago().
+        ->assertJsonPath('data.referencia_pago', sprintf('%018d', $distribuidora->id));
 });
 
 it('salta al corte de fin de mes si el día 15 ya pasó -- el corte es quincenal, no mensual', function (): void {

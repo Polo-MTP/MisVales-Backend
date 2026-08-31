@@ -151,7 +151,9 @@ it('si ya existe un corte en la fecha indicada, genera el siguiente con la fecha
 
     expect($primeraRelacion->fecha_corte->toDateString())->toBe('2026-02-15')
         ->and($segundaRelacion->fecha_corte->toDateString())->toBe('2026-02-16')
-        ->and($segundaRelacion->referencia_pago)->not->toBe($primeraRelacion->referencia_pago)
+        // La referencia es fija por distribuidora (no por corte, ver construirReferenciaPago())
+        // -- ambas comparten la misma a propósito, aunque sean cortes distintos.
+        ->and($segundaRelacion->referencia_pago)->toBe($primeraRelacion->referencia_pago)
         ->and($segundaRelacion->detalles->first()->cuota_numero)->toBe(2);
 });
 
