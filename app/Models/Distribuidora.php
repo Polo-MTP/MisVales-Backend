@@ -199,17 +199,41 @@ final class Distribuidora extends Model
     }
 
     /**
-     * Crédito disponible: límite de crédito menos el monto de vales que aún cuentan
-     * contra el crédito (mismo criterio de "pendiente" que usa RelacionCalculoService).
+     * Crédito disponible: límite de crédito menos el CAPITAL que aún falta por liquidar de
+     * cada vale activo -- no el monto completo del vale, aunque le queden 7 de 8 quincenas
+     * sin terminar. Según se van liquidando quincenas, el capital de esas cuotas se recupera
+     * y libera crédito de inmediato, sin tener que esperar a que el vale entero llegue a su
+     * última cuota (eso solo libera el crédito, no lo bloquea hasta ahí).
+     *
+     * "Liquidada" = la cuota quedó 'pagado' de verdad (con dinero real aplicado) -- una cuota
+     * 'arrastrada' nunca cuenta por sí sola (su capital nunca se cobró directo, se movió a la
+     * cuota que la absorbió), pero SÍ queda cubierta en cuanto esa cuota que la absorbió se
+     * liquida: el capital recuperado de un vale es la suma de 'capital' de todas sus cuotas
+     * hasta (inclusive) la última que llegó a 'pagado', sin importar si esas cuotas de en medio
+     * quedaron 'arrastrada' o 'pagado' cada una por su cuenta -- su capital ya viajó dentro del
+     * total que sí se cobró.
      */
     public function getCreditoDisponibleAttribute(): float
     {
-        $totalEnUso = $this->vales()
+        $valesActivos = $this->vales()
             ->where('activo', true)
             ->whereIn('estado', ['autorizado', 'parcial', 'vencido'])
-            ->sum('monto') ?? 0;
+            ->with('relacionDetalles')
+            ->get();
 
-        return max(0, (float) $this->limite_credito - (float) $totalEnUso);
+        $totalEnUso = $valesActivos->sum(function (Vale $vale): float {
+            $ultimaCuotaPagada = $vale->relacionDetalles
+                ->where('estado', 'pagado')
+                ->max('cuota_numero');
+
+            $capitalRecuperado = $ultimaCuotaPagada
+                ? (float) $vale->relacionDetalles->where('cuota_numero', '<=', $ultimaCuotaPagada)->sum('capital')
+                : 0.0;
+
+            return max(0.0, (float) $vale->monto - $capitalRecuperado);
+        });
+
+        return max(0, (float) $this->limite_credito - $totalEnUso);
     }
 
     /**
