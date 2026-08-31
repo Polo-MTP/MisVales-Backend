@@ -159,6 +159,12 @@ final class RelacionLiquidacionService
      * 'pagado' (se queda en 'pendiente' para siempre) y le cobra el recargo por atraso a TODO
      * corte a partir del segundo, así se haya pagado puntual.
      *
+     * 'arrastrada' queda fuera por completo: esa cuota ya no representa una deuda propia (su
+     * saldo se movió a la cuota que la absorbió, ver RelacionCalculoService::calcularDetalleVale())
+     * -- forzarla a 'pagado' aquí mentiría (nunca se le pagó nada a ELLA, pago sigue en 0) y le
+     * quitaría su estado histórico real. Solo puede haber quedado 'arrastrada' si esta misma
+     * Relacion junta más de un vale y otro sí se liquidó normal.
+     *
      * Un vale además queda 'pagado' hasta que se liquida su última cuota (cuota_numero ===
      * cuotas_totales); si nació como 'pre-vale' (primer vale de un cliente nuevo), se convierte
      * en 'vale-digital' en ese mismo momento.
@@ -168,6 +174,10 @@ final class RelacionLiquidacionService
         $relacion->loadMissing('detalles.vale');
 
         foreach ($relacion->detalles as $detalle) {
+            if ($detalle->estado === 'arrastrada') {
+                continue;
+            }
+
             if ($detalle->estado !== 'pagado') {
                 $detalle->update(['estado' => 'pagado']);
             }
